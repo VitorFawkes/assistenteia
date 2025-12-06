@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Mail, Calendar, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 
