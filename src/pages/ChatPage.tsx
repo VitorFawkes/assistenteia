@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Database } from '../types/database.types';
+import type { Database } from '../lib/database.types';
 import MessageBubble from '../components/chat/MessageBubble';
 import ChatInput from '../components/chat/ChatInput';
 import { useAuth } from '../contexts/AuthContext';
