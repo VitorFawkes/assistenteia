@@ -32,7 +32,7 @@ export default function IntegrationsPage() {
                 .select('provider, created_at');
 
             if (error) throw error;
-            setIntegrations(data || []);
+            setIntegrations((data as unknown as Integration[]) || []);
         } catch (err: any) {
             console.error('Error fetching integrations:', err);
             setError('Erro ao carregar integrações.');
