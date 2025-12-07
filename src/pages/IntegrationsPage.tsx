@@ -58,7 +58,7 @@ export default function IntegrationsPage() {
 
     const fetchWhatsappStatus = async () => {
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('whatsapp_instances')
                 .select('status, qr_code')
                 .maybeSingle();
