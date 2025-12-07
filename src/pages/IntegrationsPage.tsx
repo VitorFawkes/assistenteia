@@ -45,7 +45,7 @@ export default function IntegrationsPage() {
     }, [whatsapp?.status]);
 
     useEffect(() => {
-        let timer: NodeJS.Timeout;
+        let timer: ReturnType<typeof setInterval>;
         if (whatsapp?.status === 'connecting' && whatsapp.qr_code && !showRefresh) {
             setQrTimer(40);
             timer = setInterval(() => {
