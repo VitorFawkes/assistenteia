@@ -194,10 +194,14 @@ Deno.serve(async (req: Request) => {
             }
         );
 
-    } catch (error) {
-        console.error('Error in check-reminders:', error);
+    } catch (error: any) {
+        console.error('CRITICAL Error in check-reminders:', error);
         return new Response(
-            JSON.stringify({ success: false, error: error.message }),
+            JSON.stringify({
+                success: false,
+                error: error.message,
+                stack: error.stack
+            }),
             {
                 status: 500,
                 headers: {

@@ -39,21 +39,50 @@ Deno.serve(async (req: Request) => {
                 console.log(`Configuring instance ${targetName}...`);
                 const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
 
-                // 1. Set Webhook
-                await fetch(`${evolutionApiUrl}/webhook/set/${targetName}`, {
+                // 1. Fetch Current Webhook Config (to debug and merge)
+                let currentConfig = {};
+                try {
+                    const currentResponse = await fetch(`${evolutionApiUrl}/webhook/find/${targetName}`, {
+                        method: 'GET',
+                        headers: { 'apikey': evolutionApiKey }
+                    });
+                    if (currentResponse.ok) {
+                        const data = await currentResponse.json();
+                        currentConfig = data.webhook || {};
+                        console.log('Current Webhook Config:', JSON.stringify(currentConfig));
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch current webhook config:', e);
+                }
+
+                // 2. Set Webhook (Merge with required settings)
+                const webhookPayload = {
+                    ...currentConfig,
+                    enabled: true,
+                    url: webhookUrl,
+                    webhookByEvents: true,
+                    webhookBase64: true,
+                    webhook_base64: true, // Send both to be safe
+                    events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
+                };
+
+                console.log('Setting Webhook with payload:', JSON.stringify(webhookPayload));
+
+                const webhookResponse = await fetch(`${evolutionApiUrl}/webhook/set/${targetName}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
-                    body: JSON.stringify({
-                        enabled: true,
-                        url: webhookUrl,
-                        webhookByEvents: true,
-                        webhookBase64: true,
-                        webhook_base64: true, // Send both to be safe
-                        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
-                    })
+                    body: JSON.stringify(webhookPayload)
                 });
 
-                // 2. Set Settings
+                if (!webhookResponse.ok) {
+                    const errorText = await webhookResponse.text();
+                    console.error(`❌ Failed to set webhook: ${webhookResponse.status} - ${errorText}`);
+                } else {
+                    const responseData = await webhookResponse.json();
+                    console.log('✅ Webhook set response:', JSON.stringify(responseData));
+                }
+
+                // 3. Set Settings
                 await fetch(`${evolutionApiUrl}/settings/set/${targetName}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
@@ -63,7 +92,7 @@ Deno.serve(async (req: Request) => {
                         always_online: true
                     })
                 });
-                console.log('✅ Instance configured successfully');
+                console.log('✅ Instance settings configured successfully');
             } catch (configError) {
                 console.error('⚠️ Error configuring instance:', configError);
             }
@@ -234,10 +263,39 @@ Deno.serve(async (req: Request) => {
                 .eq('user_id', user.id)
                 .maybeSingle();
 
-            // 3. SELF-HEALING: If transitioning to Connected, FORCE CONFIGURATION
-            if (isConnected && currentDb?.status !== 'connected') {
-                console.log('🚀 Detected new connection! Applying configuration...');
-                await configureInstance(instanceName);
+            // 3. AGGRESSIVE ENFORCEMENT: Check Webhook Config on EVERY status check
+            // The user requires webhookBase64 to be ALWAYS enabled.
+            if (isConnected) {
+                try {
+                    const webhookCheck = await fetch(`${evolutionApiUrl}/webhook/find/${instanceName}`, {
+                        method: 'GET',
+                        headers: { 'apikey': evolutionApiKey }
+                    });
+
+                    let needsConfig = false;
+                    if (webhookCheck.ok) {
+                        const webhookData = await webhookCheck.json();
+                        const currentWebhook = webhookData.webhook || {};
+
+                        // Check if base64 is enabled
+                        if (!currentWebhook.webhookBase64 && !currentWebhook.webhook_base64) {
+                            console.warn('⚠️ Webhook Base64 is DISABLED! Enforcing configuration...');
+                            needsConfig = true;
+                        } else {
+                            console.log('✅ Webhook Base64 is enabled.');
+                        }
+                    } else {
+                        console.warn('⚠️ Failed to check webhook config. Enforcing just in case...');
+                        needsConfig = true;
+                    }
+
+                    if (needsConfig || currentDb?.status !== 'connected') {
+                        console.log('🚀 Applying configuration (Enforcement or New Connection)...');
+                        await configureInstance(instanceName);
+                    }
+                } catch (e) {
+                    console.error('Error checking webhook config:', e);
+                }
             }
 
             // 4. Update DB

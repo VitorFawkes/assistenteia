@@ -490,6 +490,15 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
         // --- AUDIO TRANSCRIPTION (WHISPER FALLBACK) ---
         // Só usa Whisper se Evolution não enviou transcrição
         if (mediaType === 'audio' && mediaUrl) {
+
+            // DEBUG: Log start of audio processing
+            await supabase.from('debug_logs').insert({
+                function_name: 'process-message',
+                level: 'info',
+                message: 'Starting audio processing',
+                meta: { mediaUrlLength: mediaUrl.length, isDataUri: mediaUrl.startsWith('data:') }
+            });
+
             // Verifica se já tem algum texto útil da Evolution
             const hasEvolutionText = processedText &&
                 !processedText.includes('[Áudio') &&
@@ -498,56 +507,109 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
 
             if (hasEvolutionText) {
                 console.log('✅ Using Evolution API transcription (PT-BR):', processedText);
-                console.log('⏭️ Skipping Whisper - already have transcription from Evolution');
+                await supabase.from('debug_logs').insert({ function_name: 'process-message', level: 'info', message: 'Using Evolution transcription', meta: { text: processedText } });
             } else {
                 console.log('⚠️ No useful text from Evolution - attempting Whisper fallback...');
-                console.log('📝 Initial text was:', processedText || 'EMPTY');
 
                 try {
-                    console.log('📥 Downloading audio from URL:', mediaUrl);
-                    const audioResponse = await fetch(mediaUrl);
+                    let audioBlob: Blob;
 
-                    if (!audioResponse.ok) {
-                        console.error(`❌ Failed to fetch audio: ${audioResponse.status} `);
-                        processedText = 'Não foi possível processar o áudio. Por favor, envie novamente ou digite sua mensagem.';
-                    } else {
-                        const audioBlob = await audioResponse.blob();
-                        console.log(`✅ Audio downloaded: ${audioBlob.size} bytes`);
+                    if (mediaUrl.startsWith('data:')) {
+                        // HANDLE DATA URI MANUALLY
+                        console.log('Processing Data URI...');
+                        const base64Data = mediaUrl.split(',')[1];
+                        const mimeType = mediaUrl.split(';')[0].split(':')[1];
 
-                        const formData = new FormData();
-                        formData.append('file', audioBlob, 'audio.ogg');
-                        formData.append('model', 'whisper-1');
-                        formData.append('language', 'pt');
-                        formData.append('prompt', 'Esta é uma mensagem de áudio em português brasileiro. Transcrever em português do Brasil.');
-                        formData.append('temperature', '0');
+                        // Convert Base64 to Uint8Array
+                        const binaryString = atob(base64Data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        audioBlob = new Blob([bytes], { type: mimeType });
+                        console.log(`✅ Converted Base64 to Blob: ${audioBlob.size} bytes, type: ${mimeType}`);
 
-                        console.log('🚀 Sending to Whisper API...');
-                        const transResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${openaiKey} `,
-                            },
-                            body: formData,
+                        await supabase.from('debug_logs').insert({
+                            function_name: 'process-message',
+                            level: 'info',
+                            message: 'Converted Base64 to Blob',
+                            meta: { size: audioBlob.size, type: mimeType }
                         });
 
-                        const transData = await transResponse.json();
-                        if (transData.text) {
-                            console.log('✅ Whisper Fallback SUCCESS:', transData.text);
-                            processedText = transData.text;
+                    } else {
+                        // HANDLE REMOTE URL
+                        console.log('📥 Downloading audio from URL:', mediaUrl);
+                        const audioResponse = await fetch(mediaUrl);
+
+                        if (!audioResponse.ok) {
+                            console.error(`❌ Failed to fetch audio: ${audioResponse.status} `);
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'process-message',
+                                level: 'error',
+                                message: 'Failed to fetch audio URL',
+                                meta: { status: audioResponse.status, url: mediaUrl }
+                            });
+                            throw new Error(`Failed to fetch audio: ${audioResponse.status}`);
+                        }
+                        audioBlob = await audioResponse.blob();
+                        console.log(`✅ Audio downloaded: ${audioBlob.size} bytes`);
+                    }
+
+                    // SEND TO WHISPER
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'audio.ogg');
+                    formData.append('model', 'whisper-1');
+                    formData.append('language', 'pt');
+                    formData.append('prompt', 'Esta é uma mensagem de áudio em português brasileiro. Transcrever em português do Brasil.');
+                    formData.append('temperature', '0');
+
+                    console.log('🚀 Sending to Whisper API...');
+                    const transResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${openaiKey}`,
+                        },
+                        body: formData,
+                    });
+
+                    const transData = await transResponse.json();
+
+                    if (transData.text) {
+                        console.log('✅ Whisper Fallback SUCCESS:', transData.text);
+                        processedText = transData.text;
+
+                        await supabase.from('debug_logs').insert({
+                            function_name: 'process-message',
+                            level: 'success',
+                            message: 'Whisper Transcription Success',
+                            meta: { text: transData.text }
+                        });
+
+                    } else {
+                        console.error('❌ Whisper Error:', transData);
+                        await supabase.from('debug_logs').insert({
+                            function_name: 'process-message',
+                            level: 'error',
+                            message: 'Whisper API Error',
+                            meta: transData
+                        });
+
+                        if (transData.error?.message?.includes('Invalid file format')) {
+                            processedText = 'O áudio está criptografado ou em formato inválido.';
                         } else {
-                            console.error('❌ Whisper Error:', transData);
-                            // Se é erro de formato inválido (arquivo criptografado), mensagem amigável
-                            if (transData.error?.message?.includes('Invalid file format')) {
-                                console.error('🔒 File is encrypted - cannot transcribe. Evolution should handle this.');
-                                processedText = 'O áudio está criptografado. Configure a Evolution API com OPENAI_ENABLED=true e LANGUAGE=pt para transcrição automática.';
-                            } else {
-                                processedText = 'Não foi possível transcrever o áudio. Por favor, tente novamente ou digite sua mensagem.';
-                            }
+                            processedText = 'Não foi possível transcrever o áudio.';
                         }
                     }
-                } catch (error) {
+
+                } catch (error: any) {
                     console.error('❌ Error processing audio:', error);
-                    processedText = 'Erro ao processar áudio. Por favor, envie novamente ou digite sua mensagem.';
+                    await supabase.from('debug_logs').insert({
+                        function_name: 'process-message',
+                        level: 'error',
+                        message: 'Audio processing exception',
+                        meta: { error: error.message, stack: error.stack }
+                    });
+                    processedText = 'Erro ao processar áudio. Por favor, envie novamente.';
                 }
             }
         }

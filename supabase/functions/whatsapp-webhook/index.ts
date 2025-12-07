@@ -1,196 +1,231 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!;
+const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 Deno.serve(async (req: Request) => {
-    if (req.method === 'OPTIONS') {
-        return new Response(null, {
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-            },
-        });
-    }
-
     try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
         const body = await req.json();
-        console.log('WhatsApp webhook received:', JSON.stringify(body));
+        const { instance, data, event } = body;
 
-        // 1. IDENTIFY INSTANCE / USER
-        // Evolution sends 'instance' in the payload
-        const instanceName = body.instance;
-        if (!instanceName) {
-            console.log('Ignored: No instance name in payload');
+        // 1. FILTER: Only process messages.upsert
+        if (event !== 'messages.upsert') {
             return new Response(JSON.stringify({ ignored: true }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        // Find user by instance name (which is the user_id)
-        const { data: instanceData } = await supabase
-            .from('whatsapp_instances')
-            .select('user_id')
-            .eq('instance_name', instanceName)
-            .maybeSingle();
-
-        if (!instanceData) {
-            console.error(`Unknown instance: ${instanceName}`);
-            return new Response(JSON.stringify({ error: 'Unknown instance' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        const message = data;
+        if (!message || !message.key) {
+            return new Response(JSON.stringify({ error: 'No message data' }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        const userId = instanceData.user_id;
-        console.log(`✅ Message for User ID: ${userId}`);
+        // LOG INCOMING
+        await supabase.from('debug_logs').insert({
+            function_name: 'whatsapp-webhook',
+            level: 'info',
+            message: 'Webhook received',
+            meta: { event, instance, key: message.key }
+        });
 
-        const event = body.event;
+        // 2. FILTER: "Note to Self" ONLY
+        // The user explicitly wants this.
+        const { fromMe, remoteJid } = message.key;
 
-        if (event === 'messages.upsert') {
-            const data = body.data;
-            const message = data;
+        // Fetch owner JID to be sure
+        let ownerJid = null;
+        const { data: instanceData } = await supabase
+            .from('whatsapp_instances')
+            .select('owner_jid')
+            .eq('instance_name', instance)
+            .maybeSingle();
 
-            // Ignorar mensagens enviadas pela própria assistente (fromMe)
-            if (message.key?.fromMe) {
-                return new Response(JSON.stringify({ success: true, ignored: 'fromMe' }), {
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            }
+        if (instanceData) ownerJid = instanceData.owner_jid;
 
-            // Extrair texto
-            let messageText = message.message?.conversation ||
-                message.message?.extendedTextMessage?.text ||
-                message.message?.imageMessage?.caption ||
-                '';
+        // SIMPLIFIED LOGIC: Accept if it's from me (Note to Self) OR from the Owner Number.
+        // This covers both scenarios without overcomplicating.
 
-            // Extrair mídia
-            let mediaUrl = null;
-            let mediaType = null;
+        const isAuthorized = fromMe || (ownerJid && remoteJid === ownerJid);
 
-            if (message.message?.imageMessage) {
-                mediaType = 'image';
-                mediaUrl = message.message.imageMessage.url;
-            } else if (message.message?.audioMessage) {
-                console.log('🎙️ Audio message received');
-                const transcribedText = data.speechToText ||
-                    body.speechToText ||
-                    data.message?.speechToText ||
-                    message.message?.audioMessage?.speechToText;
+        if (!isAuthorized) {
+            console.log('Ignored: Not authorized. FromMe: ' + fromMe + ', Remote: ' + remoteJid + ', Owner: ' + ownerJid);
+            return new Response(JSON.stringify({ ignored: 'not_authorized' }), { headers: { 'Content-Type': 'application/json' } });
+        }
 
-                mediaType = 'audio';
-                mediaUrl = message.message.audioMessage.url;
+        console.log('✅ Processing Message');
 
-                if (transcribedText) {
-                    console.log('✅ Evolution speechToText found:', transcribedText);
-                    messageText = transcribedText;
-                } else {
-                    console.warn('⚠️ No speechToText from Evolution - Whisper will attempt fallback');
-                    messageText = '[Áudio sem transcrição - tentando Whisper...]';
+        // 3. EXTRACT CONTENT & MEDIA
+        const msgContent = message.message;
+        if (!msgContent) return new Response(JSON.stringify({ ignored: 'no_content' }));
+
+        let content = '';
+        let mediaType = null;
+        let mediaBase64 = null;
+
+        // Text
+        content = msgContent.conversation || msgContent.extendedTextMessage?.text || '';
+
+        // Audio
+        if (msgContent.audioMessage) {
+            mediaType = 'audio';
+            console.log('🎤 Audio message detected');
+
+            // Strategy: Check payload -> Fallback to Fetch
+            if (message.base64) {
+                mediaBase64 = message.base64;
+                console.log('✅ Base64 found in payload');
+            } else {
+                console.log('⚠️ Base64 MISSING in payload. Fetching from Evolution...');
+
+                // Call Evolution to get Base64
+                // Endpoint: /chat/getBase64FromMediaMessage/{instance}
+                // Body: { message: { ... } }
+                try {
+                    const fetchResponse = await fetch(`${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instance}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': evolutionApiKey
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            convertToMp4: false
+                        })
+                    });
+
+                    if (fetchResponse.ok) {
+                        const fetchData = await fetchResponse.json();
+                        if (fetchData.base64) {
+                            mediaBase64 = fetchData.base64;
+                            console.log('✅ Base64 fetched successfully from Evolution');
+                        } else {
+                            console.error('❌ Evolution returned no base64');
+                        }
+                    } else {
+                        console.error(`❌ Failed to fetch base64: ${fetchResponse.status}`);
+                        const errText = await fetchResponse.text();
+                        console.error('Error details:', errText);
+                    }
+                } catch (e) {
+                    console.error('❌ Exception fetching base64:', e);
                 }
-            } else if (message.message?.documentMessage) {
-                mediaType = 'document';
-                mediaUrl = message.message.documentMessage.url;
-                if (!messageText) messageText = message.message.documentMessage.fileName || 'Documento';
             }
+        }
+        // Image (Optional, but good to have)
+        else if (msgContent.imageMessage) {
+            mediaType = 'image';
+            content = msgContent.imageMessage.caption || '';
+            // Same logic for image base64 if needed, but focusing on audio for now
+        }
 
-            if (!messageText && !mediaUrl) {
-                return new Response(JSON.stringify({ success: false, error: 'Empty message' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            }
+        // 4. PREPARE PAYLOAD FOR PROCESS-MESSAGE
+        let finalMediaUrl = null;
+        if (mediaType === 'audio' && mediaBase64) {
+            // Construct Data URI
+            // Audio messages are usually ogg/opus
+            finalMediaUrl = `data:audio/ogg;base64,${mediaBase64}`;
+        }
 
-            // Verificar duplicidade (idempotência)
-            const { data: existingMessage } = await supabase
-                .from('messages')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('content', messageText + (mediaType ? ` [${mediaType}]` : ''))
-                .eq('role', 'user')
-                .gt('created_at', new Date(Date.now() - 10000).toISOString()) // 10 segundos atrás
-                .maybeSingle();
+        // 5. CALL PROCESS-MESSAGE
+        // We need the User ID.
+        // We already fetched instanceData, but we need user_id.
+        const { data: userData } = await supabase
+            .from('whatsapp_instances')
+            .select('user_id')
+            .eq('instance_name', instance)
+            .single();
 
-            if (existingMessage) {
-                console.log('Duplicate message detected, ignoring:', messageText);
-                return new Response(JSON.stringify({ success: true, ignored: 'duplicate' }), {
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            }
+        if (!userData) {
+            console.error('❌ Instance not linked to user');
+            return new Response(JSON.stringify({ error: 'Instance not linked' }), { status: 500 });
+        }
 
-            // Salvar mensagem do usuário
-            await supabase.from('messages').insert({
-                user_id: userId,
-                role: 'user',
-                content: messageText + (mediaType ? ` [${mediaType}]` : ''),
-                media_url: mediaUrl,
-                media_type: mediaType
+        console.log(`🚀 Forwarding to process-message. Content: "${content}", Media: ${mediaType}`);
+
+        // 4.5 INSERT MESSAGE INTO DATABASE (Fix for visibility)
+        // We must save the user's message so it appears in the chat history
+        const { error: insertError } = await supabase.from('messages').insert({
+            user_id: userData.user_id,
+            role: 'user',
+            content: content || (mediaType ? `[${mediaType.toUpperCase()}]` : null),
+            media_url: finalMediaUrl || null, // Prefer Data URI if available
+            media_type: mediaType || null
+        });
+
+        if (insertError) {
+            console.error('❌ Error saving user message to DB:', insertError);
+            // We continue even if save fails, to ensure AI still replies? 
+            // Or we stop? Let's log and continue, but it's a critical failure for UI visibility.
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'error',
+                message: 'Failed to save user message',
+                meta: { error: insertError }
             });
+        } else {
+            console.log('✅ User message saved to DB');
+        }
 
-            // Processar com IA
-            // Passamos o userId para o process-message saber quem é
-            const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-message`, {
+        await supabase.from('debug_logs').insert({
+            function_name: 'whatsapp-webhook',
+            level: 'info',
+            message: 'Forwarding to process-message',
+            meta: { content, mediaType, userId: userData.user_id }
+        });
+
+        // Call the Edge Function
+        const { data: processData, error: processError } = await supabase.functions.invoke('process-message', {
+            body: {
+                content: content,
+                mediaUrl: finalMediaUrl,
+                mediaType: mediaType,
+                userId: userData.user_id
+            }
+        });
+
+        if (processError) {
+            console.error('❌ Error invoking process-message:', processError);
+            throw processError;
+        }
+
+        if (processData && processData.response) {
+            console.log('🤖 AI Response:', processData.response);
+
+            // Send response back via Evolution API
+            const sendResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseKey}`,
+                    'apikey': evolutionApiKey
                 },
                 body: JSON.stringify({
-                    content: messageText,
-                    userId: userId,
-                    mediaUrl,
-                    mediaType,
-                }),
+                    number: remoteJid,
+                    text: processData.response,
+                    delay: 1200,
+                    linkPreview: true
+                })
             });
 
-            const processResult = await processResponse.json();
-
-            if (processResult.success && processResult.response) {
-                // Salvar resposta da IA
-                await supabase.from('messages').insert({
-                    user_id: userId,
-                    role: 'assistant',
-                    content: processResult.response,
-                });
-
-                // Enviar resposta via WhatsApp USANDO A INSTÂNCIA DO USUÁRIO
-                const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
-                const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-
-                // O número de destino é quem enviou a mensagem (remoteJid)
-                const remoteJid = message.key?.remoteJid;
-
-                if (evolutionApiUrl && evolutionApiKey && remoteJid) {
-                    try {
-                        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'apikey': evolutionApiKey,
-                            },
-                            body: JSON.stringify({
-                                number: remoteJid.replace(/\D/g, ''), // Limpa o número
-                                text: processResult.response,
-                            }),
-                        });
-                    } catch (error) {
-                        console.error('Error sending WhatsApp response:', error);
-                    }
-                }
+            if (!sendResponse.ok) {
+                console.error('❌ Failed to send WhatsApp response:', await sendResponse.text());
+            } else {
+                console.log('✅ Response sent to WhatsApp');
             }
-
-            return new Response(JSON.stringify({ success: true }), {
-                headers: { 'Content-Type': 'application/json' },
-            });
         }
 
-        return new Response(JSON.stringify({ success: true, ignored: event }), {
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
 
-    } catch (error) {
-        console.error('Webhook error:', error);
-        return new Response(
-            JSON.stringify({ success: false, error: (error as Error).message }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
+    } catch (error: any) {
+        console.error('CRITICAL WEBHOOK ERROR:', error);
+        await supabase.from('debug_logs').insert({
+            function_name: 'whatsapp-webhook',
+            level: 'error',
+            message: 'Critical Error',
+            meta: { error: error.message }
+        });
+        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 });
