@@ -31,6 +31,10 @@ Agora vamos rodar a migração para que a IA aprenda tudo que já aconteceu.
 A função vai retornar algo como `{"processed": 50, "errors": 0}`.
 Isso significa que 50 itens antigos agora têm memória vetorial! 🧠
 
+## 3. Frontend Publicado (Concluído)
+O site foi publicado com sucesso na Vercel:
+**URL:** https://assistenteia-qbwq.vercel.app
+
 ---
 **PRÓXIMO PASSO (FASE 2):**
-Assim que você confirmar o deploy, eu vou implementar a **Busca** (para a IA usar essas memórias).
+Agora que o site está no ar e as funções de memória estão ativas, vou implementar a **Busca** (para a IA usar essas memórias).

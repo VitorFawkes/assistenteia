@@ -22,22 +22,16 @@ Deno.serve(async (req: Request) => {
 
         const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY');
-        const evolutionInstance = Deno.env.get('EVOLUTION_INSTANCE');
 
         // CRON SECRET AUTHENTICATION
-        // Since we don't have the Service Role Key in the code, we use a custom secret
-        // to authenticate the cron job securely.
         const CRON_SECRET = "CRON_SECRET_a1b2c3d4e5f6g7h8i9j0";
         const authHeader = req.headers.get('Authorization');
         const cronHeader = req.headers.get('x-cron-secret');
 
-        // Allow if Authorization is valid (Service Role) OR if Cron Secret matches
-        const isServiceRole = authHeader?.includes(supabaseKey); // This might not work if key is hidden, but usually we rely on the custom secret for Cron
+        const isServiceRole = authHeader?.includes(supabaseKey);
         const isCronAuthenticated = cronHeader === CRON_SECRET;
 
         if (!isCronAuthenticated && !isServiceRole) {
-            // Fallback: Check if it's a browser request (OPTIONS handled above)
-            // But for safety, we reject unauthorized requests
             console.error('⛔ Unauthorized access attempt to check-reminders');
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
         }
@@ -45,9 +39,14 @@ Deno.serve(async (req: Request) => {
         console.log('🔔 Checking for overdue reminders...');
 
         // Get all non-completed reminders that are due
+        // JOIN with whatsapp_instances to get the instance name for each user
         const { data: overdueReminders, error } = await supabase
             .from('reminders')
-            .select('*, users(phone_number)')
+            .select(`
+                *,
+                users (id),
+                whatsapp_instances (instance_name, status)
+            `)
             .eq('is_completed', false)
             .lte('due_at', new Date().toISOString())
             .order('due_at');
@@ -64,31 +63,49 @@ Deno.serve(async (req: Request) => {
 
         for (const reminder of overdueReminders || []) {
             try {
-                const phoneNumber = reminder.users?.phone_number;
+                const instanceName = reminder.whatsapp_instances?.instance_name;
+                const instanceStatus = reminder.whatsapp_instances?.status;
 
-                if (!phoneNumber) {
-                    console.error(`No phone number for reminder ${reminder.id}`);
-                    continue;
-                }
-
-                // Send WhatsApp notification
-                if (evolutionApiUrl && evolutionApiKey && evolutionInstance) {
+                // Send WhatsApp notification ONLY if instance is connected
+                if (evolutionApiUrl && evolutionApiKey && instanceName && instanceStatus === 'connected') {
                     const message = `🔔 *Lembrete:* ${reminder.title}`;
 
-                    await fetch(`${evolutionApiUrl}/message/sendText/${evolutionInstance}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': evolutionApiKey,
-                        },
-                        body: JSON.stringify({
-                            number: phoneNumber.replace(/\D/g, ''),
-                            text: message,
-                        }),
-                    });
+                    // We need the destination number. 
+                    // In a perfect world, we'd store the user's phone number in the 'users' table or 'whatsapp_instances'.
+                    // For now, we assume the instance is connected to the user's phone, so we can send to "myself" or we need the user's number.
+                    // WAIT: Evolution API sends to a number. We need the user's phone number.
+                    // The previous code used `users(phone_number)`. Let's check if we still have it.
+                    // The `users` table in Supabase Auth usually doesn't expose phone easily unless we have a public `users` table copy.
+                    // My previous analysis showed a `users` table in public schema with `phone_number`.
 
-                    console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber}`);
-                    notificationsSent++;
+                    // Let's fetch the phone number from the public users table if not in the join
+                    const { data: userData } = await supabase
+                        .from('users')
+                        .select('phone_number')
+                        .eq('id', reminder.user_id)
+                        .single();
+
+                    const phoneNumber = userData?.phone_number;
+
+                    if (phoneNumber) {
+                        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': evolutionApiKey,
+                            },
+                            body: JSON.stringify({
+                                number: phoneNumber.replace(/\D/g, ''),
+                                text: message,
+                            }),
+                        });
+                        console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber} via instance ${instanceName}`);
+                        notificationsSent++;
+                    } else {
+                        console.warn(`⚠️ No phone number for user ${reminder.user_id}, cannot send WhatsApp.`);
+                    }
+                } else {
+                    console.log(`⚠️ Skipping WhatsApp for reminder ${reminder.id}: Instance not connected or missing.`);
                 }
 
                 // ALWAYS insert into chat history (so it appears in the App)
@@ -98,20 +115,15 @@ Deno.serve(async (req: Request) => {
                     content: `🔔 Lembrete: ${reminder.title}`
                 });
 
-                // Update reminder based on recurrence type
+                // Update reminder based on recurrence type (Same logic as before)
                 if (reminder.recurrence_type === 'once') {
-                    // Mark as completed
                     await supabase
                         .from('reminders')
                         .update({ is_completed: true, last_reminded_at: new Date().toISOString() })
                         .eq('id', reminder.id);
-
-                    console.log(`✓ Completed one-time reminder: ${reminder.title}`);
                 } else {
-                    // Handle recurring reminder
                     const timesReminded = (reminder.times_reminded || 0) + 1;
 
-                    // Check if reached recurrence limit
                     if (reminder.recurrence_count && timesReminded >= reminder.recurrence_count) {
                         await supabase
                             .from('reminders')
@@ -121,10 +133,7 @@ Deno.serve(async (req: Request) => {
                                 times_reminded: timesReminded
                             })
                             .eq('id', reminder.id);
-
-                        console.log(`✓ Completed recurring reminder (reached count): ${reminder.title}`);
                     } else {
-                        // Calculate next occurrence
                         const currentDue = new Date(reminder.due_at);
                         let nextDue: Date;
 
@@ -137,22 +146,12 @@ Deno.serve(async (req: Request) => {
                         } else if (reminder.recurrence_type === 'custom') {
                             nextDue = new Date(currentDue);
                             const interval = reminder.recurrence_interval || 1;
-
                             switch (reminder.recurrence_unit) {
-                                case 'minutes':
-                                    nextDue.setMinutes(nextDue.getMinutes() + interval);
-                                    break;
-                                case 'hours':
-                                    nextDue.setHours(nextDue.getHours() + interval);
-                                    break;
-                                case 'days':
-                                    nextDue.setDate(nextDue.getDate() + interval);
-                                    break;
-                                case 'weeks':
-                                    nextDue.setDate(nextDue.getDate() + (interval * 7));
-                                    break;
-                                default:
-                                    nextDue.setDate(nextDue.getDate() + 1);
+                                case 'minutes': nextDue.setMinutes(nextDue.getMinutes() + interval); break;
+                                case 'hours': nextDue.setHours(nextDue.getHours() + interval); break;
+                                case 'days': nextDue.setDate(nextDue.getDate() + interval); break;
+                                case 'weeks': nextDue.setDate(nextDue.getDate() + (interval * 7)); break;
+                                default: nextDue.setDate(nextDue.getDate() + 1);
                             }
                         } else {
                             nextDue = new Date(currentDue);
@@ -167,8 +166,6 @@ Deno.serve(async (req: Request) => {
                                 times_reminded: timesReminded
                             })
                             .eq('id', reminder.id);
-
-                        console.log(`↻ Rescheduled recurring reminder "${reminder.title}" to ${nextDue.toISOString()}`);
                     }
                 }
 
