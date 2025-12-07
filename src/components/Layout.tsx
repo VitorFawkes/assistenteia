@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { MessageSquare, Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare } from 'lucide-react';
+import { MessageSquare, Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,6 +15,7 @@ export default function Layout() {
         { icon: Folder, label: 'Coleções', path: '/collections' },
         { icon: Brain, label: 'Cérebro', path: '/brain' },
         { icon: FileText, label: 'Documentos', path: '/documents' },
+        { icon: Plug, label: 'Integrações', path: '/integrations' },
     ];
 
     return (
