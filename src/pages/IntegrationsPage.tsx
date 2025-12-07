@@ -177,7 +177,11 @@ export default function IntegrationsPage() {
                     ) : whatsapp?.status === 'connecting' && whatsapp.qr_code ? (
                         <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in">
                             <div className="bg-white p-2 rounded-lg">
-                                <img src={`data:image/png;base64,${whatsapp.qr_code}`} alt="QR Code" className="w-48 h-48" />
+                                <img
+                                    src={whatsapp.qr_code.startsWith('data:image') ? whatsapp.qr_code : `data:image/png;base64,${whatsapp.qr_code}`}
+                                    alt="QR Code"
+                                    className="w-48 h-48"
+                                />
                             </div>
                             <p className="text-sm text-gray-300">Escaneie o QR Code com seu WhatsApp</p>
                         </div>
