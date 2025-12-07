@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Check, AlertCircle, Loader2, Smartphone, Trash2 } from 'lucide-react';
+import { Calendar, Check, AlertCircle, Loader2, Smartphone, Trash2, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 
@@ -19,9 +19,6 @@ export default function IntegrationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isWhatsappLoading, setIsWhatsappLoading] = useState(false);
-
-    const [qrTimer, setQrTimer] = useState(40);
-    const [showRefresh, setShowRefresh] = useState(false);
 
     useEffect(() => {
         fetchIntegrations();
@@ -43,26 +40,6 @@ export default function IntegrationsPage() {
 
         return () => clearInterval(interval);
     }, [whatsapp?.status]);
-
-    useEffect(() => {
-        let timer: ReturnType<typeof setInterval>;
-        if (whatsapp?.status === 'connecting' && whatsapp.qr_code && !showRefresh) {
-            setQrTimer(40);
-            timer = setInterval(() => {
-                setQrTimer((prev) => {
-                    if (prev <= 1) {
-                        setShowRefresh(true);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        } else {
-            setQrTimer(40);
-            setShowRefresh(false);
-        }
-        return () => clearInterval(timer);
-    }, [whatsapp?.status, whatsapp?.qr_code, showRefresh]); // Reset when status/QR changes or refresh is triggered
 
     const fetchIntegrations = async () => {
         try {
@@ -108,8 +85,6 @@ export default function IntegrationsPage() {
     const handleConnectWhatsapp = async () => {
         setIsWhatsappLoading(true);
         setError(null);
-        setShowRefresh(false); // Reset refresh state
-        setQrTimer(40); // Reset timer
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
@@ -203,8 +178,8 @@ export default function IntegrationsPage() {
                             </Button>
                         </div>
                     ) : whatsapp?.status === 'connecting' && whatsapp.qr_code ? (
-                        <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in relative">
-                            <div className={`bg-white p-2 rounded-lg transition-all duration-300 ${showRefresh ? 'blur-sm opacity-50' : ''}`}>
+                        <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in">
+                            <div className="bg-white p-2 rounded-lg">
                                 <img
                                     src={whatsapp.qr_code.startsWith('data:image') ? whatsapp.qr_code : `data:image/png;base64,${whatsapp.qr_code}`}
                                     alt="QR Code"
@@ -212,20 +187,18 @@ export default function IntegrationsPage() {
                                 />
                             </div>
 
-                            {showRefresh && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Button onClick={handleConnectWhatsapp} className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg">
-                                        Atualizar QR Code
-                                    </Button>
-                                </div>
-                            )}
+                            <p className="text-sm text-gray-300 max-w-xs">
+                                Escaneie o QR Code com seu WhatsApp. Se expirar, clique abaixo.
+                            </p>
 
-                            {!showRefresh && (
-                                <p className="text-sm text-gray-300">
-                                    Atualiza em {qrTimer}s
-                                </p>
-                            )}
-                            <p className="text-sm text-gray-400">Escaneie o QR Code com seu WhatsApp</p>
+                            <Button
+                                onClick={handleConnectWhatsapp}
+                                variant="secondary"
+                                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                            >
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Atualizar QR Code
+                            </Button>
                         </div>
                     ) : (
                         <Button onClick={handleConnectWhatsapp} className="bg-[#25D366] hover:bg-[#20bd5a] text-white px-8">
