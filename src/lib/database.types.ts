@@ -302,6 +302,44 @@ export type Database = {
                     user_id?: string
                 }
                 Relationships: []
+            },
+            whatsapp_instances: {
+                Row: {
+                    id: string
+                    user_id: string
+                    instance_name: string
+                    status: 'connecting' | 'connected' | 'disconnected'
+                    qr_code: string | null
+                    created_at: string | null
+                    updated_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    instance_name: string
+                    status?: 'connecting' | 'connected' | 'disconnected'
+                    qr_code?: string | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    instance_name?: string
+                    status?: 'connecting' | 'connected' | 'disconnected'
+                    qr_code?: string | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "whatsapp_instances_user_id_fkey"
+                        columns: ["user_id"]
+                        isOneToOne: true
+                        referencedRelation: "users"
+                        referencedColumns: ["id"]
+                    }
+                ]
             }
             users: {
                 Row: {
