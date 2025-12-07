@@ -33,68 +33,143 @@ Deno.serve(async (req: Request) => {
 
         const instanceName = user.id; // Instance Name IS the User ID
 
+        // --- SHARED HELPER: Configure Instance ---
+        const configureInstance = async (targetName: string) => {
+            try {
+                console.log(`Configuring instance ${targetName}...`);
+                const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
+
+                // 1. Set Webhook
+                await fetch(`${evolutionApiUrl}/webhook/set/${targetName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                    body: JSON.stringify({
+                        enabled: true,
+                        url: webhookUrl,
+                        webhookByEvents: true,
+                        webhookBase64: true,
+                        webhook_base64: true, // Send both to be safe
+                        events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
+                    })
+                });
+
+                // 2. Set Settings
+                await fetch(`${evolutionApiUrl}/settings/set/${targetName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                    body: JSON.stringify({
+                        reject_call: true,
+                        msg_call: "Não aceito chamadas de voz/vídeo. Por favor, envie uma mensagem de texto ou áudio.",
+                        always_online: true
+                    })
+                });
+                console.log('✅ Instance configured successfully');
+            } catch (configError) {
+                console.error('⚠️ Error configuring instance:', configError);
+            }
+        };
+        // -----------------------------------------
+
         if (action === 'create_instance') {
-            console.log(`Creating instance for user ${user.id}...`);
+            console.log(`Creating/Checking instance for user ${user.id}...`);
 
-            // 1. Check if instance already exists in DB
-            const { data: existing } = await supabase
-                .from('whatsapp_instances')
-                .select('*')
-                .eq('user_id', user.id)
-                .maybeSingle();
+            // 1. Check Evolution API status first
+            let evolutionState = 'disconnected';
+            let instanceExists = false;
 
-            if (existing && existing.status === 'connected') {
-                return new Response(JSON.stringify({ success: true, status: 'connected', instance: existing }), {
+            try {
+                const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+                    method: 'GET',
+                    headers: { 'apikey': evolutionApiKey }
+                });
+
+                if (statusResponse.ok) {
+                    const statusData = await statusResponse.json();
+                    evolutionState = statusData.instance?.state || 'disconnected';
+                    instanceExists = true;
+                }
+            } catch (err) {
+                console.warn('Failed to check Evolution status:', err);
+            }
+
+            console.log(`Evolution State: ${evolutionState}, Exists: ${instanceExists}`);
+
+            // 2. Handle Scenarios
+            if (instanceExists && evolutionState === 'open') {
+                // Already Connected -> Ensure Config & Return
+                await configureInstance(instanceName);
+
+                await supabase.from('whatsapp_instances').upsert({
+                    user_id: user.id,
+                    instance_name: instanceName,
+                    status: 'connected',
+                    qr_code: null,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+                return new Response(JSON.stringify({ success: true, status: 'connected' }), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
 
-            // 2. Call Evolution API to create instance
-            // Endpoint: /instance/create
-            const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': evolutionApiKey
-                },
-                body: JSON.stringify({
-                    instanceName: instanceName,
-                    token: instanceName, // Token can be the same as name for simplicity or generated
-                    qrcode: true,
-                    integration: "WHATSAPP-BAILEYS"
-                })
+            // Scenario B: Exists but Disconnected OR Doesn't Exist
+            if (!instanceExists) {
+                // Create if not exists
+                console.log(`Creating new instance for ${instanceName}...`);
+                const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
+
+                await fetch(`${evolutionApiUrl}/instance/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                    body: JSON.stringify({
+                        instanceName: instanceName,
+                        token: instanceName,
+                        qrcode: true,
+                        integration: "WHATSAPP-BAILEYS",
+                        webhook: {
+                            enabled: true,
+                            url: webhookUrl,
+                            webhookByEvents: true,
+                            webhookBase64: true,
+                            events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
+                        }
+                    })
+                });
+
+                // FORCE CONFIGURATION IMMEDIATELY AFTER CREATION
+                // Some Evolution versions ignore the webhook payload in create
+                console.log('Force configuring instance after creation...');
+                await configureInstance(instanceName);
+            }
+
+            // Always configure before fetching QR (Redundant but safe)
+            await configureInstance(instanceName);
+
+            // Fetch QR Code
+            console.log(`Fetching QR for ${instanceName}...`);
+            const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+                method: 'GET',
+                headers: { 'apikey': evolutionApiKey }
             });
 
-            const createData = await createResponse.json();
-            console.log('Evolution Create Response:', createData);
-
-            // Evolution returns the QR code in the response usually, or we need to fetch it
-            // If instance already exists in Evolution but not connected, we might need to fetch QR
-
-            let qrCode = createData.qrcode?.base64;
-
-            if (!qrCode && createData.instance?.status !== 'open') {
-                // Try fetching QR specifically if not returned
-                const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
-                    method: 'GET',
-                    headers: { 'apikey': evolutionApiKey }
-                });
+            let qrCode: string | undefined;
+            if (qrResponse.ok) {
                 const qrData = await qrResponse.json();
                 qrCode = qrData.base64 || qrData.qrcode;
             }
 
-            // 3. Upsert into DB
-            const { error: upsertError } = await supabase
-                .from('whatsapp_instances')
-                .upsert({
-                    user_id: user.id,
-                    instance_name: instanceName,
-                    status: 'connecting',
-                    qr_code: qrCode,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
+            if (!qrCode) {
+                throw new Error('Failed to generate QR Code. Please try again.');
+            }
 
-            if (upsertError) throw upsertError;
+            // Upsert Connecting
+            await supabase.from('whatsapp_instances').upsert({
+                user_id: user.id,
+                instance_name: instanceName,
+                status: 'connecting',
+                qr_code: qrCode,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
 
             return new Response(JSON.stringify({ success: true, qr_code: qrCode }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -102,50 +177,137 @@ Deno.serve(async (req: Request) => {
         }
 
         if (action === 'get_status') {
-            // 1. Check Evolution API status
-            const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
-                method: 'GET',
-                headers: { 'apikey': evolutionApiKey }
-            });
+            console.log(`Checking status for ${instanceName}...`);
 
-            if (statusResponse.status === 404) {
-                return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
+            // 1. Check Evolution API status
+            let statusData: any = null;
+            let evolutionError = null;
+
+            try {
+                const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+                    method: 'GET',
+                    headers: { 'apikey': evolutionApiKey }
+                });
+
+                if (statusResponse.status === 404) {
+                    console.log('Instance not found in Evolution (404)');
+                    // Instance doesn't exist in Evolution
+                    await supabase
+                        .from('whatsapp_instances')
+                        .update({ status: 'disconnected', qr_code: null })
+                        .eq('user_id', user.id);
+
+                    return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+
+                if (!statusResponse.ok) {
+                    throw new Error(`Evolution API error: ${statusResponse.status}`);
+                }
+
+                statusData = await statusResponse.json();
+                console.log('Evolution Status Response:', JSON.stringify(statusData));
+
+            } catch (err) {
+                console.error('Error fetching Evolution status:', err);
+                evolutionError = err;
+            }
+
+            // If we couldn't get status from Evolution, return current DB status or error
+            if (!statusData) {
+                return new Response(JSON.stringify({ success: false, error: 'Failed to fetch status from Evolution' }), {
+                    status: 500, // Keep 500 so frontend knows it failed
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
 
-            const statusData = await statusResponse.json();
-            // Evolution returns { instance: { state: 'open' } } or similar
-            const state = statusData.instance?.state || 'disconnected';
-
+            const state = statusData.instance?.state || statusData.state || 'disconnected';
             const isConnected = state === 'open';
 
-            // Update DB
+            console.log(`🔍 Status check for ${instanceName}: ${state} (Connected: ${isConnected})`);
+
+            // 2. Check Current DB Status
+            const { data: currentDb } = await supabase
+                .from('whatsapp_instances')
+                .select('status')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            // 3. SELF-HEALING: If transitioning to Connected, FORCE CONFIGURATION
+            if (isConnected && currentDb?.status !== 'connected') {
+                console.log('🚀 Detected new connection! Applying configuration...');
+                await configureInstance(instanceName);
+            }
+
+            // 4. Update DB
+            // Only update if state changed or if we need to clear QR code
+            // If Evolution says 'connecting' or 'close', we might want to keep 'connecting' in DB if we just started
+            // But if it says 'open', we definitely want 'connected'
+
+            let newStatus = 'disconnected';
+            if (isConnected) newStatus = 'connected';
+            else if (state === 'connecting') newStatus = 'connecting';
+
+            // If Evolution is 'close' but we are 'connecting', maybe we timed out? 
+            // For now, let's trust Evolution. If it says close, it's disconnected.
+
             await supabase
                 .from('whatsapp_instances')
                 .update({
-                    status: isConnected ? 'connected' : 'disconnected',
-                    qr_code: isConnected ? null : undefined // Clear QR if connected
+                    status: newStatus,
+                    qr_code: isConnected ? null : (newStatus === 'connecting' ? currentDb?.qr_code : null)
                 })
                 .eq('user_id', user.id);
 
-            return new Response(JSON.stringify({ success: true, status: isConnected ? 'connected' : 'disconnected' }), {
+            return new Response(JSON.stringify({ success: true, status: newStatus }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        if (action === 'logout_instance') {
+            try {
+                await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+                    method: 'DELETE',
+                    headers: { 'apikey': evolutionApiKey }
+                });
+            } catch (error) {
+                console.warn('Logout failed:', error);
+            }
+
+            // Update DB to disconnected
+            await supabase
+                .from('whatsapp_instances')
+                .update({ status: 'disconnected', qr_code: null })
+                .eq('user_id', user.id);
+
+            return new Response(JSON.stringify({ success: true }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
         if (action === 'delete_instance') {
-            await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
-                method: 'DELETE',
-                headers: { 'apikey': evolutionApiKey }
-            });
+            // Try to logout first, but don't fail if it errors (e.g. already disconnected)
+            try {
+                await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+                    method: 'DELETE',
+                    headers: { 'apikey': evolutionApiKey }
+                });
+            } catch (logoutError) {
+                console.warn('Logout failed (ignoring):', logoutError);
+            }
 
-            // Also delete from Evolution registry to be clean
-            await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
-                method: 'DELETE',
-                headers: { 'apikey': evolutionApiKey }
-            });
+            // Always try to delete from Evolution registry
+            try {
+                await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+                    method: 'DELETE',
+                    headers: { 'apikey': evolutionApiKey }
+                });
+            } catch (deleteError) {
+                console.warn('Delete from Evolution failed (ignoring):', deleteError);
+            }
 
+            // Always delete from our DB
             await supabase.from('whatsapp_instances').delete().eq('user_id', user.id);
 
             return new Response(JSON.stringify({ success: true }), {

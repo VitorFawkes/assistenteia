@@ -278,28 +278,31 @@ export type Database = {
             }
             user_settings: {
                 Row: {
-                    ai_model: string | null
-                    created_at: string | null
-                    custom_system_prompt: string | null
                     id: string
-                    updated_at: string | null
                     user_id: string
+                    custom_system_prompt: string | null
+                    ai_model: string | null
+                    preferred_name: string | null
+                    created_at: string
+                    updated_at: string
                 }
                 Insert: {
-                    ai_model?: string | null
-                    created_at?: string | null
-                    custom_system_prompt?: string | null
                     id?: string
-                    updated_at?: string | null
                     user_id: string
+                    custom_system_prompt?: string | null
+                    ai_model?: string | null
+                    preferred_name?: string | null
+                    created_at?: string
+                    updated_at?: string
                 }
                 Update: {
-                    ai_model?: string | null
-                    created_at?: string | null
-                    custom_system_prompt?: string | null
                     id?: string
-                    updated_at?: string | null
                     user_id?: string
+                    custom_system_prompt?: string | null
+                    ai_model?: string | null
+                    preferred_name?: string | null
+                    created_at?: string
+                    updated_at?: string
                 }
                 Relationships: []
             },

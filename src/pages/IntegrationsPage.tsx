@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Check, AlertCircle, Loader2, Smartphone, Trash2, RefreshCw } from 'lucide-react';
+import { Calendar, Check, AlertCircle, Loader2, Smartphone, Trash2, RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 
@@ -22,7 +22,7 @@ export default function IntegrationsPage() {
 
     useEffect(() => {
         fetchIntegrations();
-        fetchWhatsappStatus();
+        fetchWhatsappStatus(true); // Force sync on load
 
         // Check for success param in URL
         const params = new URLSearchParams(window.location.search);
@@ -30,15 +30,23 @@ export default function IntegrationsPage() {
             window.history.replaceState({}, '', window.location.pathname);
             fetchIntegrations();
         }
+    }, []);
 
-        // Poll WhatsApp status if connecting
-        const interval = setInterval(() => {
-            if (whatsapp?.status === 'connecting') {
-                fetchWhatsappStatus();
-            }
-        }, 3000);
+    // Poll WhatsApp status if connecting
+    // Poll WhatsApp status if connecting
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
 
-        return () => clearInterval(interval);
+        if (whatsapp?.status === 'connecting') {
+            // Poll every 3 seconds
+            interval = setInterval(() => {
+                fetchWhatsappStatus(true);
+            }, 3000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
     }, [whatsapp?.status]);
 
     const fetchIntegrations = async () => {
@@ -56,8 +64,23 @@ export default function IntegrationsPage() {
         }
     };
 
-    const fetchWhatsappStatus = async () => {
+    const fetchWhatsappStatus = async (force = false) => {
         try {
+            // If forcing update (e.g. polling), call Edge Function to sync with Evolution
+            if (force) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    await fetch('https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/whatsapp-manager', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({ action: 'get_status' })
+                    });
+                }
+            }
+
             const { data } = await supabase
                 .from('whatsapp_instances')
                 .select('status, qr_code')
@@ -101,7 +124,13 @@ export default function IntegrationsPage() {
             const result = await response.json();
             if (!result.success) throw new Error(result.error);
 
-            fetchWhatsappStatus();
+            if (result.status === 'connected') {
+                setWhatsapp({ status: 'connected' });
+            } else if (result.qr_code) {
+                setWhatsapp({ status: 'connecting', qr_code: result.qr_code });
+            } else {
+                fetchWhatsappStatus(true);
+            }
         } catch (err: any) {
             setError(err.message || 'Erro ao conectar WhatsApp');
         } finally {
@@ -109,8 +138,33 @@ export default function IntegrationsPage() {
         }
     };
 
+    const handleLogoutWhatsapp = async () => {
+        if (!confirm('Deseja apenas desconectar (sair) do WhatsApp? A instância será mantida.')) return;
+
+        setIsWhatsappLoading(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            await fetch('https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/whatsapp-manager', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ action: 'logout_instance' })
+            });
+
+            fetchWhatsappStatus(); // Refresh status
+        } catch (err: any) {
+            setError('Erro ao sair.');
+        } finally {
+            setIsWhatsappLoading(false);
+        }
+    };
+
     const handleDisconnectWhatsapp = async () => {
-        if (!confirm('Tem certeza que deseja desconectar o WhatsApp?')) return;
+        if (!confirm('Tem certeza que deseja EXCLUIR a conexão? Você precisará escanear o QR Code novamente.')) return;
 
         setIsWhatsappLoading(true);
         try {
@@ -139,7 +193,7 @@ export default function IntegrationsPage() {
     };
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-6 max-w-4xl mx-auto pb-32">
             <h1 className="text-3xl font-bold text-white mb-2">Integrações</h1>
             <p className="text-gray-400 mb-8">Conecte seus serviços para potencializar sua assistente.</p>
 
@@ -173,9 +227,14 @@ export default function IntegrationsPage() {
                                 <Check size={18} />
                                 <span className="font-medium">Conectado</span>
                             </div>
-                            <Button variant="ghost" onClick={handleDisconnectWhatsapp} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-                                <Trash2 size={16} className="mr-2" /> Desconectar
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="secondary" onClick={handleLogoutWhatsapp} className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 border-gray-600">
+                                    <LogOut size={16} className="mr-2" /> Sair
+                                </Button>
+                                <Button variant="ghost" onClick={handleDisconnectWhatsapp} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                                    <Trash2 size={16} className="mr-2" /> Excluir
+                                </Button>
+                            </div>
                         </div>
                     ) : whatsapp?.status === 'connecting' && whatsapp.qr_code ? (
                         <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in">
@@ -183,7 +242,7 @@ export default function IntegrationsPage() {
                                 <img
                                     src={whatsapp.qr_code.startsWith('data:image') ? whatsapp.qr_code : `data:image/png;base64,${whatsapp.qr_code}`}
                                     alt="QR Code"
-                                    className="w-48 h-48"
+                                    className="w-32 h-32" // Changed QR code size
                                 />
                             </div>
 
@@ -191,14 +250,24 @@ export default function IntegrationsPage() {
                                 Escaneie o QR Code com seu WhatsApp. Se expirar, clique abaixo.
                             </p>
 
-                            <Button
-                                onClick={handleConnectWhatsapp}
-                                variant="secondary"
-                                className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
-                            >
-                                <RefreshCw className="w-4 h-4 mr-2" />
-                                Atualizar QR Code
-                            </Button>
+                            <div className="flex gap-2 w-full">
+                                <Button
+                                    onClick={handleConnectWhatsapp}
+                                    variant="secondary"
+                                    className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                                >
+                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                    Atualizar
+                                </Button>
+                                <Button
+                                    onClick={handleDisconnectWhatsapp}
+                                    variant="ghost"
+                                    className="flex-1 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Cancelar
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <Button onClick={handleConnectWhatsapp} className="bg-[#25D366] hover:bg-[#20bd5a] text-white px-8">

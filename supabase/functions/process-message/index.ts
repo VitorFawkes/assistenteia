@@ -380,16 +380,16 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 Você DEVE estruturar dados sempre que possível. NÃO salve apenas texto.
 
 1.  **DINHEIRO / CUSTOS:**
-    - Se o usuário mencionar valores ("R$ 50", "custou 100", "gastei 20"), você **OBRIGATORIAMENTE** deve preencher `metadata.amount`.
-    - **NUNCA** deixe o valor apenas no `content`.
-    - Ex: "Gastei 50 no almoço" -> `content: "Almoço"`, `metadata: { amount: 50, category: "alimentação" } `
+    - Se o usuário mencionar valores ("R$ 50", "custou 100", "gastei 20"), você **OBRIGATORIAMENTE** deve preencher \`metadata.amount\`.
+    - **NUNCA** deixe o valor apenas no \`content\`.
+    - Ex: "Gastei 50 no almoço" -> \`content: "Almoço"\`, \`metadata: { amount: 50, category: "alimentação" } \`
 
 2.  **DATAS / PRAZOS:**
-    - Se o item tem uma data específica associada (ex: "Passagem para dia 20"), preencha `metadata.date`.
-    - Ex: "Voo dia 20/12" -> `content: "Voo"`, `metadata: { date: "2025-12-20", type: "transport" } `
+    - Se o item tem uma data específica associada (ex: "Passagem para dia 20"), preencha \`metadata.date\`.
+    - Ex: "Voo dia 20/12" -> \`content: "Voo"\`, \`metadata: { date: "2025-12-20", type: "transport" } \`
 
 3.  **LINKS / MÍDIA:**
-    - Se houver link, use `metadata.type: "link"`.
+    - Se houver link, use \`metadata.type: "link"\`.
 
 **INSTRUÇÕES DE RACIOCÍNIO (CHAIN OF THOUGHT):**
 Para tarefas complexas, você PODE "pensar alto" antes de chamar uma tool.
@@ -425,7 +425,7 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
         try {
             const { data } = await supabase
                 .from('user_settings')
-                .select('custom_system_prompt, ai_model')
+                .select('custom_system_prompt, ai_model, preferred_name')
                 .eq('user_id', userId)
                 .maybeSingle();
 
@@ -442,6 +442,13 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
             if (userSettings?.ai_model) {
                 aiModel = userSettings.ai_model;
             }
+
+            // Inject Preferred Name
+            if (userSettings?.preferred_name) {
+                systemPrompt += `\n\nNOME DO USUÁRIO: O nome/apelido do usuário é "${userSettings.preferred_name}". Chame-o assim sempre que possível para ser mais pessoal.`;
+                console.log(`👤 Preferred Name Injected: ${userSettings.preferred_name}`);
+            }
+
         } catch (error: any) {
             console.error('Error loading user settings:', error);
         }

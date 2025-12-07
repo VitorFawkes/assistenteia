@@ -93,7 +93,7 @@ export default function Layout() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-hidden relative flex flex-col">
+            <main className="flex-1 overflow-y-auto relative flex flex-col">
                 <Outlet />
             </main>
         </div>
