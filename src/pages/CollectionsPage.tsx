@@ -142,17 +142,29 @@ export default function CollectionsPage() {
 
     // Grouping Logic
     const groupedItems = filteredItems.reduce((acc, item) => {
-        const category = item.metadata?.subcategory || 'Geral';
-        if (!acc[category]) acc[category] = [];
-        acc[category].push(item);
+        // Priority: Section -> Subcategory -> Geral
+        const section = item.metadata?.section || item.metadata?.subcategory || 'Geral';
+        if (!acc[section]) acc[section] = [];
+        acc[section].push(item);
         return acc;
     }, {} as Record<string, typeof filteredItems>);
 
     const sortedCategories = Object.keys(groupedItems).sort((a, b) => {
-        if (a === 'Financeiro') return -1; // Financeiro first
-        if (b === 'Financeiro') return 1;
-        if (a === 'Geral') return 1; // Geral last
+        // Smart Sorting:
+        // 1. "Geral" always last
+        // 2. "Financeiro" (if used as section) near top? No, let's stick to alphabetical for sections unless specific.
+        // Actually, let's try to detect "Semana X" and sort numerically if possible, otherwise alphabetical.
+
+        if (a === 'Geral') return 1;
         if (b === 'Geral') return -1;
+
+        // Try to sort "Semana 1", "Semana 2" correctly
+        const weekA = a.match(/Semana (\d+)/i);
+        const weekB = b.match(/Semana (\d+)/i);
+        if (weekA && weekB) {
+            return parseInt(weekA[1]) - parseInt(weekB[1]);
+        }
+
         return a.localeCompare(b);
     });
 

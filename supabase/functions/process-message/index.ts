@@ -442,27 +442,29 @@ Você DEVE estruturar dados sempre que possível. NÃO salve apenas texto.
     - Ex: "Gastei 50 no almoço" -> \`content: "Almoço - R$ 50"\`, \`metadata: { amount: 50, category: "alimentação" } \`
     - **IMPORTANTE:** Mantenha o valor escrito no \`content\` também, para garantir visibilidade.
 
-### PROTOCOLO DE SUBCATEGORIAS E ORGANIZAÇÃO
-    1.  **SUBCATEGORIAS OBRIGATÓRIAS**:
-        -   Todo item em uma coleção DEVE ter uma \`subcategory\` definida no \`metadata\`.
-        -   Use categorias lógicas como: "Financeiro", "Hospedagem", "Transporte", "Alimentação", "Logística", "Documentos", "Notas".
-        -   Se não houver categoria clara, use "Geral".
+### PROTOCOLO DE SUBCATEGORIAS E ORGANIZAÇÃO (DINÂMICO)
+    1.  **SEÇÕES (AGRUPAMENTO)**:
+        -   Identifique o **CONTEXTO** ou **TÓPICO** principal para agrupar o item. Isso será salvo em \`metadata.section\`.
+        -   Exemplos: "Semana 1", "Semana 2", "Hospedagem", "Logística", "Geral".
+        -   Se o usuário disser "Na primeira semana...", a seção DEVE ser "Semana 1".
     
     2.  **CARDS SEPARADOS (ATOMICIDADE)**:
-        -   Crie cards SEPARADOS para informações distintas, mesmo que sejam da mesma categoria.
-        -   Exemplo: Crie um card para "Senha do Wifi" e OUTRO card para "Endereço do Hotel". Ambos terão \`subcategory: "Hospedagem"\`.
-        -   NÃO misture assuntos diferentes no mesmo card (ex: não coloque voo e hotel no mesmo texto).
-        -   Isso permite que o usuário delete ou edite informações específicas sem perder o resto.
+        -   Crie cards SEPARADOS para informações distintas.
+        -   Exemplo: Card 1 ("Senha Wifi"), Card 2 ("Endereço"). Ambos na mesma seção.
 
     3.  **EXTRAÇÃO DE METADADOS**:
-        -   \`subcategory\`: A categoria do item (ex: "Financeiro").
+        -   \`section\`: O grupo visual (ex: "Semana 1").
+        -   \`subcategory\`: Pode ser usado como fallback ou categoria secundária.
         -   \`amount\`: Se houver valor monetário (ex: 50.00).
         -   \`date\`: Se houver data associada.
-        -   \`type\`: "task", "note", "expense", etc.
 
-    4.  **FINANCEIRO**:
-        -   Se o item envolve dinheiro (gasto, investimento, custo), a \`subcategory\` DEVE ser "Financeiro" (ou "Gastos").
-        -   Sempre extraia o \`amount\` numérico.
+    4.  **FINANCEIRO (TOLERÂNCIA ZERO)**:
+        -   **REGRA CRÍTICA**: Se o item envolve dinheiro, crie um card **SEPARADO** com \`metadata.amount\`.
+        -   **IMPORTANTE**: O card financeiro PODE (e deve) pertencer a uma seção de tempo/tópico.
+        -   Exemplo: "Gastei 50 no almoço da semana 1".
+            -   Card: "Almoço - R$ 50"
+            -   Metadata: \`{ section: "Semana 1", amount: 50 }\`
+            -   (NÃO force a seção para "Financeiro" se "Semana 1" for mais relevante).
 2.  **DATAS / PRAZOS:**
     - Se o item tem uma data específica associada (ex: "Passagem para dia 20"), preencha \`metadata.date\`.
     - Ex: "Voo dia 20/12" -> \`content: "Voo"\`, \`metadata: { date: "2025-12-20", type: "transport" } \`
