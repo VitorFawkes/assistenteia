@@ -39,14 +39,9 @@ Deno.serve(async (req: Request) => {
         console.log('🔔 Checking for overdue reminders...');
 
         // Get all non-completed reminders that are due
-        // JOIN with whatsapp_instances to get the instance name for each user
         const { data: overdueReminders, error } = await supabase
             .from('reminders')
-            .select(`
-                *,
-                users (id),
-                whatsapp_instances (instance_name, status)
-            `)
+            .select('*')
             .eq('is_completed', false)
             .lte('due_at', new Date().toISOString())
             .order('due_at');
@@ -63,22 +58,21 @@ Deno.serve(async (req: Request) => {
 
         for (const reminder of overdueReminders || []) {
             try {
-                const instanceName = reminder.whatsapp_instances?.instance_name;
-                const instanceStatus = reminder.whatsapp_instances?.status;
+                // Fetch instance info manually
+                const { data: instanceData } = await supabase
+                    .from('whatsapp_instances')
+                    .select('instance_name, status')
+                    .eq('user_id', reminder.user_id)
+                    .maybeSingle();
+
+                const instanceName = instanceData?.instance_name;
+                const instanceStatus = instanceData?.status;
 
                 // Send WhatsApp notification ONLY if instance is connected
                 if (evolutionApiUrl && evolutionApiKey && instanceName && instanceStatus === 'connected') {
                     const message = `🔔 *Lembrete:* ${reminder.title}`;
 
-                    // We need the destination number. 
-                    // In a perfect world, we'd store the user's phone number in the 'users' table or 'whatsapp_instances'.
-                    // For now, we assume the instance is connected to the user's phone, so we can send to "myself" or we need the user's number.
-                    // WAIT: Evolution API sends to a number. We need the user's phone number.
-                    // The previous code used `users(phone_number)`. Let's check if we still have it.
-                    // The `users` table in Supabase Auth usually doesn't expose phone easily unless we have a public `users` table copy.
-                    // My previous analysis showed a `users` table in public schema with `phone_number`.
-
-                    // Let's fetch the phone number from the public users table if not in the join
+                    // Fetch user phone number manually
                     const { data: userData } = await supabase
                         .from('users')
                         .select('phone_number')
@@ -88,7 +82,8 @@ Deno.serve(async (req: Request) => {
                     const phoneNumber = userData?.phone_number;
 
                     if (phoneNumber) {
-                        await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+                        console.log(`Sending to ${phoneNumber} via ${instanceName}...`);
+                        const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -99,8 +94,14 @@ Deno.serve(async (req: Request) => {
                                 text: message,
                             }),
                         });
-                        console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber} via instance ${instanceName}`);
-                        notificationsSent++;
+
+                        if (!response.ok) {
+                            const errText = await response.text();
+                            console.error(`❌ Failed to send WhatsApp: ${response.status} - ${errText}`);
+                        } else {
+                            console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber}`);
+                            notificationsSent++;
+                        }
                     } else {
                         console.warn(`⚠️ No phone number for user ${reminder.user_id}, cannot send WhatsApp.`);
                     }

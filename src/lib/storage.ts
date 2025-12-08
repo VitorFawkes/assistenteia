@@ -36,7 +36,8 @@ export async function processMessage(
     content: string,
     userId: string,
     mediaUrl?: string,
-    mediaType?: 'image' | 'audio' | 'document'
+    mediaType?: 'image' | 'audio' | 'document',
+    messageId?: string
 ): Promise<{ success: boolean; response?: string; error?: string; action?: string }> {
     try {
         const { data, error } = await supabase.functions.invoke('process-message', {
@@ -45,6 +46,7 @@ export async function processMessage(
                 mediaUrl,
                 mediaType,
                 userId,
+                messageId
             },
         });
 

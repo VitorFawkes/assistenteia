@@ -6,6 +6,64 @@ interface ProcessMessageRequest {
     mediaUrl?: string;
     mediaType?: 'image' | 'audio' | 'document';
     userId: string;
+    messageId?: string;
+}
+
+function calculateDueAt(args: any, brasiliaTime: Date, overrideDueAt: string | null): string | null {
+    let finalDueAt = args.due_at || null;
+
+    if (args.time_config) {
+        const { mode } = args.time_config;
+        const targetDate = new Date(brasiliaTime.getTime());
+        console.log(`🧠 TIME CONFIG RECEIVED: Mode = ${mode} `, args.time_config);
+
+        if (mode === 'relative') {
+            const { relative_amount, relative_unit } = args.time_config;
+            if (relative_amount && relative_unit) {
+                if (relative_unit === 'minutes') targetDate.setMinutes(targetDate.getMinutes() + relative_amount);
+                else if (relative_unit === 'hours') targetDate.setHours(targetDate.getHours() + relative_amount);
+                else if (relative_unit === 'days') targetDate.setDate(targetDate.getDate() + relative_amount);
+
+                finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
+            }
+        } else if (mode === 'absolute') {
+            const { target_day, target_month, target_year, target_hour, target_minute } = args.time_config;
+
+            // Se ano não informado, usa atual
+            if (target_year) targetDate.setFullYear(target_year);
+
+            // Se mês informado (1-12), ajusta (0-11)
+            if (target_month) targetDate.setMonth(target_month - 1);
+
+            // Se dia informado
+            if (target_day) targetDate.setDate(target_day);
+
+            // Se hora informada
+            if (target_hour !== undefined) targetDate.setHours(target_hour);
+            else targetDate.setHours(9); // Default para "manhã" se não especificado
+
+            // Se minuto informado
+            if (target_minute !== undefined) targetDate.setMinutes(target_minute);
+            else targetDate.setMinutes(0);
+
+            finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
+        }
+    }
+    // FALLBACKS (Para compatibilidade ou segurança)
+    else if (args.relative_time && args.relative_time.amount) {
+        // Lógica antiga (Híbrido 1.0)
+        const { amount, unit } = args.relative_time;
+        const targetDate = new Date(brasiliaTime.getTime());
+        if (unit === 'minutes') targetDate.setMinutes(targetDate.getMinutes() + amount);
+        else if (unit === 'hours') targetDate.setHours(targetDate.getHours() + amount);
+        else if (unit === 'days') targetDate.setDate(targetDate.getDate() + amount);
+        finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
+    }
+    else if (overrideDueAt) {
+        finalDueAt = overrideDueAt;
+    }
+
+    return finalDueAt;
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,7 +78,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { content, mediaUrl, mediaType, userId }: ProcessMessageRequest = await req.json();
+        const { content, mediaUrl, mediaType, userId, messageId }: ProcessMessageRequest = await req.json();
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -49,10 +107,11 @@ Deno.serve(async (req: Request) => {
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['create', 'list'], description: 'Ação a realizar' },
-                            name: { type: 'string', description: 'Nome da coleção (para create)' },
-                            description: { type: 'string', description: 'Descrição (para create)' },
-                            icon: { type: 'string', description: 'Emoji (para create)' }
+                            action: { type: 'string', enum: ['create', 'list', 'update', 'delete'], description: 'Ação a realizar' },
+                            name: { type: 'string', description: 'Nome da coleção (alvo para update/delete)' },
+                            new_name: { type: 'string', description: 'Novo nome da coleção (para update)' },
+                            description: { type: 'string', description: 'Descrição (para create/update)' },
+                            icon: { type: 'string', description: 'Emoji (para create/update)' }
                         },
                         required: ['action']
                     }
@@ -74,7 +133,8 @@ Deno.serve(async (req: Request) => {
                             // Critérios para encontrar item para update/delete
                             search_content: { type: 'string', description: 'Texto para buscar item a alterar/deletar' },
                             search_metadata_key: { type: 'string', description: 'Chave do metadata para busca (ex: category)' },
-                            search_metadata_value: { type: 'string', description: 'Valor do metadata para busca (ex: transporte)' }
+                            search_metadata_value: { type: 'string', description: 'Valor do metadata para busca (ex: transporte)' },
+                            should_append: { type: 'boolean', description: 'Se true, ADICIONA o novo conteúdo ao final do existente (para update). Se false, SUBSTITUI.' }
                         },
                         required: ['action', 'collection_name']
                     }
@@ -110,8 +170,9 @@ Deno.serve(async (req: Request) => {
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['create', 'list', 'update', 'complete'], description: 'Ação' },
+                            action: { type: 'string', enum: ['create', 'list', 'update', 'complete', 'delete'], description: 'Ação' },
                             title: { type: 'string', description: 'Título do lembrete' },
+                            id: { type: 'string', description: 'ID do lembrete (para update/complete). Use o ID retornado pelo list.' },
                             // NOVO: Configuração de Tempo (Component Based)
                             time_config: {
                                 type: 'object',
@@ -193,26 +254,19 @@ Deno.serve(async (req: Request) => {
                     }
                 }
             },
+
             {
                 type: 'function',
                 function: {
-                    name: 'manage_calendar',
-                    description: 'Gerencia calendários externos (Google Calendar, Outlook). Use para agendar reuniões, verificar disponibilidade e listar eventos.',
+                    name: 'manage_rules',
+                    description: 'Gerencia as Regras e Preferências do usuário (Brain). Use isso para salvar instruções permanentes sobre como o usuário gosta que você se comporte.',
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['list_events', 'create_event', 'update_event', 'delete_event'], description: 'Ação a realizar' },
-                            provider: { type: 'string', enum: ['google', 'microsoft', 'all'], description: 'Qual calendário usar (padrão: all para list, google/microsoft para create)' },
-                            // Event Details
-                            summary: { type: 'string', description: 'Título do evento' },
-                            description: { type: 'string', description: 'Descrição do evento' },
-                            start_time: { type: 'string', description: 'Data/hora de início (ISO 8601)' },
-                            end_time: { type: 'string', description: 'Data/hora de fim (ISO 8601)' },
-                            attendees: { type: 'array', items: { type: 'string' }, description: 'Lista de emails dos participantes' },
-                            // Search/Filter
-                            time_min: { type: 'string', description: 'Início do período de busca (ISO)' },
-                            time_max: { type: 'string', description: 'Fim do período de busca (ISO)' },
-                            max_results: { type: 'number', description: 'Máximo de eventos para retornar' }
+                            action: { type: 'string', enum: ['create', 'delete', 'list'], description: 'Ação a realizar' },
+                            key: { type: 'string', description: 'Tópico da regra (ex: "Tom de voz", "Formatação", "Horários")' },
+                            value: { type: 'string', description: 'A regra em si (ex: "Seja sempre formal", "Use listas com emojis")' },
+                            id: { type: 'string', description: 'ID da regra (para delete)' }
                         },
                         required: ['action']
                     }
@@ -333,6 +387,7 @@ Ferramentas:
 - manage_tasks: gerenciar lista de tarefas (To-Do) sem hora marcada obrigatória
 - save_memory: salvar fatos importantes na memória permanente (vetorial)
 - recall_memory: buscar memórias passadas por significado (RAG)
+- manage_rules: criar/listar/deletar regras de comportamento e preferências (Brain)
 
 Exemplos:
 "Cria pasta Viagem" -> manage_collections {action: "create", name: "Viagem"}
@@ -346,6 +401,8 @@ Exemplos:
 "Coloca na lista comprar pão" -> manage_tasks {action: "create", title: "Comprar pão", priority: "medium", tags: ["mercado"]}
 "O que tenho pra fazer?" -> manage_tasks {action: "list", filter_status: "todo"}
 "Lembre que eu não gosto de cebola" -> save_memory {content: "O usuário não gosta de cebola", category: "preferência"}
+"Sempre me chame de Chefe" -> manage_rules {action: "create", key: "Apelido", value: "Sempre chamar o usuário de Chefe"}
+"Nunca use emojis" -> manage_rules {action: "create", key: "Estilo", value: "Não usar emojis nas respostas"}
 
 **LEMBRETES RECORRENTES - Exemplos:**
 "Me lembra todo dia às 10h de tomar água" -> manage_reminders {action: "create", title: "tomar água", time_config: {mode: "absolute", target_hour: 10, target_minute: 0}, recurrence_type: "daily"}
@@ -382,7 +439,19 @@ Você DEVE estruturar dados sempre que possível. NÃO salve apenas texto.
 1.  **DINHEIRO / CUSTOS:**
     - Se o usuário mencionar valores ("R$ 50", "custou 100", "gastei 20"), você **OBRIGATORIAMENTE** deve preencher \`metadata.amount\`.
     - **NUNCA** deixe o valor apenas no \`content\`.
-    - Ex: "Gastei 50 no almoço" -> \`content: "Almoço"\`, \`metadata: { amount: 50, category: "alimentação" } \`
+    - Ex: "Gastei 50 no almoço" -> \`content: "Almoço - R$ 50"\`, \`metadata: { amount: 50, category: "alimentação" } \`
+    - **IMPORTANTE:** Mantenha o valor escrito no \`content\` também, para garantir visibilidade.
+
+2.  **PROTOCOLO DE AGRUPAMENTO (ANTI-FRAGMENTAÇÃO - CRÍTICO):**
+    - **REGRA DE OURO:** Evite criar múltiplos cards para o mesmo assunto.
+    - **AGRUPE POR TÓPICO:** Se o usuário mandar "Senha do Wifi", depois "Endereço", depois "Check-in", TUDO ISSO pertence ao tópico "Estadia/Casa".
+    - **AÇÃO:**
+        1.  Identifique o Tópico (ex: "Estadia").
+        2.  Busque se já existe um item sobre esse tópico na coleção.
+        3.  **SE EXISTIR:** Use \`manage_items\` -> \`update\` com \`should_append: true\` para adicionar a nova info ao item existente.
+        4.  **SE NÃO EXISTIR:** Crie um novo item.
+    - **OBJETIVO:** Ter UM card completo com todas as infos daquele tópico, em vez de 5 cards picados.
+    - **VALORES:** Se for um valor (R$), garanta que \`metadata.amount\` esteja preenchido, mesmo se estiver atualizando um card existente.
 
 2.  **DATAS / PRAZOS:**
     - Se o item tem uma data específica associada (ex: "Passagem para dia 20"), preencha \`metadata.date\`.
@@ -403,8 +472,10 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
     - Para datas passadas (ex: "última semana"), você PODE calcular a data ISO aproximada (ex: hoje - 7 dias).
     - Para "tarefas abertas", use \`manage_reminders\` com \`action: 'list'\`.
 
-2.  **MEMÓRIA PROFUNDA (RAG):**
+2.  **MEMÓRIA PROFUNDA (RAG) - CRÍTICO:**
     - Se o usuário perguntar algo vago ("Qual era o nome daquele restaurante?", "O que eu falei sobre o projeto X?"), use \`recall_memory\`.
+    - **OBRIGATÓRIO:** Se o usuário perguntar sobre memórias salvas ("O que você sabe sobre mim?", "O que tem na sua memória?", "O que eu te pedi para lembrar?", "Você consegue acessar suas memórias?"), você DEVE chamar \`recall_memory\` com query genérica como "preferências fatos informações do usuário".
+    - **NUNCA** responda "não há memórias salvas" ou "não encontrei nenhuma memória" SEM ANTES ter chamado \`recall_memory\` para verificar!
     - Isso busca no banco vetorial por significado. Use isso antes de dizer "não sei".
 
 3.  **PROATIVIDADE E FOLLOW-UP:**
@@ -473,15 +544,15 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
         systemPrompt += `\n\nCONTEXTO DE DADOS ATUAL: \n - Coleções / Pastas Existentes: [${existingCollections}]\n - Use essas pastas se apropriado antes de criar novas.`;
 
         // --- 🧠 DEEP LEARNING: FETCH USER RULES ---
-        // Buscar regras que o usuário ensinou (salvas na coleção 'user_preferences' ou 'regras_sistema')
+        // Buscar regras que o usuário ensinou (salvas na tabela 'user_preferences')
         const { data: userRules } = await supabase
-            .from('collection_items')
-            .select('content')
-            .eq('collection_id', (await supabase.from('collections').select('id').eq('name', 'user_preferences').eq('user_id', userId).maybeSingle()).data?.id);
+            .from('user_preferences')
+            .select('key, value')
+            .eq('user_id', userId);
 
         if (userRules && userRules.length > 0) {
-            const rulesText = userRules.map((r: any) => `- ${r.content} `).join('\n');
-            systemPrompt += `\n\nREGRAS APRENDIDAS(PREFERÊNCIAS DO USUÁRIO): \n${rulesText} \n(Siga estas regras acima de tudo).`;
+            const rulesText = userRules.map((r: any) => `- [${r.key}]: ${r.value}`).join('\n');
+            systemPrompt += `\n\nREGRAS APRENDIDAS (PREFERÊNCIAS DO USUÁRIO):\n${rulesText}\n(Siga estas regras acima de tudo).`;
             console.log(`🧠 Injected ${userRules.length} user rules.`);
         }
 
@@ -615,6 +686,15 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
         }
 
         console.log('📝 FINAL TEXT SENT TO AI:', processedText);
+
+        // --- AUDIO TRANSCRIPTION UPDATE (FIX VISIBILITY) ---
+        // If we have a messageId and the text was transcribed (it was audio), update the DB
+        if (messageId && processedText && mediaType === 'audio') {
+            console.log(`💾 Updating transcription for message ${messageId}...`);
+            await supabase.from('messages').update({
+                content: processedText
+            }).eq('id', messageId);
+        }
 
         // --- 🧠 MEMORY LAYER: SAVE USER MESSAGE & RETRIEVE HISTORY ---
 
@@ -754,6 +834,35 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                         } else if (args.action === 'list') {
                             const { data } = await supabase.from('collections').select('name').eq('user_id', userId);
                             toolOutput = `Pastas existentes: ${data?.map((c: any) => c.name).join(', ') || 'Nenhuma'} `;
+                        } else if (args.action === 'update') {
+                            // Find collection by name
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.name}" não encontrada.`;
+                            } else {
+                                const updateData: any = {};
+                                if (args.new_name) updateData.name = args.new_name;
+                                if (args.description) updateData.description = args.description;
+                                if (args.icon) updateData.icon = args.icon;
+
+                                if (Object.keys(updateData).length === 0) {
+                                    toolOutput = "Nenhuma alteração fornecida. Informe new_name, description ou icon.";
+                                } else {
+                                    const { error } = await supabase.from('collections').update(updateData).eq('id', coll.id);
+                                    if (error) {
+                                        toolOutput = `Erro ao atualizar pasta: ${error.message}`;
+                                    } else {
+                                        toolOutput = `Pasta "${args.name}" atualizada com sucesso.`;
+                                    }
+                                }
+                            }
+                        } else if (args.action === 'delete') {
+                            const { error } = await supabase.from('collections').delete().eq('user_id', userId).eq('name', args.name);
+                            if (error) {
+                                toolOutput = `Erro ao apagar pasta: ${error.message}`;
+                            } else {
+                                toolOutput = `Pasta "${args.name}" apagada com sucesso.`;
+                            }
                         }
                     }
 
@@ -780,7 +889,10 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                                     type: args.type || 'text',
                                     content: args.content || null,
                                     media_url: args.media_url || mediaUrl || null,
-                                    metadata: args.metadata || null,
+                                    metadata: args.metadata ? {
+                                        ...args.metadata,
+                                        amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                    } : null,
                                 });
 
                                 if (insertError) {
@@ -799,7 +911,10 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                                     type: args.type || 'text',
                                     content: args.content || null,
                                     media_url: args.media_url || mediaUrl || null,
-                                    metadata: args.metadata || null,
+                                    metadata: args.metadata ? {
+                                        ...args.metadata,
+                                        amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                    } : null,
                                 });
 
                                 if (insertError) {
@@ -814,7 +929,7 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                                 // Lógica de busca para encontrar o item
                                 let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id);
 
-                                if (args.search_content) query = query.ilike('content', `% ${args.search_content}% `);
+                                if (args.search_content) query = query.ilike('content', `%${args.search_content}%`);
                                 if (args.search_metadata_key && args.search_metadata_value) {
                                     query = query.eq(`metadata ->> ${args.search_metadata_key} `, args.search_metadata_value);
                                 }
@@ -829,13 +944,71 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                                         await supabase.from('collection_items').delete().eq('id', targetItem.id);
                                         toolOutput = `Item apagado da pasta "${args.collection_name}".`;
                                     } else {
+                                        let newContent = args.content || targetItem.content;
+                                        if (args.should_append && args.content) {
+                                            newContent = `${targetItem.content}\n${args.content}`;
+                                        }
+
                                         await supabase.from('collection_items').update({
-                                            content: args.content || targetItem.content,
-                                            metadata: args.metadata ? { ...targetItem.metadata, ...args.metadata } : targetItem.metadata
+                                            content: newContent,
+                                            metadata: args.metadata ? {
+                                                ...targetItem.metadata,
+                                                ...args.metadata,
+                                                amount: args.metadata.amount ? Number(args.metadata.amount) : (targetItem.metadata?.amount || undefined)
+                                            } : targetItem.metadata
                                         }).eq('id', targetItem.id);
                                         toolOutput = `Item atualizado na pasta "${args.collection_name}".`;
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE RULES ---
+                    else if (functionName === 'manage_rules') {
+                        console.log('rules manager called', args);
+                        if (args.action === 'create') {
+                            if (!args.key || !args.value) {
+                                toolOutput = "Erro: 'key' e 'value' são obrigatórios para criar uma regra.";
+                            } else {
+                                const { error } = await supabase.from('user_preferences').insert({
+                                    user_id: userId,
+                                    key: args.key,
+                                    value: args.value
+                                });
+                                if (error) {
+                                    console.error('Error creating rule:', error);
+                                    toolOutput = `Erro ao criar regra: ${error.message}`;
+                                } else {
+                                    toolOutput = `Regra criada: [${args.key}] ${args.value}`;
+                                }
+                            }
+                        } else if (args.action === 'delete') {
+                            if (!args.id && !args.key) {
+                                toolOutput = "Erro: Forneça o ID da regra ou o 'key' para deletar.";
+                            } else {
+                                let query = supabase.from('user_preferences').delete().eq('user_id', userId);
+
+                                if (args.id) {
+                                    query = query.eq('id', args.id);
+                                } else if (args.key) {
+                                    query = query.eq('key', args.key);
+                                }
+
+                                const { error } = await query;
+                                if (error) {
+                                    console.error('Error deleting rule:', error);
+                                    toolOutput = `Erro ao deletar regra: ${error.message}`;
+                                } else {
+                                    toolOutput = "Regra(s) removida(s) com sucesso.";
+                                }
+                            }
+                        } else if (args.action === 'list') {
+                            const { data } = await supabase.from('user_preferences').select('*').eq('user_id', userId);
+                            if (data && data.length > 0) {
+                                toolOutput = "Regras Atuais:\n" + data.map((r: any) => `ID: ${r.id} | [${r.key}]: ${r.value}`).join('\n');
+                            } else {
+                                toolOutput = "Nenhuma regra definida.";
                             }
                         }
                     }
@@ -890,66 +1063,7 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                     // --- MANAGE REMINDERS ---
                     else if (functionName === 'manage_reminders') {
                         if (args.action === 'create') {
-                            let finalDueAt = args.due_at;
-
-                            // 🧠 CÉREBRO HÍBRIDO 2.0: Component Based Time
-                            if (args.time_config) {
-                                const { mode } = args.time_config;
-                                const targetDate = new Date(brasiliaTime.getTime());
-                                console.log(`🧠 TIME CONFIG RECEIVED: Mode = ${mode} `, args.time_config);
-
-                                if (mode === 'relative') {
-                                    const { relative_amount, relative_unit } = args.time_config;
-                                    if (relative_amount && relative_unit) {
-                                        if (relative_unit === 'minutes') targetDate.setMinutes(targetDate.getMinutes() + relative_amount);
-                                        else if (relative_unit === 'hours') targetDate.setHours(targetDate.getHours() + relative_amount);
-                                        else if (relative_unit === 'days') targetDate.setDate(targetDate.getDate() + relative_amount);
-
-                                        finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
-                                    }
-                                } else if (mode === 'absolute') {
-                                    const { target_day, target_month, target_year, target_hour, target_minute } = args.time_config;
-
-                                    // Se ano não informado, usa atual
-                                    if (target_year) targetDate.setFullYear(target_year);
-
-                                    // Se mês informado (1-12), ajusta (0-11)
-                                    if (target_month) targetDate.setMonth(target_month - 1);
-
-                                    // Se dia informado
-                                    if (target_day) targetDate.setDate(target_day);
-
-                                    // Se hora informada
-                                    if (target_hour !== undefined) targetDate.setHours(target_hour);
-                                    else targetDate.setHours(9); // Default para "manhã" se não especificado
-
-                                    // Se minuto informado
-                                    if (target_minute !== undefined) targetDate.setMinutes(target_minute);
-                                    else targetDate.setMinutes(0);
-
-                                    // Lógica inteligente: Se a data montada já passou hoje, e o usuário disse "dia 5" (e hoje é 10), provavelmente é mês que vem
-                                    // Mas se ele disse "amanhã", a IA já mandou o dia certo.
-                                    // Vamos confiar na IA para o dia, mas validar o passado.
-
-                                    // Se a data ficou no passado (ex: agora é 15h, pediu 14h de hoje), joga para amanhã? 
-                                    // Não, melhor avisar ou assumir erro. Mas se for "às 14h" sem dia, a IA deve mandar o dia.
-
-                                    finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
-                                }
-                            }
-                            // FALLBACKS (Para compatibilidade ou segurança)
-                            else if (args.relative_time && args.relative_time.amount) {
-                                // Lógica antiga (Híbrido 1.0)
-                                const { amount, unit } = args.relative_time;
-                                const targetDate = new Date(brasiliaTime.getTime());
-                                if (unit === 'minutes') targetDate.setMinutes(targetDate.getMinutes() + amount);
-                                else if (unit === 'hours') targetDate.setHours(targetDate.getHours() + amount);
-                                else if (unit === 'days') targetDate.setDate(targetDate.getDate() + amount);
-                                finalDueAt = targetDate.toISOString().replace('Z', '-03:00');
-                            }
-                            else if (overrideDueAt) {
-                                finalDueAt = overrideDueAt;
-                            }
+                            const finalDueAt = calculateDueAt(args, brasiliaTime, overrideDueAt);
 
                             // VALIDAÇÃO FINAL
                             if (finalDueAt) {
@@ -998,12 +1112,57 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
 
                         } else if (args.action === 'list') {
                             const { data } = await supabase.from('reminders').select('*').eq('user_id', userId).eq('is_completed', false).order('due_at');
-                            toolOutput = `Lembretes pendentes: ${data?.map((r: any) => `${r.title} (${r.due_at})`).join(', ') || "Nenhum"} `;
+                            toolOutput = `Lembretes pendentes: ${data?.map((r: any) => `[ID: ${r.id}] ${r.title} (${r.due_at})`).join(', ') || "Nenhum"} `;
                         } else if (args.action === 'complete') {
-                            await supabase.from('reminders').update({ is_completed: true }).ilike('title', `%${args.search_title}%`).eq('user_id', userId);
-                            toolOutput = `Lembrete "${args.search_title}" marcado como concluído.`;
+                            if (args.id) {
+                                await supabase.from('reminders').update({ is_completed: true }).eq('id', args.id).eq('user_id', userId);
+                                toolOutput = `Lembrete marcado como concluído (ID: ${args.id}).`;
+                            } else {
+                                await supabase.from('reminders').update({ is_completed: true }).ilike('title', `%${args.search_title || args.title}%`).eq('user_id', userId);
+                                toolOutput = `Lembrete "${args.search_title || args.title}" marcado como concluído.`;
+                            }
+                        } else if (args.action === 'update') {
+                            // First find the reminder
+                            let query = supabase.from('reminders').select('*').eq('user_id', userId);
+                            if (args.id) query = query.eq('id', args.id);
+                            else if (args.title) query = query.ilike('title', `%${args.title}%`);
+
+                            const { data: reminders } = await query.limit(1);
+                            const reminder = reminders?.[0];
+
+                            if (!reminder) {
+                                toolOutput = `Erro: Lembrete não encontrado para atualização.`;
+                            } else {
+                                const updateData: any = {};
+                                if (args.title) updateData.title = args.title;
+
+                                // Recalculate time if provided
+                                if (args.time_config || args.relative_time || overrideDueAt) {
+                                    const newDueAt = calculateDueAt(args, brasiliaTime, overrideDueAt);
+                                    if (newDueAt) updateData.due_at = newDueAt;
+                                }
+
+                                if (args.recurrence_type) updateData.recurrence_type = args.recurrence_type;
+                                if (args.recurrence_interval) updateData.recurrence_interval = args.recurrence_interval;
+                                if (args.recurrence_unit) updateData.recurrence_unit = args.recurrence_unit;
+                                if (args.weekdays) updateData.weekdays = args.weekdays;
+                                if (args.recurrence_count) updateData.recurrence_count = args.recurrence_count;
+
+                                const { error } = await supabase.from('reminders').update(updateData).eq('id', reminder.id);
+                                if (error) throw error;
+                                toolOutput = `Lembrete atualizado com sucesso.`;
+                            }
+                        } else if (args.action === 'delete') {
+                            if (args.id) {
+                                await supabase.from('reminders').delete().eq('id', args.id).eq('user_id', userId);
+                                toolOutput = `Lembrete apagado (ID: ${args.id}).`;
+                            } else {
+                                await supabase.from('reminders').delete().ilike('title', `%${args.search_title || args.title}%`).eq('user_id', userId);
+                                toolOutput = `Lembrete "${args.search_title || args.title}" apagado.`;
+                            }
                         }
                     }
+
 
                     // --- MANAGE TASKS (TO-DO) ---
                     else if (functionName === 'manage_tasks') {

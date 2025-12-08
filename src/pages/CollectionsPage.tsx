@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Folder, FileText, Trash2, Search, Image, Link as LinkIcon, Grid, List, CheckSquare, Square, X, Filter, Plus, Edit2 } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Filter, Folder, Grid, FileText, CheckSquare, List } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,7 +41,7 @@ export default function CollectionsPage() {
     // Search & Filters
     const [collectionSearch, setCollectionSearch] = useState('');
     const [itemSearch, setItemSearch] = useState('');
-    const [activeFilter, setActiveFilter] = useState<'all' | 'image' | 'text' | 'link'>('all');
+    const [activeFilter] = useState<'all' | 'image' | 'text' | 'link'>('all');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
     // Selection & Deletion
@@ -151,13 +151,7 @@ export default function CollectionsPage() {
         setSelectedItems(newSelection);
     };
 
-    const toggleSelectAll = () => {
-        if (selectedItems.size === filteredItems.length) {
-            setSelectedItems(new Set());
-        } else {
-            setSelectedItems(new Set(filteredItems.map(i => i.id)));
-        }
-    };
+
 
     // CRUD Logic
     const handleCreateCollection = async () => {
@@ -285,31 +279,7 @@ export default function CollectionsPage() {
         }
     };
 
-    const deleteSelectedItems = async () => {
-        if (selectedItems.size === 0) return;
-        if (!confirm(`Tem certeza que deseja excluir ${selectedItems.size} itens?`)) return;
 
-        try {
-            const ids = Array.from(selectedItems);
-            const { error } = await supabase.from('collection_items').delete().in('id', ids);
-
-            if (error) throw error;
-
-            setItems(items.filter(i => !selectedItems.has(i.id)));
-            setSelectedItems(new Set());
-
-            // Update count locally
-            if (selectedCollection) {
-                const updatedCollections = collections.map(c =>
-                    c.id === selectedCollection.id ? { ...c, item_count: (c.item_count || 0) - ids.length } : c
-                );
-                setCollections(updatedCollections);
-            }
-        } catch (error) {
-            console.error('Error deleting selected items:', error);
-            alert('Erro ao excluir itens selecionados.');
-        }
-    };
 
     return (
         <div className="flex h-full">
@@ -392,228 +362,150 @@ export default function CollectionsPage() {
             <div className="flex-1 flex flex-col bg-gray-900">
                 {selectedCollection ? (
                     <>
-                        {/* Header */}
-                        <div className="p-8 border-b border-gray-800">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="text-5xl">{selectedCollection.icon || '📁'}</div>
-                                    <div>
-                                        <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                                            {selectedCollection.name}
-                                            <button
-                                                onClick={() => openEditModal(selectedCollection)}
-                                                className="text-gray-500 hover:text-blue-400 transition-colors"
-                                                title="Editar Coleção"
-                                            >
-                                                <Edit2 size={18} />
-                                            </button>
-                                        </h2>
-                                        <p className="text-gray-400 mt-1">{selectedCollection.description || 'Sem descrição'}</p>
+                        {/* Header with Financial Widget */}
+                        <div className="p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
+                            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-4 mb-2">
+                                        <div className="text-5xl filter drop-shadow-lg">{selectedCollection.icon || '📁'}</div>
+                                        <div>
+                                            <h2 className="text-4xl font-bold text-white tracking-tight flex items-center gap-3">
+                                                {selectedCollection.name}
+                                                <button
+                                                    onClick={() => openEditModal(selectedCollection)}
+                                                    className="text-gray-600 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Edit2 size={20} />
+                                                </button>
+                                            </h2>
+                                            <p className="text-gray-400 text-lg mt-1 font-light">{selectedCollection.description || 'Sem descrição'}</p>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg border border-gray-700 mr-4">
+
+                                {/* Financial Summary Widget */}
+                                {items.some(i => i.metadata?.amount || i.metadata?.value) && (
+                                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-5 rounded-2xl border border-gray-700 shadow-xl min-w-[280px]">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-gray-400 text-sm font-medium uppercase tracking-wider">Investimento Total</span>
+                                            <div className="bg-green-500/10 p-1.5 rounded-lg">
+                                                <span className="text-green-400 text-xs font-bold">BRL</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-3xl font-bold text-white mb-1">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                items.reduce((acc, item) => {
+                                                    const val = item.metadata?.amount || item.metadata?.value;
+                                                    return acc + (Number(val) || 0);
+                                                }, 0)
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                                            <CheckSquare size={12} />
+                                            {items.filter(i => i.metadata?.amount || i.metadata?.value).length} itens com valor
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Controls Bar */}
+                            <div className="flex flex-col md:flex-row gap-4 justify-between items-center mt-8">
+                                <div className="relative w-full md:w-96 group">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={20} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar em todas as notas..."
+                                        value={itemSearch}
+                                        onChange={(e) => setItemSearch(e.target.value)}
+                                        className="w-full bg-gray-800/50 border border-gray-700 text-white pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder-gray-600"
+                                    />
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <div className="bg-gray-800/50 p-1 rounded-xl border border-gray-700 flex">
                                         <button
                                             onClick={() => setViewMode('grid')}
-                                            className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                                            title="Visualização em Grade"
+                                            className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
                                         >
                                             <Grid size={20} />
                                         </button>
                                         <button
                                             onClick={() => setViewMode('list')}
-                                            className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                                            title="Visualização em Lista"
+                                            className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
                                         >
                                             <List size={20} />
                                         </button>
                                     </div>
                                     <Button
-                                        variant="secondary"
+                                        variant="danger"
                                         onClick={() => handleDeleteCollectionClick(selectedCollection.id)}
-                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20"
+                                        className="h-full px-4 bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
                                         icon={Trash2}
                                     >
-                                        Excluir Coleção
+                                        Excluir
                                     </Button>
                                 </div>
                             </div>
-
-                            {/* Controls Bar */}
-                            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                                {/* Search */}
-                                <div className="relative w-full md:w-96">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar itens..."
-                                        value={itemSearch}
-                                        onChange={(e) => setItemSearch(e.target.value)}
-                                        className="w-full bg-gray-800 border border-gray-700 text-white pl-10 pr-8 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                    />
-                                    {itemSearch && (
-                                        <button
-                                            onClick={() => setItemSearch('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Filters */}
-                                <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-                                    {[
-                                        { id: 'all', label: 'Todos', icon: null },
-                                        { id: 'image', label: 'Imagens', icon: Image },
-                                        { id: 'text', label: 'Texto', icon: FileText },
-                                        { id: 'link', label: 'Links', icon: LinkIcon },
-                                    ].map(filter => (
-                                        <button
-                                            key={filter.id}
-                                            onClick={() => setActiveFilter(filter.id as any)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${activeFilter === filter.id
-                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700'
-                                                }`}
-                                        >
-                                            {filter.icon && <filter.icon size={14} />}
-                                            {filter.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Bulk Actions Bar */}
-                            {filteredItems.length > 0 && (
-                                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={toggleSelectAll}
-                                            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-                                        >
-                                            {selectedItems.size === filteredItems.length && filteredItems.length > 0 ? (
-                                                <CheckSquare size={18} className="text-blue-500" />
-                                            ) : (
-                                                <Square size={18} />
-                                            )}
-                                            {selectedItems.size === filteredItems.length ? 'Desmarcar todos' : 'Selecionar todos'}
-                                        </button>
-                                        <span className="text-gray-600 text-sm">|</span>
-                                        <span className="text-gray-400 text-sm">{filteredItems.length} itens</span>
-                                    </div>
-
-                                    {selectedItems.size > 0 && (
-                                        <Button
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={deleteSelectedItems}
-                                            icon={Trash2}
-                                        >
-                                            Excluir ({selectedItems.size})
-                                        </Button>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
-                        {/* Items List */}
-                        <div className="flex-1 overflow-y-auto p-6 bg-gray-900">
+                        {/* Items List - Masonry Layout */}
+                        <div className="flex-1 overflow-y-auto p-8 bg-gray-950">
                             {isLoadingItems ? (
-                                <div className="text-center text-gray-500 py-10">Carregando itens...</div>
+                                <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                    <p>Carregando suas memórias...</p>
+                                </div>
                             ) : filteredItems.length > 0 ? (
-                                <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
-                                    {filteredItems.map(item => (
-                                        <Card
-                                            key={item.id}
-                                            className={`group relative transition-all ${selectedItems.has(item.id)
-                                                ? 'border-blue-500/50 bg-blue-500/5 ring-1 ring-blue-500/50'
-                                                : 'hover:border-gray-600'
-                                                } ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : 'p-5 flex flex-col'}`}
-                                        >
-                                            {/* Selection Checkbox */}
-                                            <div className={`absolute top-3 left-3 z-10 ${!selectedItems.has(item.id) && 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedItems.has(item.id)}
-                                                    onChange={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleSelection(item.id);
-                                                    }}
-                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer shadow-sm"
-                                                />
-                                            </div>
+                                <div className={viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}>
+                                    {filteredItems.map(item => {
+                                        const hasAmount = item.metadata?.amount || item.metadata?.value;
+                                        const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
 
-                                            {/* Delete Button */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteItemClick(item.id);
-                                                }}
-                                                className="absolute top-3 right-3 p-2 rounded-lg bg-gray-900/80 text-gray-500 hover:text-red-400 hover:bg-gray-800 opacity-0 group-hover:opacity-100 transition-all z-10 backdrop-blur-sm"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-
-                                            {/* Content */}
+                                        return (
                                             <div
-                                                className={`flex-1 min-w-0 cursor-pointer ${viewMode === 'grid' ? 'mt-6' : ''}`}
+                                                key={item.id}
+                                                className={`group relative break-inside-avoid bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-gray-700 hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 ${selectedItems.has(item.id) ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                                                 onClick={() => toggleSelection(item.id)}
                                             >
+                                                {/* Selection Overlay */}
+                                                <div className={`absolute top-4 left-4 z-20 ${!selectedItems.has(item.id) && 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedItems.has(item.id)}
+                                                        onChange={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
+                                                        className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                                    />
+                                                </div>
+
+                                                {/* Delete Action */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteItemClick(item.id); }}
+                                                    className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-gray-400 hover:text-red-400 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+
+                                                {/* Media Header */}
                                                 {item.media_url && (
-                                                    <CardMedia url={item.media_url} />
+                                                    <div className="w-full h-48 overflow-hidden relative">
+                                                        <CardMedia url={item.media_url} />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-60"></div>
+                                                    </div>
                                                 )}
 
-                                                <div className="flex items-start gap-3">
-                                                    {!item.media_url && (
-                                                        <div className="mt-1 shrink-0">
-                                                            {item.content.startsWith('http') ? (
-                                                                <LinkIcon className="text-purple-400" size={20} />
-                                                            ) : (
-                                                                <FileText className="text-blue-400" size={20} />
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`text-white leading-relaxed break-words ${viewMode === 'grid' ? 'line-clamp-4' : 'line-clamp-2'}`}>
-                                                            {item.content}
-                                                        </p>
-
-                                                        {/* Metadata Display */}
-                                                        {item.metadata && Object.keys(item.metadata).length > 0 && (
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                {Object.entries(item.metadata).map(([key, value]) => {
-                                                                    if (key === 'type') return null; // Skip type as it's shown below
-
-                                                                    // Format currency
-                                                                    if (['amount', 'value', 'price', 'custo', 'valor'].includes(key.toLowerCase())) {
-                                                                        const numValue = Number(value);
-                                                                        if (!isNaN(numValue)) {
-                                                                            return (
-                                                                                <span key={key} className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs font-medium border border-green-500/30 flex items-center gap-1">
-                                                                                    <span className="opacity-70 text-[10px] uppercase">{key}:</span>
-                                                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numValue)}
-                                                                                </span>
-                                                                            );
-                                                                        }
-                                                                    }
-
-                                                                    // Format dates
-                                                                    if (['date', 'data', 'prazo'].includes(key.toLowerCase())) {
-                                                                        return (
-                                                                            <span key={key} className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs border border-blue-500/30">
-                                                                                {key}: {String(value)}
-                                                                            </span>
-                                                                        );
-                                                                    }
-
-                                                                    return (
-                                                                        <span key={key} className="bg-gray-800 text-gray-300 px-2 py-1 rounded text-xs border border-gray-700 max-w-full truncate">
-                                                                            <span className="opacity-70 mr-1">{key}:</span>
-                                                                            {String(value)}
-                                                                        </span>
-                                                                    );
-                                                                })}
+                                                {/* Content Body */}
+                                                <div className="p-6">
+                                                    {/* Smart Icon/Type Indicator */}
+                                                    <div className="mb-4 flex items-center justify-between">
+                                                        {hasAmount ? (
+                                                            <div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-green-500/20 flex items-center gap-2">
+                                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                                                Financeiro
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-blue-500/20 flex items-center gap-2">
+                                                                <FileText size={12} />
+                                                                Nota
                                                             </div>
                                                         )}
 
@@ -626,10 +518,40 @@ export default function CollectionsPage() {
                                                             )}
                                                         </p>
                                                     </div>
+
+                                                    {/* Main Text */}
+                                                    <div className="prose prose-invert prose-sm max-w-none">
+                                                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap font-light text-[15px]">
+                                                            {item.content}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Footer / Metadata */}
+                                                    {(hasAmount || (item.metadata && Object.keys(item.metadata).length > 0)) && (
+                                                        <div className="mt-6 pt-4 border-t border-gray-800 flex flex-wrap gap-2 items-center">
+                                                            {hasAmount && (
+                                                                <div className="flex-1">
+                                                                    <span className="text-2xl font-bold text-white tracking-tight">
+                                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Other Metadata Pills */}
+                                                            {Object.entries(item.metadata || {}).map(([key, value]) => {
+                                                                if (['amount', 'value', 'price', 'custo', 'valor', 'type'].includes(key.toLowerCase())) return null;
+                                                                return (
+                                                                    <span key={key} className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                                                                        {String(value)}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </Card>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="text-center py-20">
@@ -732,111 +654,117 @@ export default function CollectionsPage() {
             </div>
 
             {/* Create/Edit Collection Modal */}
-            {(isCreateModalOpen || isEditModalOpen) && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
-                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-white mb-6">
-                            {isEditModalOpen ? 'Editar Coleção' : 'Nova Coleção'}
-                        </h3>
+            {
+                (isCreateModalOpen || isEditModalOpen) && (
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
+                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-white mb-6">
+                                {isEditModalOpen ? 'Editar Coleção' : 'Nova Coleção'}
+                            </h3>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Nome</label>
-                                <input
-                                    type="text"
-                                    value={collectionForm.name}
-                                    onChange={(e) => setCollectionForm({ ...collectionForm, name: e.target.value })}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="Ex: Viagem para Paris"
-                                    autoFocus
-                                />
-                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Nome</label>
+                                    <input
+                                        type="text"
+                                        value={collectionForm.name}
+                                        onChange={(e) => setCollectionForm({ ...collectionForm, name: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Ex: Viagem para Paris"
+                                        autoFocus
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Descrição (Opcional)</label>
-                                <textarea
-                                    value={collectionForm.description}
-                                    onChange={(e) => setCollectionForm({ ...collectionForm, description: e.target.value })}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
-                                    placeholder="Detalhes sobre esta coleção..."
-                                />
-                            </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Descrição (Opcional)</label>
+                                    <textarea
+                                        value={collectionForm.description}
+                                        onChange={(e) => setCollectionForm({ ...collectionForm, description: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+                                        placeholder="Detalhes sobre esta coleção..."
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Ícone</label>
-                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                    {['📁', '✈️', '💼', '🏠', '🎓', '💡', '📅', '🛒', '🎵', '📷', '🍔', '💪'].map(icon => (
-                                        <button
-                                            key={icon}
-                                            onClick={() => setCollectionForm({ ...collectionForm, icon })}
-                                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-colors ${collectionForm.icon === icon
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
-                                                }`}
-                                        >
-                                            {icon}
-                                        </button>
-                                    ))}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Ícone</label>
+                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                        {['📁', '✈️', '💼', '🏠', '🎓', '💡', '📅', '🛒', '🎵', '📷', '🍔', '💪'].map(icon => (
+                                            <button
+                                                key={icon}
+                                                onClick={() => setCollectionForm({ ...collectionForm, icon })}
+                                                className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-colors ${collectionForm.icon === icon
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
+                                                    }`}
+                                            >
+                                                {icon}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="flex gap-3 justify-end mt-8">
-                            <Button
-                                variant="secondary"
-                                onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                onClick={isEditModalOpen ? handleEditCollection : handleCreateCollection}
-                                disabled={!collectionForm.name}
-                            >
-                                {isEditModalOpen ? 'Salvar Alterações' : 'Criar Coleção'}
-                            </Button>
+                            <div className="flex gap-3 justify-end mt-8">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={isEditModalOpen ? handleEditCollection : handleCreateCollection}
+                                    disabled={!collectionForm.name}
+                                >
+                                    {isEditModalOpen ? 'Salvar Alterações' : 'Criar Coleção'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Delete Confirmation Modals */}
-            {collectionToDelete && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setCollectionToDelete(null)}>
-                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-white mb-3">Excluir Coleção?</h3>
-                        <p className="text-gray-300 mb-6">
-                            Isso apagará a coleção e <strong>TODOS os itens</strong> nela permanentemente.
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <Button variant="secondary" onClick={() => setCollectionToDelete(null)}>
-                                Cancelar
-                            </Button>
-                            <Button variant="danger" onClick={confirmDeleteCollection}>
-                                Excluir Tudo
-                            </Button>
+            {
+                collectionToDelete && (
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setCollectionToDelete(null)}>
+                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-white mb-3">Excluir Coleção?</h3>
+                            <p className="text-gray-300 mb-6">
+                                Isso apagará a coleção e <strong>TODOS os itens</strong> nela permanentemente.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <Button variant="secondary" onClick={() => setCollectionToDelete(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button variant="danger" onClick={confirmDeleteCollection}>
+                                    Excluir Tudo
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {itemToDelete && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setItemToDelete(null)}>
-                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-white mb-3">Excluir Item?</h3>
-                        <p className="text-gray-300 mb-6">
-                            Tem certeza que deseja excluir este item?
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <Button variant="secondary" onClick={() => setItemToDelete(null)}>
-                                Cancelar
-                            </Button>
-                            <Button variant="danger" onClick={confirmDeleteItem}>
-                                Excluir
-                            </Button>
+            {
+                itemToDelete && (
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setItemToDelete(null)}>
+                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-white mb-3">Excluir Item?</h3>
+                            <p className="text-gray-300 mb-6">
+                                Tem certeza que deseja excluir este item?
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                                <Button variant="secondary" onClick={() => setItemToDelete(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button variant="danger" onClick={confirmDeleteItem}>
+                                    Excluir
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

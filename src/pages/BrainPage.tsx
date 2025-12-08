@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+
 import { Brain, Sparkles, Search, Trash2, Plus, BookOpen, Settings, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
@@ -7,15 +7,12 @@ import { ptBR } from 'date-fns/locale';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../lib/supabase';
 
 interface MemoryVector {
     id: string;
     content: string;
-    created_at: string;
+    created_at: string | null;
     similarity?: number;
 }
 
@@ -23,7 +20,7 @@ interface UserRule {
     id: string;
     key: string;
     value: string;
-    created_at: string;
+    created_at: string | null;
 }
 
 export default function BrainPage() {
@@ -99,14 +96,26 @@ export default function BrainPage() {
     // --- RULES LOGIC ---
     const fetchRules = async () => {
         if (!user) return;
+        console.log('Fetching rules for user:', user.id);
         const { data, error } = await supabase
             .from('user_preferences')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
-        if (error) console.error('Error fetching rules:', error);
-        setRules(data || []);
+        if (error) {
+            console.error('Error fetching rules:', error);
+        } else {
+            console.log('Rules fetched:', data);
+        }
+
+        // Map data to match interface
+        const formattedRules = (data || []).map((r: any) => ({
+            ...r,
+            value: typeof r.value === 'string' ? r.value : JSON.stringify(r.value)
+        }));
+
+        setRules(formattedRules);
     };
 
     const addRule = async () => {
@@ -153,7 +162,10 @@ export default function BrainPage() {
         if (error) console.error('Error fetching settings:', error);
 
         if (data) {
-            setSettings(data);
+            setSettings({
+                custom_system_prompt: data.custom_system_prompt || '',
+                ai_model: data.ai_model || 'gpt-4o'
+            });
         } else {
             // Default settings if none exist
             setSettings({
@@ -257,7 +269,7 @@ export default function BrainPage() {
                                             <div>
                                                 <p className="text-gray-200 text-lg">{mem.content}</p>
                                                 <p className="text-xs text-gray-500 mt-2">
-                                                    Aprendido em {format(new Date(mem.created_at), "d 'de' MMMM, HH:mm", { locale: ptBR })}
+                                                    Aprendido em {mem.created_at ? format(new Date(mem.created_at), "d 'de' MMMM, HH:mm", { locale: ptBR }) : 'Data desconhecida'}
                                                 </p>
                                             </div>
                                             <button
@@ -286,6 +298,14 @@ export default function BrainPage() {
                                     <h2 className="text-2xl font-bold text-white">Regras & Preferências</h2>
                                     <p className="text-gray-400">Defina comportamentos fixos para a IA.</p>
                                 </div>
+                                <Button
+                                    onClick={fetchRules}
+                                    variant="ghost"
+                                    className="text-gray-400 hover:text-white"
+                                    title="Atualizar lista"
+                                >
+                                    <Sparkles size={18} />
+                                </Button>
                             </div>
 
                             <Card className="p-4 mb-8 bg-gray-800/50 border-purple-500/20">

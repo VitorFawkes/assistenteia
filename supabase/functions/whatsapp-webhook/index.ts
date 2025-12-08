@@ -147,13 +147,13 @@ Deno.serve(async (req: Request) => {
 
         // 4.5 INSERT MESSAGE INTO DATABASE (Fix for visibility)
         // We must save the user's message so it appears in the chat history
-        const { error: insertError } = await supabase.from('messages').insert({
+        const { data: insertedMessage, error: insertError } = await supabase.from('messages').insert({
             user_id: userData.user_id,
             role: 'user',
             content: content || (mediaType ? `[${mediaType.toUpperCase()}]` : null),
             media_url: finalMediaUrl || null, // Prefer Data URI if available
             media_type: mediaType || null
-        });
+        }).select('id').single();
 
         if (insertError) {
             console.error('❌ Error saving user message to DB:', insertError);
@@ -166,14 +166,14 @@ Deno.serve(async (req: Request) => {
                 meta: { error: insertError }
             });
         } else {
-            console.log('✅ User message saved to DB');
+            console.log('✅ User message saved to DB:', insertedMessage?.id);
         }
 
         await supabase.from('debug_logs').insert({
             function_name: 'whatsapp-webhook',
             level: 'info',
             message: 'Forwarding to process-message',
-            meta: { content, mediaType, userId: userData.user_id }
+            meta: { content, mediaType, userId: userData.user_id, messageId: insertedMessage?.id }
         });
 
         // Call the Edge Function
@@ -182,7 +182,8 @@ Deno.serve(async (req: Request) => {
                 content: content,
                 mediaUrl: finalMediaUrl,
                 mediaType: mediaType,
-                userId: userData.user_id
+                userId: userData.user_id,
+                messageId: insertedMessage?.id
             }
         });
 

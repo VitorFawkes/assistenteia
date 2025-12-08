@@ -8,9 +8,10 @@ interface MessageBubbleProps {
     role: 'user' | 'assistant';
     timestamp?: string;
     mediaUrl?: string | null;
+    mediaType?: string | null;
 }
 
-export default function MessageBubble({ content, role, timestamp, mediaUrl }: MessageBubbleProps) {
+export default function MessageBubble({ content, role, timestamp, mediaUrl, mediaType }: MessageBubbleProps) {
     const isUser = role === 'user';
 
     return (
@@ -26,9 +27,18 @@ export default function MessageBubble({ content, role, timestamp, mediaUrl }: Me
                 "rounded-2xl p-4 shadow-sm",
                 isUser ? "bg-blue-600 text-white" : "bg-gray-800 border border-gray-700 text-gray-100"
             )}>
-                {mediaUrl && (
+                {mediaUrl && mediaType === 'image' && (
                     <div className="mb-3 rounded-lg overflow-hidden">
                         <img src={mediaUrl} alt="Attachment" className="max-w-full h-auto" />
+                    </div>
+                )}
+
+                {mediaUrl && mediaType === 'audio' && (
+                    <div className="mb-3">
+                        <audio controls src={mediaUrl} className="w-full max-w-[240px]" />
+                        <div className="flex items-center gap-1 mt-1 text-xs text-purple-300/70">
+                            <span>🎙️ Transcrição de Áudio</span>
+                        </div>
                     </div>
                 )}
 
