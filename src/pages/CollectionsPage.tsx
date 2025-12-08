@@ -140,6 +140,22 @@ export default function CollectionsPage() {
         return true;
     });
 
+    // Grouping Logic
+    const groupedItems = filteredItems.reduce((acc, item) => {
+        const category = item.metadata?.subcategory || 'Geral';
+        if (!acc[category]) acc[category] = [];
+        acc[category].push(item);
+        return acc;
+    }, {} as Record<string, typeof filteredItems>);
+
+    const sortedCategories = Object.keys(groupedItems).sort((a, b) => {
+        if (a === 'Financeiro') return -1; // Financeiro first
+        if (b === 'Financeiro') return 1;
+        if (a === 'Geral') return 1; // Geral last
+        if (b === 'Geral') return -1;
+        return a.localeCompare(b);
+    });
+
     // Selection Logic
     const toggleSelection = (id: string) => {
         const newSelection = new Set(selectedItems);
@@ -448,7 +464,7 @@ export default function CollectionsPage() {
                             </div>
                         </div>
 
-                        {/* Items List - Masonry Layout */}
+                        {/* Items List - Masonry Layout with Subcategories */}
                         <div className="flex-1 overflow-y-auto p-8 bg-gray-950">
                             {isLoadingItems ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
@@ -456,102 +472,107 @@ export default function CollectionsPage() {
                                     <p>Carregando suas memórias...</p>
                                 </div>
                             ) : filteredItems.length > 0 ? (
-                                <div className={viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}>
-                                    {filteredItems.map(item => {
-                                        const hasAmount = item.metadata?.amount || item.metadata?.value;
-                                        const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
+                                <div className="space-y-12">
+                                    {sortedCategories.map(category => (
+                                        <div key={category} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="flex items-center gap-3 mb-6 pb-2 border-b border-gray-800/50">
+                                                <h3 className="text-xl font-bold text-white tracking-tight">{category}</h3>
+                                                <span className="text-xs font-medium text-gray-400 bg-gray-900 px-2.5 py-1 rounded-full border border-gray-800">
+                                                    {groupedItems[category].length}
+                                                </span>
+                                            </div>
 
-                                        return (
-                                            <div
-                                                key={item.id}
-                                                className={`group relative break-inside-avoid bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-gray-700 hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 ${selectedItems.has(item.id) ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
-                                                onClick={() => toggleSelection(item.id)}
-                                            >
-                                                {/* Selection Overlay */}
-                                                <div className={`absolute top-4 left-4 z-20 ${!selectedItems.has(item.id) && 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedItems.has(item.id)}
-                                                        onChange={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
-                                                        className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 cursor-pointer"
-                                                    />
-                                                </div>
+                                            <div className={viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}>
+                                                {groupedItems[category].map(item => {
+                                                    const hasAmount = item.metadata?.amount || item.metadata?.value;
+                                                    const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
 
-                                                {/* Delete Action */}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteItemClick(item.id); }}
-                                                    className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-gray-400 hover:text-red-400 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-
-                                                {/* Media Header */}
-                                                {item.media_url && (
-                                                    <div className="w-full h-48 overflow-hidden relative">
-                                                        <CardMedia url={item.media_url} />
-                                                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-60"></div>
-                                                    </div>
-                                                )}
-
-                                                {/* Content Body */}
-                                                <div className="p-6">
-                                                    {/* Smart Icon/Type Indicator */}
-                                                    <div className="mb-4 flex items-center justify-between">
-                                                        {hasAmount ? (
-                                                            <div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-green-500/20 flex items-center gap-2">
-                                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                                                Financeiro
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className={`group relative break-inside-avoid bg-gray-800 border border-gray-700/50 rounded-2xl overflow-hidden hover:border-gray-600 hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 ${selectedItems.has(item.id) ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
+                                                            onClick={() => toggleSelection(item.id)}
+                                                        >
+                                                            {/* Selection Overlay */}
+                                                            <div className={`absolute top-4 left-4 z-20 ${!selectedItems.has(item.id) && 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedItems.has(item.id)}
+                                                                    onChange={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
+                                                                    className="w-5 h-5 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                                                />
                                                             </div>
-                                                        ) : (
-                                                            <div className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-blue-500/20 flex items-center gap-2">
-                                                                <FileText size={12} />
-                                                                Nota
-                                                            </div>
-                                                        )}
 
-                                                        <p className="text-gray-500 text-xs mt-2 flex items-center gap-2">
-                                                            <span>{format(new Date(item.created_at), "d 'de' MMM 'às' HH:mm", { locale: ptBR })}</span>
-                                                            {item.metadata?.type && (
-                                                                <span className="bg-gray-800 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                                                                    {item.metadata.type}
-                                                                </span>
-                                                            )}
-                                                        </p>
-                                                    </div>
+                                                            {/* Delete Action */}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteItemClick(item.id); }}
+                                                                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-gray-400 hover:text-red-400 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
 
-                                                    {/* Main Text */}
-                                                    <div className="prose prose-invert prose-sm max-w-none">
-                                                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap font-light text-[15px]">
-                                                            {item.content}
-                                                        </p>
-                                                    </div>
-
-                                                    {/* Footer / Metadata */}
-                                                    {(hasAmount || (item.metadata && Object.keys(item.metadata).length > 0)) && (
-                                                        <div className="mt-6 pt-4 border-t border-gray-800 flex flex-wrap gap-2 items-center">
-                                                            {hasAmount && (
-                                                                <div className="flex-1">
-                                                                    <span className="text-2xl font-bold text-white tracking-tight">
-                                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
-                                                                    </span>
+                                                            {/* Media Header */}
+                                                            {item.media_url && (
+                                                                <div className="w-full h-48 overflow-hidden relative">
+                                                                    <CardMedia url={item.media_url} />
+                                                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-60"></div>
                                                                 </div>
                                                             )}
 
-                                                            {/* Other Metadata Pills */}
-                                                            {Object.entries(item.metadata || {}).map(([key, value]) => {
-                                                                if (['amount', 'value', 'price', 'custo', 'valor', 'type'].includes(key.toLowerCase())) return null;
-                                                                return (
-                                                                    <span key={key} className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded border border-gray-700">
-                                                                        {String(value)}
-                                                                    </span>
-                                                                );
-                                                            })}
+                                                            {/* Content Body */}
+                                                            <div className="p-6">
+                                                                {/* Smart Icon/Type Indicator */}
+                                                                <div className="mb-4 flex items-center justify-between">
+                                                                    {hasAmount ? (
+                                                                        <div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-green-500/20 flex items-center gap-2">
+                                                                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                                                            Financeiro
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-blue-500/20 flex items-center gap-2">
+                                                                            <FileText size={12} />
+                                                                            Nota
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-xs text-gray-500 font-mono">{format(new Date(item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                                </div>
+
+                                                                {/* Main Text */}
+                                                                <div className="prose prose-invert prose-sm max-w-none">
+                                                                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap font-light text-[15px]">
+                                                                        {item.content}
+                                                                    </p>
+                                                                </div>
+
+                                                                {/* Footer / Metadata */}
+                                                                {(hasAmount || (item.metadata && Object.keys(item.metadata).length > 0)) && (
+                                                                    <div className="mt-6 pt-4 border-t border-gray-700/50 flex flex-wrap gap-2 items-center">
+                                                                        {hasAmount && (
+                                                                            <div className="flex-1">
+                                                                                <span className="text-2xl font-bold text-white tracking-tight">
+                                                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Other Metadata Pills */}
+                                                                        {Object.entries(item.metadata || {}).map(([key, value]) => {
+                                                                            if (['amount', 'value', 'price', 'custo', 'valor', 'type', 'subcategory'].includes(key.toLowerCase())) return null;
+                                                                            return (
+                                                                                <span key={key} className="text-xs text-gray-400 bg-gray-900/50 px-2 py-1 rounded border border-gray-700">
+                                                                                    {String(value)}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
                                 <div className="text-center py-20">
