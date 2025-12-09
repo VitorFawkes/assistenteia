@@ -68,8 +68,20 @@ Deno.serve(async (req: Request) => {
                 const instanceName = instanceData?.instance_name;
                 const instanceStatus = instanceData?.status;
 
+                let whatsappSent = false;
+                let failureReason = '';
+
+                // Check connection status
+                if (!evolutionApiUrl || !evolutionApiKey) {
+                    failureReason = 'Configuração de API ausente';
+                } else if (!instanceName) {
+                    failureReason = 'Instância não encontrada';
+                } else if (instanceStatus !== 'connected') {
+                    failureReason = 'WhatsApp desconectado';
+                }
+
                 // Send WhatsApp notification ONLY if instance is connected
-                if (evolutionApiUrl && evolutionApiKey && instanceName && instanceStatus === 'connected') {
+                if (!failureReason) {
                     const message = `🔔 *Lembrete:* ${reminder.title}`;
 
                     // Fetch user phone number manually
@@ -98,22 +110,31 @@ Deno.serve(async (req: Request) => {
                         if (!response.ok) {
                             const errText = await response.text();
                             console.error(`❌ Failed to send WhatsApp: ${response.status} - ${errText}`);
+                            failureReason = `Erro API: ${response.status}`;
                         } else {
                             console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber}`);
                             notificationsSent++;
+                            whatsappSent = true;
                         }
                     } else {
                         console.warn(`⚠️ No phone number for user ${reminder.user_id}, cannot send WhatsApp.`);
+                        failureReason = 'Sem telefone cadastrado';
                     }
                 } else {
-                    console.log(`⚠️ Skipping WhatsApp for reminder ${reminder.id}: Instance not connected or missing.`);
+                    console.log(`⚠️ Skipping WhatsApp for reminder ${reminder.id}: ${failureReason}`);
                 }
 
                 // ALWAYS insert into chat history (so it appears in the App)
+                // If WhatsApp failed, append the reason to the message
+                let chatContent = `🔔 Lembrete: ${reminder.title}`;
+                if (!whatsappSent && failureReason) {
+                    chatContent += `\n⚠️ (Não enviado no WhatsApp: ${failureReason})`;
+                }
+
                 await supabase.from('messages').insert({
                     user_id: reminder.user_id,
                     role: 'assistant',
-                    content: `🔔 Lembrete: ${reminder.title}`
+                    content: chatContent
                 });
 
                 // Update reminder based on recurrence type (Same logic as before)

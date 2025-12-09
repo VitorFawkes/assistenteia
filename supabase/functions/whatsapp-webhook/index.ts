@@ -13,6 +13,26 @@ Deno.serve(async (req: Request) => {
         const body = await req.json();
         const { instance, data, event } = body;
 
+        // 0. HANDLE CONNECTION UPDATES
+        if (event === 'CONNECTION_UPDATE') {
+            const { state } = data;
+            console.log(`🔌 Connection Update for ${instance}: ${state}`);
+
+            let newStatus = 'disconnected';
+            if (state === 'open') newStatus = 'connected';
+            else if (state === 'connecting') newStatus = 'connecting';
+
+            await supabase
+                .from('whatsapp_instances')
+                .update({
+                    status: newStatus,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('instance_name', instance);
+
+            return new Response(JSON.stringify({ success: true, status: newStatus }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
         // 1. FILTER: Only process messages.upsert
         if (event !== 'messages.upsert') {
             return new Response(JSON.stringify({ ignored: true }), { headers: { 'Content-Type': 'application/json' } });

@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import Card from '../components/ui/Card';
 import CardMedia from '../components/ui/CardMedia';
 import Button from '../components/ui/Button';
+import EditItemModal from '../components/collections/EditItemModal';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -54,6 +55,10 @@ export default function CollectionsPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [collectionForm, setCollectionForm] = useState({ name: '', description: '', icon: '📁' });
+
+    // Item Editing
+    const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
+    const [itemToEdit, setItemToEdit] = useState<CollectionItem | null>(null);
 
     const fetchCollections = useCallback(async () => {
         if (!user) return;
@@ -307,7 +312,28 @@ export default function CollectionsPage() {
         }
     };
 
+    const handleEditItemClick = (item: CollectionItem) => {
+        setItemToEdit(item);
+        setIsEditItemModalOpen(true);
+    };
 
+    const handleSaveItem = async (id: string, updates: any) => {
+        try {
+            const { data, error } = await supabase
+                .from('collection_items')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setItems(items.map(i => i.id === id ? { ...i, ...data } : i));
+        } catch (error) {
+            console.error('Error updating item:', error);
+            alert('Erro ao atualizar item.');
+        }
+    };
 
     return (
         <div className="flex h-full">
@@ -492,6 +518,20 @@ export default function CollectionsPage() {
                                                 <span className="text-xs font-medium text-gray-400 bg-gray-900 px-2.5 py-1 rounded-full border border-gray-800">
                                                     {groupedItems[category].length}
                                                 </span>
+                                                {/* Section Total */}
+                                                {groupedItems[category].some(i => i.metadata?.amount || i.metadata?.value) && (
+                                                    <div className="ml-auto flex items-center gap-2 bg-green-500/10 px-3 py-1 rounded-lg border border-green-500/20">
+                                                        <span className="text-xs text-green-400 font-medium uppercase">Total</span>
+                                                        <span className="text-sm font-bold text-green-400">
+                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                                groupedItems[category].reduce((acc, item) => {
+                                                                    const val = item.metadata?.amount || item.metadata?.value;
+                                                                    return acc + (Number(val) || 0);
+                                                                }, 0)
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className={viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}>
@@ -516,12 +556,22 @@ export default function CollectionsPage() {
                                                             </div>
 
                                                             {/* Delete Action */}
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteItemClick(item.id); }}
-                                                                className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-gray-400 hover:text-red-400 hover:bg-black/80 opacity-0 group-hover:opacity-100 transition-all z-20 backdrop-blur-sm"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
+                                                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-20">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleEditItemClick(item); }}
+                                                                    className="p-2 rounded-full bg-black/50 text-gray-400 hover:text-blue-400 hover:bg-black/80 backdrop-blur-sm"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Edit2 size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteItemClick(item.id); }}
+                                                                    className="p-2 rounded-full bg-black/50 text-gray-400 hover:text-red-400 hover:bg-black/80 backdrop-blur-sm"
+                                                                    title="Excluir"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
 
                                                             {/* Media Header */}
                                                             {item.media_url && (
@@ -798,6 +848,14 @@ export default function CollectionsPage() {
                     </div>
                 )
             }
+
+            {/* Edit Item Modal */}
+            <EditItemModal
+                isOpen={isEditItemModalOpen}
+                onClose={() => setIsEditItemModalOpen(false)}
+                onSave={handleSaveItem}
+                item={itemToEdit}
+            />
         </div >
     );
 }

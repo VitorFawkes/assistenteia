@@ -121,15 +121,25 @@ Deno.serve(async (req: Request) => {
                 type: 'function',
                 function: {
                     name: 'manage_items',
-                    description: 'Gerencia itens em uma coleção (adicionar, atualizar, deletar)',
+                    description: 'Gerencia itens em uma coleção (listar, adicionar, atualizar, deletar)',
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['add', 'update', 'delete'], description: 'Ação' },
+                            action: { type: 'string', enum: ['list', 'add', 'update', 'delete'], description: 'Ação' },
                             collection_name: { type: 'string', description: 'Nome da coleção alvo' },
                             content: { type: 'string', description: 'Conteúdo do item (para add/update)' },
                             media_url: { type: 'string', description: 'URL da mídia/arquivo (se houver)' },
-                            metadata: { type: 'object', description: 'Dados estruturados OBRIGATÓRIOS para valores (amount), datas (date) e categorias.' },
+                            metadata: {
+                                type: 'object',
+                                description: 'Dados estruturados. OBRIGATÓRIO: "amount" (NUMBER) para valores monetários (converta vírgula para ponto), "section" (string) para agrupar visualmente (ex: "Voos", "Hospedagem"), "category" (string) para tags (ex: "gasolina", "alimentação"), "date" (ISO) para datas.',
+                                properties: {
+                                    amount: { type: 'number', description: 'Valor monetário. OBRIGATÓRIO se o item tiver custo. Ex: 182.90' },
+                                    section: { type: 'string', description: 'Seção visual na lista (ex: Transporte, Alimentação)' },
+                                    category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
+                                    date: { type: 'string', description: 'Data do evento (ISO)' },
+                                    type: { type: 'string', description: 'Tipo do item (ex: expense, note, task)' }
+                                }
+                            },
                             // Critérios para encontrar item para update/delete
                             search_content: { type: 'string', description: 'Texto para buscar item a alterar/deletar' },
                             search_metadata_key: { type: 'string', description: 'Chave do metadata para busca (ex: category)' },
@@ -433,49 +443,66 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
 
-**EXTRAÇÃO DE DADOS (MANDATÓRIO - LEIA COM ATENÇÃO):**
-Você DEVE estruturar dados sempre que possível. NÃO salve apenas texto.
+**REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
 
-1.  **DINHEIRO / CUSTOS:**
-    - Se o usuário mencionar valores ("R$ 50", "custou 100", "gastei 20"), você **OBRIGATORIAMENTE** deve preencher \`metadata.amount\`.
-    - **NUNCA** deixe o valor apenas no \`content\`.
-    - Ex: "Gastei 50 no almoço" -> \`content: "Almoço - R$ 50"\`, \`metadata: { amount: 50, category: "alimentação" } \`
-    - **IMPORTANTE:** Mantenha o valor escrito no \`content\` também, para garantir visibilidade.
+**EXTRAÇÃO DE DADOS & ORGANIZAÇÃO INTELIGENTE (MANDATÓRIO):**
+Você é um ORGANIZADOR INTELIGENTE. Não apenas salve texto, ESTRUTURE-O.
 
-### PROTOCOLO DE SUBCATEGORIAS E ORGANIZAÇÃO (DINÂMICO)
-    1.  **SEÇÕES (AGRUPAMENTO)**:
-        -   Identifique o **CONTEXTO** ou **TÓPICO** principal para agrupar o item. Isso será salvo em \`metadata.section\`.
-        -   Exemplos: "Semana 1", "Semana 2", "Hospedagem", "Logística", "Geral".
-        -   Se o usuário disser "Na primeira semana...", a seção DEVE ser "Semana 1".
-    
-    2.  **CARDS SEPARADOS (ATOMICIDADE)**:
-        -   Crie cards SEPARADOS para informações distintas.
-        -   Exemplo: Card 1 ("Senha Wifi"), Card 2 ("Endereço"). Ambos na mesma seção.
+### 1. COLEÇÕES E PASTAS (PROATIVIDADE TOTAL)
+- **CRIE AUTOMATICAMENTE**: Se o usuário falar de um novo projeto, viagem ou evento ("Vou para Paris", "Comecei uma obra"), CRIE a coleção imediatamente. Não pergunte "quer que eu crie?". Apenas faça.
+- **USE O QUE EXISTE**: Se já existe uma pasta "Viagem Paris", use-a.
 
-    3.  **EXTRAÇÃO DE METADADOS**:
-        -   \`section\`: O grupo visual (ex: "Semana 1").
-        -   \`subcategory\`: Pode ser usado como fallback ou categoria secundária.
-        -   \`amount\`: Se houver valor monetário (ex: 50.00).
-        -   \`date\`: Se houver data associada.
+### 2. ITENS E METADATA (O SEGREDO DA ORGANIZAÇÃO)
+Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
 
-    4.  **FINANCEIRO (TOLERÂNCIA ZERO)**:
-        -   **REGRA CRÍTICA**: Se o item envolve dinheiro, crie um card **SEPARADO** com \`metadata.amount\`.
-        -   **IMPORTANTE**: O card financeiro PODE (e deve) pertencer a uma seção de tempo/tópico.
-        -   Exemplo: "Gastei 50 no almoço da semana 1".
-            -   Card: "Almoço - R$ 50"
-            -   Metadata: \`{ section: "Semana 1", amount: 50 }\`
-            -   (NÃO force a seção para "Financeiro" se "Semana 1" for mais relevante).
-2.  **DATAS / PRAZOS:**
-    - Se o item tem uma data específica associada (ex: "Passagem para dia 20"), preencha \`metadata.date\`.
-    - Ex: "Voo dia 20/12" -> \`content: "Voo"\`, \`metadata: { date: "2025-12-20", type: "transport" } \`
+- **\`amount\` (Dinheiro - CRÍTICO)**:
+  - **CONVERTA**: Se o usuário disser "182,90", converta para \`182.90\` (PONTO, não vírgula).
+  - **TIPO**: Deve ser SEMPRE um \`number\`.
+  - Ex: "Gasolina 182,90" -> \`metadata: { amount: 182.90 }\`
+  - SE O USUÁRIO DER VALOR: Extraia IMEDIATAMENTE.
+  - SE NÃO DER VALOR: Pergunte! "Quanto custou?" (se for relevante).
 
-3.  **LINKS / MÍDIA:**
-    - Se houver link, use \`metadata.type: "link"\`.
+- **\`section\` (Agrupamento Visual)**:
+  - Use este campo para criar SEÇÕES dentro da pasta. Isso organiza o site visualmente.
+  - Ex: Na pasta "Viagem Paris":
+    - Passagem aérea -> \`metadata: { section: "Transporte" }\`
+    - Hotel -> \`metadata: { section: "Hospedagem" }\`
+    - Jantar -> \`metadata: { section: "Alimentação" }\`
+    - "Dia 1: Torre Eiffel" -> \`metadata: { section: "Roteiro" }\`
 
-**INSTRUÇÕES DE RACIOCÍNIO (CHAIN OF THOUGHT):**
-Para tarefas complexas, você PODE "pensar alto" antes de chamar uma tool.
-Exemplo: "Preciso primeiro buscar o gasto na pasta Viagem e depois somar."
-O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem, mas ele ajuda você a se organizar.
+- **\`category\` (Tags/Etiquetas)**:
+  - Use para classificar o item com uma palavra-chave curta.
+  - Ex: "Gasolina", "Pedágio", "Almoço", "Uber".
+
+- **\`date\` (Cronologia)**:
+  - Se tiver data específica, coloque em \`metadata.date\` (ISO).
+
+### 3. EXEMPLOS DE "TOTAL AUTONOMIA":
+
+**Usuário**: "Vou viajar para Londres em Dezembro. Já comprei a passagem por 3000 reais."
+**Você (Raciocínio)**:
+1. Nova viagem? -> Criar coleção "Viagem Londres".
+2. Passagem tem valor? -> Adicionar item com \`amount: 3000\`, \`section: "Transporte"\` e \`category: "Passagem"\`.
+**Ação**:
+\`manage_collections({ action: 'create', name: 'Viagem Londres', icon: '🇬🇧' })\`
+\`manage_items({ action: 'add', collection_name: 'Viagem Londres', content: 'Passagem Aérea - R$ 3.000', metadata: { amount: 3000, section: 'Transporte', category: 'Passagem', type: 'expense' } })\`
+**Resposta**: "Criei a pasta 'Viagem Londres' 🇬🇧 e já anotei a passagem (R$ 3.000) na seção de Transporte."
+
+**Usuário**: "Coloque na viagem para Curitiba o valor de 182,90 de gasolina."
+**Você (Raciocínio)**:
+1. Pasta existe? (Sim, Curitiba).
+2. Valor? 182,90 -> 182.90.
+3. Seção? "Transporte".
+4. Categoria? "Gasolina".
+**Ação**:
+\`manage_items({ action: 'add', collection_name: 'Viagem Curitiba', content: 'Gasolina', metadata: { amount: 182.90, section: 'Transporte', category: 'Gasolina', type: 'expense' } })\`
+**Resposta**: "Adicionado 'Gasolina' (R$ 182,90) na Viagem Curitiba."
+
+**Usuário**: "Lembre que não gosto de cebola"
+**Ação**: \`save_memory({ content: "Usuário não gosta de cebola", category: "preferência" })\`
+
+**Usuário**: "O que tenho pra fazer?"
+**Ação**: \`manage_tasks({ action: "list", filter_status: "todo" })\`
 
 **SUPER-PODERES (USE COM SABEDORIA):**
 
@@ -916,7 +943,28 @@ O usuário não verá esse pensamento se você chamar uma tool na mesma mensagem
                                 }
                             }
                         } else {
-                            if (args.action === 'add') {
+                            if (args.action === 'list') {
+                                // List all items in this collection
+                                const { data: items, error } = await supabase
+                                    .from('collection_items')
+                                    .select('id, content, metadata, created_at, media_url')
+                                    .eq('collection_id', coll.id)
+                                    .order('created_at', { ascending: false });
+
+                                if (error) {
+                                    toolOutput = `Erro ao listar itens: ${error.message}`;
+                                } else if (!items || items.length === 0) {
+                                    toolOutput = `A pasta "${args.collection_name}" está vazia (0 itens).`;
+                                } else {
+                                    toolOutput = `Itens na pasta "${args.collection_name}" (${items.length} total):\n\n` +
+                                        items.map((item, i) => {
+                                            const amountInfo = item.metadata?.amount ? ` → R$ ${item.metadata.amount}` : '';
+                                            const sectionInfo = item.metadata?.section ? ` [${item.metadata.section}]` : '';
+                                            return `${i + 1}. ${item.content || '[sem texto]'}${amountInfo}${sectionInfo}`;
+                                        }).join('\n');
+                                }
+                            }
+                            else if (args.action === 'add') {
                                 const { error: insertError } = await supabase.from('collection_items').insert({
                                     collection_id: coll.id,
                                     user_id: userId, // Adicionado user_id explicitamente
