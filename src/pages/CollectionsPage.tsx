@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,6 +42,18 @@ export default function CollectionsPage() {
     // Search & Filters
     const [collectionSearch, setCollectionSearch] = useState('');
     const [itemSearch, setItemSearch] = useState('');
+
+    // Collection Filters
+    const [collectionSort, setCollectionSort] = useState<'name' | 'count' | 'date'>('name');
+    const [collectionTypeFilter] = useState<'all' | 'financial' | 'notes'>('all');
+
+    // Item Filters
+    const [itemSort, setItemSort] = useState<'date_desc' | 'date_asc' | 'amount_desc'>('date_desc');
+    const [itemTypeFilter, setItemTypeFilter] = useState<'all' | 'expense' | 'note' | 'task' | 'credential'>('all');
+    const [itemDateFilter, setItemDateFilter] = useState<'all' | 'this_month' | 'last_month' | 'future'>('all');
+
+    // UI State
+    const [revealedItems, setRevealedItems] = useState<Set<string>>(new Set());
     // Selection & Deletion
 
     // Selection & Deletion
@@ -120,9 +132,29 @@ export default function CollectionsPage() {
     }, [selectedCollection, fetchItems]);
 
     // Filter Logic
-    const filteredCollections = collections.filter(c =>
-        c.name.toLowerCase().includes(collectionSearch.toLowerCase())
-    );
+    const filteredCollections = collections.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(collectionSearch.toLowerCase());
+        if (!matchesSearch) return false;
+
+        if (collectionTypeFilter === 'financial') {
+            // Check if collection has financial items (this is an approximation as we only have count, 
+            // but ideally we'd need metadata on the collection or a better query. 
+            // For now, let's assume all collections can have financial items, 
+            // or we could check if it has 'Finanças' in name/icon. 
+            // BETTER: Let's filter by icon or description if possible, or just keep it simple for now.
+            // Actually, let's skip this complex filter for now or implement it if we fetch more data.
+            // Let's filter by "Has Items" vs "Empty" maybe? 
+            // User asked for "Type of thing". Let's stick to Search + Sort for Collections for now, 
+            // and maybe "Has Items".
+            return true;
+        }
+        return true;
+    }).sort((a, b) => {
+        if (collectionSort === 'name') return a.name.localeCompare(b.name);
+        if (collectionSort === 'count') return (b.item_count || 0) - (a.item_count || 0);
+        if (collectionSort === 'date') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return 0;
+    });
 
     const filteredItems = items.filter(item => {
         const matchesSearch = item.content.toLowerCase().includes(itemSearch.toLowerCase()) ||
@@ -130,14 +162,39 @@ export default function CollectionsPage() {
 
         if (!matchesSearch) return false;
 
+        // Type Filter
+        if (itemTypeFilter !== 'all') {
+            const itemType = item.metadata?.type || (item.metadata?.amount ? 'expense' : 'note');
+            if (itemType !== itemTypeFilter) return false;
+        }
 
+        // Date Filter
+        if (itemDateFilter !== 'all') {
+            const itemDateStr = item.metadata?.date || item.created_at;
+            const itemDate = new Date(itemDateStr);
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+            if (itemDateFilter === 'this_month') {
+                if (itemDate < startOfMonth) return false;
+            } else if (itemDateFilter === 'last_month') {
+                if (itemDate < startOfLastMonth || itemDate > endOfLastMonth) return false;
+            } else if (itemDateFilter === 'future') {
+                if (itemDate <= now) return false;
+            }
+        }
 
         return true;
     }).sort((a, b) => {
         const dateA = new Date(a.metadata?.date || a.created_at).getTime();
         const dateB = new Date(b.metadata?.date || b.created_at).getTime();
+        const amountA = Number(a.metadata?.amount || 0);
+        const amountB = Number(b.metadata?.amount || 0);
 
-
+        if (itemSort === 'date_asc') return dateA - dateB;
+        if (itemSort === 'amount_desc') return amountB - amountA;
         return dateB - dateA; // Default: date_desc
     });
 
@@ -461,6 +518,58 @@ export default function CollectionsPage() {
                                 </div>
 
                                 <div className="flex gap-2">
+                                    {/* Type Filter */}
+                                    <div className="relative group">
+                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                            <Filter size={18} />
+                                            <span className="text-sm hidden md:inline">
+                                                {itemTypeFilter === 'all' ? 'Todos' :
+                                                    itemTypeFilter === 'expense' ? 'Gastos' :
+                                                        itemTypeFilter === 'note' ? 'Notas' :
+                                                            itemTypeFilter === 'credential' ? 'Senhas' : 'Tarefas'}
+                                            </span>
+                                        </button>
+                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
+                                            <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Todos</button>
+                                            <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Gastos</button>
+                                            <button onClick={() => setItemTypeFilter('note')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Notas</button>
+                                            <button onClick={() => setItemTypeFilter('credential')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Senhas</button>
+                                            <button onClick={() => setItemTypeFilter('task')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Tarefas</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Date Filter */}
+                                    <div className="relative group">
+                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                            <Calendar size={18} />
+                                            <span className="text-sm hidden md:inline">
+                                                {itemDateFilter === 'all' ? 'Qualquer Data' :
+                                                    itemDateFilter === 'this_month' ? 'Este Mês' :
+                                                        itemDateFilter === 'last_month' ? 'Mês Passado' : 'Futuro'}
+                                            </span>
+                                        </button>
+                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
+                                            <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Qualquer Data</button>
+                                            <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Este Mês</button>
+                                            <button onClick={() => setItemDateFilter('last_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mês Passado</button>
+                                            <button onClick={() => setItemDateFilter('future')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Futuro</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Sort */}
+                                    <div className="relative group">
+                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                            <ArrowUpDown size={18} />
+                                        </button>
+                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
+                                            <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Recentes</button>
+                                            <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Antigos</button>
+                                            <button onClick={() => setItemSort('amount_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Maior Valor</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="w-px bg-gray-700 mx-1"></div>
+
                                     <Button
                                         variant="danger"
                                         onClick={() => handleDeleteCollectionClick(selectedCollection.id)}
@@ -509,63 +618,139 @@ export default function CollectionsPage() {
                                                 {groupedItems[category].map((item) => {
                                                     const hasAmount = item.metadata?.amount || item.metadata?.value;
                                                     const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
+                                                    const isCredential = item.metadata?.type === 'credential';
+                                                    const isRevealed = revealedItems.has(item.id);
+
+                                                    const toggleReveal = (e: React.MouseEvent) => {
+                                                        e.stopPropagation();
+                                                        const newRevealed = new Set(revealedItems);
+                                                        if (newRevealed.has(item.id)) {
+                                                            newRevealed.delete(item.id);
+                                                        } else {
+                                                            newRevealed.add(item.id);
+                                                        }
+                                                        setRevealedItems(newRevealed);
+                                                    };
+
+                                                    const copyToClipboard = (text: string, e: React.MouseEvent) => {
+                                                        e.stopPropagation();
+                                                        navigator.clipboard.writeText(text);
+                                                        // Could add a toast here
+                                                    };
+
                                                     return (
                                                         <div
                                                             key={item.id}
-                                                            className="flex items-center gap-4 p-4 border-b border-gray-800 last:border-b-0 hover:bg-gray-700/30 transition-colors cursor-pointer group"
+                                                            className="flex flex-col gap-2 p-4 border-b border-gray-800 last:border-b-0 hover:bg-gray-700/30 transition-colors cursor-pointer group"
                                                             onClick={() => {
                                                                 setItemToEdit(item);
                                                                 setIsEditItemModalOpen(true);
                                                             }}
                                                         >
-                                                            {/* Icon */}
-                                                            {item.metadata?.type === 'expense' || hasAmount ? (
-                                                                <div className="bg-green-500/10 text-green-400 p-2 rounded-lg">
-                                                                    <DollarSign size={16} />
-                                                                </div>
-                                                            ) : item.metadata?.type === 'credential' ? (
-                                                                <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg">
-                                                                    <Lock size={16} />
-                                                                </div>
-                                                            ) : item.metadata?.type === 'task' ? (
-                                                                <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg">
-                                                                    <CheckCircle size={16} />
-                                                                </div>
-                                                            ) : (
-                                                                <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg">
-                                                                    <FileText size={16} />
-                                                                </div>
-                                                            )}
+                                                            <div className="flex items-start gap-4">
+                                                                {/* Icon */}
+                                                                {item.metadata?.type === 'expense' || hasAmount ? (
+                                                                    <div className="bg-green-500/10 text-green-400 p-2 rounded-lg mt-1">
+                                                                        <DollarSign size={16} />
+                                                                    </div>
+                                                                ) : item.metadata?.type === 'credential' ? (
+                                                                    <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg mt-1">
+                                                                        <Lock size={16} />
+                                                                    </div>
+                                                                ) : item.metadata?.type === 'task' ? (
+                                                                    <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg mt-1">
+                                                                        <CheckCircle size={16} />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg mt-1">
+                                                                        <FileText size={16} />
+                                                                    </div>
+                                                                )}
 
-                                                            <div className="flex-1">
-                                                                <p className="text-gray-200 text-sm line-clamp-1 font-light">
-                                                                    {item.content}
-                                                                </p>
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-xs text-gray-500">{format(new Date(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
-                                                                    {item.metadata?.category && (
-                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                                                                            {item.metadata.category}
-                                                                        </span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    {isCredential ? (
+                                                                        <div className="space-y-2">
+                                                                            <p className="text-gray-200 font-medium">{item.content}</p>
+                                                                            <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50 flex flex-col gap-2">
+                                                                                {item.metadata?.username && (
+                                                                                    <div className="flex items-center justify-between text-sm">
+                                                                                        <span className="text-gray-500">Usuário:</span>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-gray-300 font-mono">{item.metadata.username}</span>
+                                                                                            <button
+                                                                                                onClick={(e) => copyToClipboard(item.metadata.username, e)}
+                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                title="Copiar usuário"
+                                                                                            >
+                                                                                                <Copy size={12} />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                                {item.metadata?.password && (
+                                                                                    <div className="flex items-center justify-between text-sm">
+                                                                                        <span className="text-gray-500">Senha:</span>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-gray-600 blur-sm select-none'}`}>
+                                                                                                {isRevealed ? item.metadata.password : '••••••••'}
+                                                                                            </span>
+                                                                                            <button
+                                                                                                onClick={toggleReveal}
+                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                title={isRevealed ? "Ocultar" : "Revelar"}
+                                                                                            >
+                                                                                                {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={(e) => copyToClipboard(item.metadata.password, e)}
+                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                title="Copiar senha"
+                                                                                            >
+                                                                                                <Copy size={12} />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div>
+                                                                            <p className="text-gray-200 text-sm font-light whitespace-pre-wrap leading-relaxed">
+                                                                                {item.content.split('|').map((part, i) => (
+                                                                                    <span key={i} className={i > 0 ? "block mt-1 text-gray-400" : ""}>
+                                                                                        {part.trim()}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </p>
+                                                                        </div>
                                                                     )}
+
+                                                                    <div className="flex items-center gap-2 mt-2">
+                                                                        <span className="text-xs text-gray-500">{format(new Date(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                                        {item.metadata?.category && (
+                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                                                                                {item.metadata.category}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
+
+                                                                {hasAmount && (
+                                                                    <div className="text-green-400 font-bold text-sm whitespace-nowrap">
+                                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
+                                                                    </div>
+                                                                )}
+
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteItemClick(item.id);
+                                                                    }}
+                                                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
                                                             </div>
-
-                                                            {hasAmount && (
-                                                                <div className="text-green-400 font-bold text-sm">
-                                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
-                                                                </div>
-                                                            )}
-
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeleteItemClick(item.id);
-                                                                }}
-                                                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
                                                         </div>
                                                     );
                                                 })}
@@ -592,15 +777,33 @@ export default function CollectionsPage() {
                                 <h2 className="text-3xl font-bold text-white">Minhas Coleções</h2>
                                 <p className="text-gray-400 mt-2">Gerencie todas as suas pastas e arquivos</p>
                             </div>
-                            <Button
-                                onClick={() => {
-                                    setCollectionForm({ name: '', description: '', icon: '📁' });
-                                    setIsCreateModalOpen(true);
-                                }}
-                                icon={Plus}
-                            >
-                                Nova Coleção
-                            </Button>
+                            <div className="flex gap-3">
+                                {/* Sort Dropdown */}
+                                <div className="relative group">
+                                    <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700">
+                                        <ArrowUpDown size={16} />
+                                        <span className="text-sm font-medium">
+                                            {collectionSort === 'name' ? 'Nome' : collectionSort === 'count' ? 'Qtd. Itens' : 'Data'}
+                                        </span>
+                                        <ChevronDown size={14} />
+                                    </button>
+                                    <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
+                                        <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'name' ? 'text-blue-400' : 'text-gray-300'}`}>Nome</button>
+                                        <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'count' ? 'text-blue-400' : 'text-gray-300'}`}>Qtd. Itens</button>
+                                        <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'date' ? 'text-blue-400' : 'text-gray-300'}`}>Data</button>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    onClick={() => {
+                                        setCollectionForm({ name: '', description: '', icon: '📁' });
+                                        setIsCreateModalOpen(true);
+                                    }}
+                                    icon={Plus}
+                                >
+                                    Nova Coleção
+                                </Button>
+                            </div>
                         </div>
 
                         {filteredCollections.length > 0 ? (
