@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 
 export default function SettingsPage() {
+    // Force redeploy - Settings Page Refactor
     const [preferredName, setPreferredName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
