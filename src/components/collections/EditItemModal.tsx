@@ -118,18 +118,22 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-white">Editar Item</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4">
+            <div className="bg-gray-900 w-full md:w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-gray-800 flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-10 duration-300">
+
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-800">
+                    <h2 className="text-xl font-bold text-white">Editar Item</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white p-2">
                         <X size={24} />
                     </button>
                 </div>
 
-                <div className="space-y-4">
-                    {/* Type Selector */}
-                    <div className="flex gap-2 p-1 bg-gray-900 rounded-lg overflow-x-auto">
+                {/* Scrollable Content */}
+                <div className="p-4 md:p-6 space-y-6 overflow-y-auto custom-scrollbar">
+
+                    {/* Type Selector - Scrollable on mobile */}
+                    <div className="flex gap-2 p-1 bg-gray-950/50 rounded-xl overflow-x-auto no-scrollbar pb-2 md:pb-1">
                         {[
                             { id: 'note', icon: FileText, label: 'Nota' },
                             { id: 'expense', icon: DollarSign, label: 'Gasto' },
@@ -139,9 +143,9 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                             <button
                                 key={t.id}
                                 onClick={() => setType(t.id as ItemType)}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all whitespace-nowrap ${type === t.id ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                                className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${type === t.id ? 'bg-blue-600 text-white shadow-lg scale-[1.02]' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                             >
-                                <t.icon size={16} />
+                                <t.icon size={18} />
                                 {t.label}
                             </button>
                         ))}

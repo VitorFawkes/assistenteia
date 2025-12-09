@@ -236,6 +236,20 @@ Deno.serve(async (req: Request) => {
             {
                 type: 'function',
                 function: {
+                    name: 'update_user_settings',
+                    description: 'Atualiza configurações do perfil do usuário, como o nome preferido.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            preferred_name: { type: 'string', description: 'Novo nome ou apelido como o usuário quer ser chamado.' }
+                        },
+                        required: ['preferred_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'manage_tasks',
                     description: 'Gerencia TAREFAS (To-Do List). Use para coisas que precisam ser feitas mas NÃO necessariamente têm hora marcada para notificar.',
                     parameters: {
@@ -456,9 +470,16 @@ Você é um ORGANIZADOR INTELIGENTE. Não apenas salve texto, ESTRUTURE-O.
 
 ### 1. COLEÇÕES E PASTAS (PROATIVIDADE & CONTEXTO)
 - **CRIE AUTOMATICAMENTE**: Se o usuário falar de um novo projeto, viagem ou evento ("Vou para Paris", "Comecei uma obra"), CRIE a coleção imediatamente.
-- **VERIFIQUE O CONTEXTO (CRÍTICO)**: Antes de adicionar a uma pasta existente, verifique se o item FAZ SENTIDO nela.
-  - Ex: Se a pasta ativa é "Viagem Paris" e o usuário diz "O código do banco é 1234", **NÃO** coloque na viagem. Crie/Use uma pasta "Códigos" ou "Segurança".
-  - Ex: Se a pasta ativa é "Obras" e o usuário diz "Comprar leite", **NÃO** coloque na obra. Crie/Use uma pasta "Mercado" ou "Tarefas".
+- **VERIFIQUE O CONTEXTO (CRÍTICO - TOLERÂNCIA ZERO)**:
+  - Antes de adicionar a uma pasta existente, verifique se o item FAZ SENTIDO nela.
+  - **REGRA DE OURO**: Se o TIPO do item (ex: Credencial, Código, Tarefa Doméstica) não tem relação com o TEMA da pasta (ex: Viagem, Projeto), **VOCÊ É PROIBIDO DE ADICIONAR LÁ**.
+  - **AÇÃO CORRETA**: Crie uma nova coleção apropriada (ex: "Códigos", "Segurança", "Casa", "Tarefas") e adicione lá.
+  - Ex: Pasta ativa "Viagem Paris". Usuário diz: "O código do banco é 1234".
+    - ❌ ERRADO: Adicionar na Viagem.
+    - ✅ CORRETO: Criar pasta "Segurança" e adicionar lá.
+  - Ex: Pasta ativa "Obras". Usuário diz: "Comprar leite".
+    - ❌ ERRADO: Adicionar na Obra.
+    - ✅ CORRETO: Criar pasta "Mercado" e adicionar lá.
 
 ### 2. ITENS E METADATA (O SEGREDO DA ORGANIZAÇÃO)
 Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
@@ -1381,6 +1402,25 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                                 const memoryText = memories.map((m: any) => `- ${m.content} (Similaridade: ${(m.similarity * 100).toFixed(0)}%)`).join('\n');
                                 toolOutput = `Memórias Encontradas:\n${memoryText}`;
                             }
+                        }
+                    }
+
+                    // --- UPDATE USER SETTINGS ---
+                    else if (functionName === 'update_user_settings') {
+                        if (args.preferred_name) {
+                            const { error } = await supabase.from('user_settings').upsert({
+                                user_id: userId,
+                                preferred_name: args.preferred_name
+                            });
+
+                            if (error) {
+                                console.error('Error updating settings:', error);
+                                toolOutput = `Erro ao atualizar nome: ${error.message}`;
+                            } else {
+                                toolOutput = `Nome preferido atualizado para "${args.preferred_name}".`;
+                            }
+                        } else {
+                            toolOutput = "Nenhuma configuração fornecida para atualização.";
                         }
                     }
                 } catch (error: any) {

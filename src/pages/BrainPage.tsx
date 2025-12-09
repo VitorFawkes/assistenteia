@@ -415,15 +415,11 @@ export default function BrainPage() {
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="mt-4">
-                                        <label className="text-xs text-gray-500 mb-1 block">Nome do Modelo Personalizado (Opcional)</label>
-                                        <input
-                                            type="text"
-                                            value={settings.ai_model}
-                                            onChange={(e) => setSettings({ ...settings, ai_model: e.target.value })}
-                                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                            placeholder="Digite o ID do modelo se não estiver na lista..."
-                                        />
+                                    <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                                        <p className="text-xs text-blue-300 flex items-center gap-2">
+                                            <Sparkles size={14} />
+                                            O modelo selecionado será usado para todas as novas conversas.
+                                        </p>
                                     </div>
                                 </Card>
 
@@ -447,12 +443,14 @@ export default function BrainPage() {
             </div>
 
             {/* Success Toast */}
-            {showSuccess && (
-                <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
-                    <CheckCircle2 size={18} />
-                    <span>Salvo com sucesso!</span>
-                </div>
-            )}
-        </div>
+            {
+                showSuccess && (
+                    <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
+                        <CheckCircle2 size={18} />
+                        <span>Salvo com sucesso!</span>
+                    </div>
+                )
+            }
+        </div >
     );
 }

@@ -534,7 +534,8 @@ export default function CollectionsPage() {
                                                 )}
                                             </div>
 
-                                            <div className={viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}>
+                                            {/* DESKTOP VIEW (Grid/Masonry) */}
+                                            <div className={`hidden md:block ${viewMode === 'grid' ? 'columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6' : 'space-y-4 max-w-4xl mx-auto'}`}>
                                                 {groupedItems[category].map(item => {
                                                     const hasAmount = item.metadata?.amount || item.metadata?.value;
                                                     const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
@@ -673,6 +674,55 @@ export default function CollectionsPage() {
                                                             </div>
                                                         </div>
                                                     );
+                                                })}
+                                            </div>
+
+                                            {/* MOBILE VIEW (Simple Stack) */}
+                                            <div className="md:hidden space-y-4">
+                                                {groupedItems[category].map(item => {
+                                                    const hasAmount = item.metadata?.amount || item.metadata?.value;
+                                                    const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
+
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className="bg-gray-800 border border-gray-700 rounded-xl p-4 active:scale-[0.98] transition-transform"
+                                                            onClick={() => handleEditItemClick(item)}
+                                                        >
+                                                            <div className="flex justify-between items-start mb-3">
+                                                                {/* Icon */}
+                                                                {item.metadata?.type === 'expense' || hasAmount ? (
+                                                                    <div className="bg-green-500/10 text-green-400 p-2 rounded-lg">
+                                                                        <DollarSign size={16} />
+                                                                    </div>
+                                                                ) : item.metadata?.type === 'credential' ? (
+                                                                    <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg">
+                                                                        <Lock size={16} />
+                                                                    </div>
+                                                                ) : item.metadata?.type === 'task' ? (
+                                                                    <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg">
+                                                                        <CheckCircle size={16} />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg">
+                                                                        <FileText size={16} />
+                                                                    </div>
+                                                                )}
+
+                                                                <span className="text-xs text-gray-500">{format(new Date(item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                            </div>
+
+                                                            <p className="text-gray-200 text-sm line-clamp-3 mb-3 font-light">
+                                                                {item.content}
+                                                            </p>
+
+                                                            {hasAmount && (
+                                                                <div className="text-green-400 font-bold text-lg">
+                                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
                                                 })}
                                             </div>
                                         </div>
