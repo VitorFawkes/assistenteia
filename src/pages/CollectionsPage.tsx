@@ -50,7 +50,8 @@ export default function CollectionsPage() {
     // Item Filters
     const [itemSort, setItemSort] = useState<'date_desc' | 'date_asc' | 'amount_desc'>('date_desc');
     const [itemTypeFilter, setItemTypeFilter] = useState<'all' | 'expense' | 'note' | 'task' | 'credential'>('all');
-    const [itemDateFilter, setItemDateFilter] = useState<'all' | 'this_month' | 'last_month' | 'future'>('all');
+    const [itemDateFilter, setItemDateFilter] = useState<'all' | 'this_month' | 'last_month' | 'future' | 'custom'>('all');
+    const [customDateRange, setCustomDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
     // UI State
     const [revealedItems, setRevealedItems] = useState<Set<string>>(new Set());
@@ -183,6 +184,12 @@ export default function CollectionsPage() {
                 if (itemDate < startOfLastMonth || itemDate > endOfLastMonth) return false;
             } else if (itemDateFilter === 'future') {
                 if (itemDate <= now) return false;
+            } else if (itemDateFilter === 'custom' && customDateRange.start && customDateRange.end) {
+                const startDate = new Date(customDateRange.start);
+                const endDate = new Date(customDateRange.end);
+                // Adjust end date to end of day
+                endDate.setHours(23, 59, 59, 999);
+                if (itemDate < startDate || itemDate > endDate) return false;
             }
         }
 
@@ -529,12 +536,14 @@ export default function CollectionsPage() {
                                                             itemTypeFilter === 'credential' ? 'Senhas' : 'Tarefas'}
                                             </span>
                                         </button>
-                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
-                                            <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Todos</button>
-                                            <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Gastos</button>
-                                            <button onClick={() => setItemTypeFilter('note')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Notas</button>
-                                            <button onClick={() => setItemTypeFilter('credential')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Senhas</button>
-                                            <button onClick={() => setItemTypeFilter('task')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Tarefas</button>
+                                        <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
+                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                                                <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Todos</button>
+                                                <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Gastos</button>
+                                                <button onClick={() => setItemTypeFilter('note')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Notas</button>
+                                                <button onClick={() => setItemTypeFilter('credential')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Senhas</button>
+                                                <button onClick={() => setItemTypeFilter('task')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Tarefas</button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -548,11 +557,37 @@ export default function CollectionsPage() {
                                                         itemDateFilter === 'last_month' ? 'Mês Passado' : 'Futuro'}
                                             </span>
                                         </button>
-                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
-                                            <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Qualquer Data</button>
-                                            <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Este Mês</button>
-                                            <button onClick={() => setItemDateFilter('last_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mês Passado</button>
-                                            <button onClick={() => setItemDateFilter('future')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Futuro</button>
+                                        <div className="absolute right-0 pt-2 w-64 z-20 hidden group-hover:block">
+                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden p-2">
+                                                <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Qualquer Data</button>
+                                                <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Este Mês</button>
+                                                <button onClick={() => setItemDateFilter('last_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Mês Passado</button>
+                                                <button onClick={() => setItemDateFilter('future')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Futuro</button>
+                                                <div className="border-t border-gray-700 my-1"></div>
+                                                <div className="px-2 py-1">
+                                                    <span className="text-xs text-gray-500 block mb-1">Personalizado</span>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="date"
+                                                            value={customDateRange.start}
+                                                            onChange={(e) => {
+                                                                setCustomDateRange(prev => ({ ...prev, start: e.target.value }));
+                                                                setItemDateFilter('custom');
+                                                            }}
+                                                            className="w-full bg-gray-900 border border-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                                                        />
+                                                        <input
+                                                            type="date"
+                                                            value={customDateRange.end}
+                                                            onChange={(e) => {
+                                                                setCustomDateRange(prev => ({ ...prev, end: e.target.value }));
+                                                                setItemDateFilter('custom');
+                                                            }}
+                                                            className="w-full bg-gray-900 border border-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -561,10 +596,12 @@ export default function CollectionsPage() {
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
                                             <ArrowUpDown size={18} />
                                         </button>
-                                        <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
-                                            <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Recentes</button>
-                                            <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Antigos</button>
-                                            <button onClick={() => setItemSort('amount_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Maior Valor</button>
+                                        <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
+                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                                                <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Recentes</button>
+                                                <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Antigos</button>
+                                                <button onClick={() => setItemSort('amount_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Maior Valor</button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -691,8 +728,8 @@ export default function CollectionsPage() {
                                                                                     <div className="flex items-center justify-between text-sm">
                                                                                         <span className="text-gray-500">Senha:</span>
                                                                                         <div className="flex items-center gap-2">
-                                                                                            <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-gray-600 blur-sm select-none'}`}>
-                                                                                                {isRevealed ? item.metadata.password : '••••••••'}
+                                                                                            <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-transparent bg-white/10 px-2 rounded blur-[2px] select-none'}`}>
+                                                                                                {isRevealed ? item.metadata.password : '••••••••••••'}
                                                                                             </span>
                                                                                             <button
                                                                                                 onClick={toggleReveal}
