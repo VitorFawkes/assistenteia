@@ -476,7 +476,7 @@ export default function CollectionsPage() {
                 {selectedCollection ? (
                     <>
                         {/* Header with Financial Widget */}
-                        <div className="p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
+                        <div className="p-4 md:p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
                             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-4 mb-2">
@@ -522,7 +522,7 @@ export default function CollectionsPage() {
                             </div>
 
                             {/* Controls Bar */}
-                            <div className="flex flex-col md:flex-row gap-4 justify-between items-center mt-8">
+                            <div className="flex flex-col md:flex-row gap-4 justify-between items-center mt-4 md:mt-8">
                                 <div className="relative w-full md:w-96 group">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={20} />
                                     <input
@@ -534,7 +534,7 @@ export default function CollectionsPage() {
                                     />
                                 </div>
 
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                                     {/* Type Filter */}
                                     <div className="relative group">
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
