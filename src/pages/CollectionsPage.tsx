@@ -72,6 +72,16 @@ export default function CollectionsPage() {
     const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<CollectionItem | null>(null);
 
+    // Helper to parse date safely, handling YYYY-MM-DD as local date (avoiding timezone shift)
+    const parseDate = (dateStr: string | undefined | null) => {
+        if (!dateStr) return new Date();
+        // If it's a simple date string YYYY-MM-DD, append time to force it to be treated as local/noon to avoid timezone shifts
+        if (dateStr.length === 10 && dateStr.includes('-')) {
+            return new Date(dateStr + 'T12:00:00');
+        }
+        return new Date(dateStr);
+    };
+
     const fetchCollections = useCallback(async () => {
         if (!user) return;
 
@@ -172,7 +182,7 @@ export default function CollectionsPage() {
         // Date Filter
         if (itemDateFilter !== 'all') {
             const itemDateStr = item.metadata?.date || item.created_at;
-            const itemDate = new Date(itemDateStr);
+            const itemDate = parseDate(itemDateStr);
             const now = new Date();
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -185,8 +195,8 @@ export default function CollectionsPage() {
             } else if (itemDateFilter === 'future') {
                 if (itemDate <= now) return false;
             } else if (itemDateFilter === 'custom' && customDateRange.start && customDateRange.end) {
-                const startDate = new Date(customDateRange.start);
-                const endDate = new Date(customDateRange.end);
+                const startDate = parseDate(customDateRange.start);
+                const endDate = parseDate(customDateRange.end);
                 // Adjust end date to end of day
                 endDate.setHours(23, 59, 59, 999);
                 if (itemDate < startDate || itemDate > endDate) return false;
@@ -195,8 +205,8 @@ export default function CollectionsPage() {
 
         return true;
     }).sort((a, b) => {
-        const dateA = new Date(a.metadata?.date || a.created_at).getTime();
-        const dateB = new Date(b.metadata?.date || b.created_at).getTime();
+        const dateA = parseDate(a.metadata?.date || a.created_at).getTime();
+        const dateB = parseDate(b.metadata?.date || b.created_at).getTime();
         const amountA = Number(a.metadata?.amount || 0);
         const amountB = Number(b.metadata?.amount || 0);
 
@@ -763,7 +773,7 @@ export default function CollectionsPage() {
                                                                     )}
 
                                                                     <div className="flex items-center gap-2 mt-2">
-                                                                        <span className="text-xs text-gray-500">{format(new Date(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                                        <span className="text-xs text-gray-500">{format(parseDate(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
                                                                         {item.metadata?.category && (
                                                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
                                                                                 {item.metadata.category}
