@@ -32,8 +32,9 @@ export default function SettingsPage() {
             if (error) throw error;
 
             if (data) {
-                setPreferredName(data.preferred_name || '');
-                setPhone(data.phone || '');
+                const settings = data as any;
+                setPreferredName(settings.preferred_name || '');
+                setPhone(settings.phone || '');
             }
         } catch (error) {
             console.error('Error loading settings:', error);
