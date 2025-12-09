@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Edit2, X, Filter, Folder, Grid, FileText, CheckSquare, List } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Filter, Folder, Grid, FileText, CheckSquare, List, Lock, CheckCircle, DollarSign } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -585,10 +585,20 @@ export default function CollectionsPage() {
                                                             <div className="p-6">
                                                                 {/* Smart Icon/Type Indicator */}
                                                                 <div className="mb-4 flex items-center justify-between">
-                                                                    {hasAmount ? (
+                                                                    {item.metadata?.type === 'expense' || hasAmount ? (
                                                                         <div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-green-500/20 flex items-center gap-2">
-                                                                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                                                            <DollarSign size={12} />
                                                                             Financeiro
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'credential' ? (
+                                                                        <div className="bg-purple-500/10 text-purple-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-purple-500/20 flex items-center gap-2">
+                                                                            <Lock size={12} />
+                                                                            Credencial
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'task' ? (
+                                                                        <div className="bg-orange-500/10 text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-orange-500/20 flex items-center gap-2">
+                                                                            <CheckCircle size={12} />
+                                                                            Tarefa
                                                                         </div>
                                                                     ) : (
                                                                         <div className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border border-blue-500/20 flex items-center gap-2">
@@ -604,6 +614,38 @@ export default function CollectionsPage() {
                                                                     <p className="text-gray-200 leading-relaxed whitespace-pre-wrap font-light text-[15px]">
                                                                         {item.content}
                                                                     </p>
+
+                                                                    {/* Credential Details */}
+                                                                    {item.metadata?.type === 'credential' && (
+                                                                        <div className="mt-4 bg-black/30 p-3 rounded-lg border border-gray-700/50 space-y-2">
+                                                                            {item.metadata.username && (
+                                                                                <div className="flex justify-between text-xs">
+                                                                                    <span className="text-gray-500">Usuário:</span>
+                                                                                    <span className="text-gray-300 font-mono select-all">{item.metadata.username}</span>
+                                                                                </div>
+                                                                            )}
+                                                                            {item.metadata.password && (
+                                                                                <div className="flex justify-between text-xs">
+                                                                                    <span className="text-gray-500">Senha:</span>
+                                                                                    <span className="text-gray-300 font-mono select-all blur-sm hover:blur-none transition-all cursor-pointer">{item.metadata.password}</span>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Task Details */}
+                                                                    {item.metadata?.type === 'task' && (
+                                                                        <div className="mt-3 flex items-center gap-2">
+                                                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.metadata.status === 'done' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                                                                {item.metadata.status === 'done' ? 'Concluído' : 'Pendente'}
+                                                                            </span>
+                                                                            {item.metadata.due_date && (
+                                                                                <span className="text-xs text-gray-500">
+                                                                                    Vence em: {format(new Date(item.metadata.due_date), "dd/MM/yyyy", { locale: ptBR })}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
 
                                                                 {/* Footer / Metadata */}
@@ -619,7 +661,7 @@ export default function CollectionsPage() {
 
                                                                         {/* Other Metadata Pills */}
                                                                         {Object.entries(item.metadata || {}).map(([key, value]) => {
-                                                                            if (['amount', 'value', 'price', 'custo', 'valor', 'type', 'subcategory'].includes(key.toLowerCase())) return null;
+                                                                            if (['amount', 'value', 'price', 'custo', 'valor', 'type', 'subcategory', 'username', 'password', 'url', 'status', 'due_date'].includes(key.toLowerCase())) return null;
                                                                             return (
                                                                                 <span key={key} className="text-xs text-gray-400 bg-gray-900/50 px-2 py-1 rounded border border-gray-700">
                                                                                     {String(value)}

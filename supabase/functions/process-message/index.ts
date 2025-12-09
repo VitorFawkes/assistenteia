@@ -137,7 +137,13 @@ Deno.serve(async (req: Request) => {
                                     section: { type: 'string', description: 'Seção visual na lista (ex: Transporte, Alimentação)' },
                                     category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
                                     date: { type: 'string', description: 'Data do evento (ISO)' },
-                                    type: { type: 'string', description: 'Tipo do item (ex: expense, note, task)' }
+                                    type: { type: 'string', enum: ['expense', 'note', 'task', 'credential'], description: 'Tipo do item' },
+                                    // Novos campos para Credenciais/Tarefas
+                                    username: { type: 'string', description: 'Para credenciais: usuário/login' },
+                                    password: { type: 'string', description: 'Para credenciais: senha/código' },
+                                    url: { type: 'string', description: 'Para credenciais: link de acesso' },
+                                    status: { type: 'string', enum: ['todo', 'done'], description: 'Para tarefas: estado atual' },
+                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO)' }
                                 }
                             },
                             // Critérios para encontrar item para update/delete
@@ -448,9 +454,11 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 **EXTRAÇÃO DE DADOS & ORGANIZAÇÃO INTELIGENTE (MANDATÓRIO):**
 Você é um ORGANIZADOR INTELIGENTE. Não apenas salve texto, ESTRUTURE-O.
 
-### 1. COLEÇÕES E PASTAS (PROATIVIDADE TOTAL)
-- **CRIE AUTOMATICAMENTE**: Se o usuário falar de um novo projeto, viagem ou evento ("Vou para Paris", "Comecei uma obra"), CRIE a coleção imediatamente. Não pergunte "quer que eu crie?". Apenas faça.
-- **USE O QUE EXISTE**: Se já existe uma pasta "Viagem Paris", use-a.
+### 1. COLEÇÕES E PASTAS (PROATIVIDADE & CONTEXTO)
+- **CRIE AUTOMATICAMENTE**: Se o usuário falar de um novo projeto, viagem ou evento ("Vou para Paris", "Comecei uma obra"), CRIE a coleção imediatamente.
+- **VERIFIQUE O CONTEXTO (CRÍTICO)**: Antes de adicionar a uma pasta existente, verifique se o item FAZ SENTIDO nela.
+  - Ex: Se a pasta ativa é "Viagem Paris" e o usuário diz "O código do banco é 1234", **NÃO** coloque na viagem. Crie/Use uma pasta "Códigos" ou "Segurança".
+  - Ex: Se a pasta ativa é "Obras" e o usuário diz "Comprar leite", **NÃO** coloque na obra. Crie/Use uma pasta "Mercado" ou "Tarefas".
 
 ### 2. ITENS E METADATA (O SEGREDO DA ORGANIZAÇÃO)
 Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
@@ -477,6 +485,12 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
 - **\`date\` (Cronologia)**:
   - Se tiver data específica, coloque em \`metadata.date\` (ISO).
 
+- **\`type\` (Polimorfismo)**:
+  - \`expense\`: Gastos financeiros (tem amount).
+  - \`credential\`: Senhas, códigos, logins (tem username, password, url).
+  - \`task\`: Coisas a fazer (tem status, due_date).
+  - \`note\`: Texto livre.
+
 ### 3. EXEMPLOS DE "TOTAL AUTONOMIA":
 
 **Usuário**: "Vou viajar para Londres em Dezembro. Já comprei a passagem por 3000 reais."
@@ -491,12 +505,20 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
 **Usuário**: "Coloque na viagem para Curitiba o valor de 182,90 de gasolina."
 **Você (Raciocínio)**:
 1. Pasta existe? (Sim, Curitiba).
-2. Valor? 182,90 -> 182.90.
-3. Seção? "Transporte".
-4. Categoria? "Gasolina".
+2. Item faz sentido na pasta? (Sim, gasolina é viagem).
+3. Ação: Adicionar.
 **Ação**:
 \`manage_items({ action: 'add', collection_name: 'Viagem Curitiba', content: 'Gasolina', metadata: { amount: 182.90, section: 'Transporte', category: 'Gasolina', type: 'expense' } })\`
-**Resposta**: "Adicionado 'Gasolina' (R$ 182,90) na Viagem Curitiba."
+
+**Usuário**: "O código de recuperação do app Clara é 123456."
+**Você (Raciocínio)**:
+1. Pasta ativa: "Viagem Curitiba".
+2. Item faz sentido na pasta? (NÃO. Código de app não é viagem).
+3. Qual pasta faz sentido? "Códigos" ou "Segurança".
+4. Ação: Criar/Usar pasta "Códigos" e adicionar lá.
+**Ação**:
+\`manage_collections({ action: 'create', name: 'Códigos', icon: '🔒' })\`
+\`manage_items({ action: 'add', collection_name: 'Códigos', content: 'Recuperação App Clara', metadata: { password: '123456', type: 'credential', category: 'App' } })\`
 
 **Usuário**: "Lembre que não gosto de cebola"
 **Ação**: \`save_memory({ content: "Usuário não gosta de cebola", category: "preferência" })\`
