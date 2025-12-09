@@ -284,18 +284,24 @@ export type Database = {
                     user_id: string
                     custom_system_prompt: string | null
                     ai_model: string | null
+                    preferred_name: string | null
+                    phone: string | null
                     updated_at: string | null
                 }
                 Insert: {
                     user_id: string
                     custom_system_prompt?: string | null
                     ai_model?: string | null
+                    preferred_name?: string | null
+                    phone?: string | null
                     updated_at?: string | null
                 }
                 Update: {
                     user_id?: string
                     custom_system_prompt?: string | null
                     ai_model?: string | null
+                    preferred_name?: string | null
+                    phone?: string | null
                     updated_at?: string | null
                 }
                 Relationships: []
