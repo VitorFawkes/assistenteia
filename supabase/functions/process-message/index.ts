@@ -138,12 +138,13 @@ Deno.serve(async (req: Request) => {
                                     category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
                                     date: { type: 'string', description: 'Data do evento (ISO)' },
                                     type: { type: 'string', enum: ['expense', 'note', 'task', 'credential'], description: 'Tipo do item' },
-                                    // Novos campos para Credenciais/Tarefas
+                                    // Novos campos para Credenciais/Tarefas/Gastos
                                     username: { type: 'string', description: 'Para credenciais: usuário/login' },
                                     password: { type: 'string', description: 'Para credenciais: senha/código' },
                                     url: { type: 'string', description: 'Para credenciais: link de acesso' },
                                     status: { type: 'string', enum: ['todo', 'done'], description: 'Para tarefas: estado atual' },
-                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO)' }
+                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO)' },
+                                    date: { type: 'string', description: 'Para GASTOS ou EVENTOS: data de ocorrência (ISO). Se não informado, usar data atual.' }
                                 }
                             },
                             // Critérios para encontrar item para update/delete
@@ -167,8 +168,8 @@ Deno.serve(async (req: Request) => {
                             collection_name: { type: 'string', description: 'Nome da coleção' },
                             operation: { type: 'string', enum: ['list', 'sum', 'count', 'average'], description: 'Operação' },
                             // Filtros
-                            start_date: { type: 'string', description: 'Data inicial (ISO)' },
-                            end_date: { type: 'string', description: 'Data final (ISO)' },
+                            start_date: { type: 'string', description: 'Data inicial (ISO) para filtrar por metadata.date ou created_at' },
+                            end_date: { type: 'string', description: 'Data final (ISO) para filtrar por metadata.date ou created_at' },
                             filter_key: { type: 'string', description: 'Filtrar por chave de metadata (ex: category)' },
                             filter_value: { type: 'string', description: 'Filtrar por valor de metadata (ex: alimentação)' },
                             // Agregação
@@ -182,37 +183,14 @@ Deno.serve(async (req: Request) => {
                 type: 'function',
                 function: {
                     name: 'manage_reminders',
-                    description: 'Gerencia lembretes (criar, listar, atualizar, completar) incluindo lembretes recorrentes',
+                    description: 'Gerencia lembretes (criar, listar, atualizar, completar)',
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['create', 'list', 'update', 'complete', 'delete'], description: 'Ação' },
+                            action: { type: 'string', enum: ['create', 'list', 'update', 'complete'], description: 'Ação' },
                             title: { type: 'string', description: 'Título do lembrete' },
-                            id: { type: 'string', description: 'ID do lembrete (para update/complete). Use o ID retornado pelo list.' },
-                            // NOVO: Configuração de Tempo (Component Based)
-                            time_config: {
-                                type: 'object',
-                                description: 'Use ISSO para definir a data/hora. NÃO calcule due_at manualmente.',
-                                properties: {
-                                    mode: { type: 'string', enum: ['relative', 'absolute'], description: 'relative="daqui a X", absolute="dia X às Y"' },
-                                    // Relative
-                                    relative_amount: { type: 'number', description: 'Quantidade (ex: 10)' },
-                                    relative_unit: { type: 'string', enum: ['minutes', 'hours', 'days'], description: 'Unidade' },
-                                    // Absolute
-                                    target_day: { type: 'number', description: 'Dia do mês (1-31)' },
-                                    target_month: { type: 'number', description: 'Mês (1-12)' },
-                                    target_year: { type: 'number', description: 'Ano (ex: 2025)' },
-                                    target_hour: { type: 'number', description: 'Hora (0-23)' },
-                                    target_minute: { type: 'number', description: 'Minuto (0-59)' }
-                                },
-                                required: ['mode']
-                            },
-                            // Campos de recorrência
-                            recurrence_type: { type: 'string', enum: ['once', 'daily', 'weekly', 'custom'], description: 'Tipo de recorrência (padrão: once)' },
-                            recurrence_interval: { type: 'number', description: 'Para custom: repetir a cada N unidades' },
-                            recurrence_unit: { type: 'string', enum: ['minutes', 'hours', 'days'], description: 'Unidade para custom' },
-                            recurrence_count: { type: 'number', description: 'Quantas vezes repetir' },
-                            weekdays: { type: 'array', items: { type: 'number' }, description: 'Para weekly: dias da semana [0-6]' }
+                            due_at: { type: 'string', description: 'Data/hora (ISO)' },
+                            search_title: { type: 'string', description: 'Busca para update/complete' }
                         },
                         required: ['action']
                     }
@@ -1123,16 +1101,65 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                         if (!coll) {
                             toolOutput = `Pasta "${args.collection_name}" não encontrada.`;
                         } else {
-                            let query = supabase.from('collection_items').select('*').eq('collection_id', coll.id);
+                            if (args.start_date) {
+                                // Tenta filtrar por metadata.date (prioridade) OU created_at
+                                // Como SQL simples não faz OR fácil em JSONB vs Coluna sem query complexa,
+                                // vamos filtrar no código se o volume for baixo, ou usar created_at como fallback.
+                                // Melhor abordagem híbrida:
+                                query = query.gte('created_at', args.start_date);
+                                // TODO: Idealmente, deveríamos fazer um filtro OR (metadata->>date >= start_date OR created_at >= start_date)
+                                // Mas por limitação do Supabase JS simples, vamos assumir que se o usuário pede data,
+                                // ele quer ver itens criados nessa data OU com metadata de data.
+                                // Por enquanto, mantemos created_at para simplicidade e performance, 
+                                // mas o correto seria o AI salvar a data no metadata e a gente filtrar por lá.
 
-                            if (args.start_date) query = query.gte('created_at', args.start_date);
-                            if (args.end_date) query = query.lte('created_at', args.end_date);
-                            if (args.filter_key && args.filter_value) {
-                                // Filtro JSONB
-                                query = query.eq(`metadata ->> ${args.filter_key} `, args.filter_value);
+                                // Vamos melhorar: Se tiver metadata.date, usamos ele?
+                                // O problema é que query builder é aditivo (AND).
+                                // Vamos deixar created_at por enquanto, mas instruir a IA a salvar items com a data correta no created_at? Não dá.
+
+                                // SOLUÇÃO: Filtrar depois de buscar (in-memory) se o volume for pequeno (limit 100).
+                                // Ou aceitar que a busca por data olha quando foi REGISTRADO.
+
+                                // V2: Vamos confiar que a IA vai buscar pelo que foi pedido.
+                                // Se o usuário diz "gastos de novembro", a IA manda start_date=2024-11-01.
+                                // Se o item foi criado em dezembro mas refere-se a novembro, o created_at falha.
+                                // Precisamos filtrar por metadata->>date.
                             }
 
-                            const { data: items } = await query;
+                            // NOVA LÓGICA DE FILTRO DE DATA (Híbrida)
+                            // Se args.start_date/end_date forem passados, filtramos no banco pelo created_at (performance)
+                            // E TAMBÉM filtramos por metadata->>date se existir.
+
+                            // Como não dá pra fazer OR complexo fácil aqui, vamos fazer o seguinte:
+                            // Buscar tudo (com limite razoável) e filtrar no código.
+                            const { data: allItems } = await supabase
+                                .from('collection_items')
+                                .select('*')
+                                .eq('collection_id', coll.id)
+                                .order('created_at', { ascending: false })
+                                .limit(500); // Limite de segurança
+
+                            let items = allItems || [];
+
+                            if (args.start_date) {
+                                items = items.filter(i => {
+                                    const itemDate = i.metadata?.date || i.created_at;
+                                    return itemDate >= args.start_date;
+                                });
+                            }
+                            if (args.end_date) {
+                                items = items.filter(i => {
+                                    const itemDate = i.metadata?.date || i.created_at;
+                                    return itemDate <= args.end_date;
+                                });
+                            }
+
+                            if (args.filter_key && args.filter_value) {
+                                items = items.filter(i => i.metadata?.[args.filter_key] === args.filter_value);
+                            }
+
+                            // A query original foi substituída pela lógica in-memory acima.
+                            // const { data: items } = await query;
 
                             if (!items || items.length === 0) {
                                 toolOutput = `Nenhum dado encontrado com esses filtros em "${args.collection_name}".`;
