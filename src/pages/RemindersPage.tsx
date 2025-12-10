@@ -256,7 +256,7 @@ export default function RemindersPage() {
     }
 
     return (
-        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden">
             <PageHeader
                 title="Lembretes"
                 subtitle="Gerencie suas tarefas e compromissos"

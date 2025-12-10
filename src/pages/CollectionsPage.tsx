@@ -506,14 +506,14 @@ export default function CollectionsPage() {
                             <span className="font-medium">Voltar às Coleções</span>
                         </button>
 
-                        {/* Header with Financial Widget */}
-                        <div className="p-4 md:p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
+                        {/* Header with Financial Widget - Compact on mobile */}
+                        <div className="p-3 md:p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
                             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 md:gap-6">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 md:gap-4 mb-2">
-                                        <div className="text-3xl md:text-5xl filter drop-shadow-lg shrink-0">{selectedCollection.icon || '📁'}</div>
+                                    <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
+                                        <div className="text-2xl md:text-5xl filter drop-shadow-lg shrink-0">{selectedCollection.icon || '📁'}</div>
                                         <div className="min-w-0">
-                                            <h2 className="text-2xl md:text-4xl font-bold text-white tracking-tight flex items-center gap-2 md:gap-3 truncate">
+                                            <h2 className="text-xl md:text-4xl font-bold text-white tracking-tight flex items-center gap-2 md:gap-3 truncate">
                                                 <span className="truncate">{selectedCollection.name}</span>
                                                 <button
                                                     onClick={() => openEditModal(selectedCollection)}
@@ -522,7 +522,7 @@ export default function CollectionsPage() {
                                                     <Edit2 size={20} />
                                                 </button>
                                             </h2>
-                                            <p className="text-gray-400 text-lg mt-1 font-light">{selectedCollection.description || 'Sem descrição'}</p>
+                                            <p className="text-gray-400 text-sm md:text-lg mt-0.5 font-light line-clamp-1">{selectedCollection.description || 'Sem descrição'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -553,7 +553,7 @@ export default function CollectionsPage() {
                             </div>
 
                             {/* Controls Bar */}
-                            <div className="flex flex-col gap-3 mt-4 md:mt-8">
+                            <div className="flex flex-col gap-2 mt-3 md:mt-8">
                                 <div className="relative w-full group">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
                                     <input

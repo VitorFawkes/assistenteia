@@ -144,7 +144,7 @@ export default function TasksPage() {
     if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
 
     return (
-        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden">
             <PageHeader
                 title="Tarefas"
                 subtitle="Gerencie suas atividades e prioridades"
@@ -250,7 +250,7 @@ export default function TasksPage() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                                 {task.status !== 'done' && (
                                     <select
                                         value={task.status}

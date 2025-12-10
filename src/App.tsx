@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-import ChatPage from './pages/ChatPage';
 import TasksPage from './pages/TasksPage';
 import RemindersPage from './pages/RemindersPage';
 import CollectionsPage from './pages/CollectionsPage';
@@ -26,7 +25,7 @@ function App() {
               <Layout />
             </ProtectedRoute>
           }>
-            <Route index element={<ChatPage />} />
+            <Route index element={<RemindersPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="reminders" element={<RemindersPage />} />
             <Route path="collections" element={<CollectionsPage />} />
