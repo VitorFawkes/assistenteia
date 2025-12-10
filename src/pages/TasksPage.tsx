@@ -33,6 +33,8 @@ export default function TasksPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('todo');
 
+    const [sortOption, setSortOption] = useState<'created_desc' | 'created_asc' | 'priority_desc' | 'priority_asc' | 'alpha_asc'>('created_desc');
+
     useEffect(() => {
         if (user) {
             fetchTasks();
@@ -119,6 +121,25 @@ export default function TasksPage() {
 
         if (activeFilter === 'all') return true;
         return task.status === activeFilter;
+    }).sort((a, b) => {
+        if (sortOption === 'created_desc') {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (sortOption === 'created_asc') {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        if (sortOption === 'priority_desc') {
+            const priorityMap = { urgent: 4, high: 3, medium: 2, low: 1 };
+            return (priorityMap[b.priority] || 0) - (priorityMap[a.priority] || 0);
+        }
+        if (sortOption === 'priority_asc') {
+            const priorityMap = { urgent: 4, high: 3, medium: 2, low: 1 };
+            return (priorityMap[a.priority] || 0) - (priorityMap[b.priority] || 0);
+        }
+        if (sortOption === 'alpha_asc') {
+            return a.title.localeCompare(b.title);
+        }
+        return 0;
     });
 
     const getPriorityColor = (priority: string) => {
@@ -180,15 +201,29 @@ export default function TasksPage() {
 
             {/* Filters */}
             <div className="mb-6 space-y-4">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar tarefas..."
-                        className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar tarefas..."
+                            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                    </div>
+
+                    <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as any)}
+                        className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[200px]"
+                    >
+                        <option value="created_desc">✨ Mais Recentes</option>
+                        <option value="created_asc">📅 Mais Antigas</option>
+                        <option value="priority_desc">🔥 Maior Prioridade</option>
+                        <option value="priority_asc">❄️ Menor Prioridade</option>
+                        <option value="alpha_asc">🔤 Alfabética (A-Z)</option>
+                    </select>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">

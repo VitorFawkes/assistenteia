@@ -427,10 +427,10 @@ export default function CollectionsPage() {
     }, [location.key]); // location.key changes on each navigation
 
     return (
-        <div className="flex h-full overflow-hidden pb-20 md:pb-0">
+        <div className="flex h-full overflow-hidden">
             {/* Sidebar - Collections List - Full width on mobile when no collection selected */}
-            <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-800 md:border-r border-gray-700 flex-col shrink-0`}>
-                <div className="p-6 border-b border-gray-700">
+            <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-800 md:border-r border-gray-700 flex-col shrink-0 h-full`}>
+                <div className="p-6 border-b border-gray-700 shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                             <Folder className="text-blue-400" size={28} />
@@ -447,23 +447,38 @@ export default function CollectionsPage() {
                             <Plus size={20} />
                         </button>
                     </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Buscar coleções..."
-                            value={collectionSearch}
-                            onChange={(e) => setCollectionSearch(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        {collectionSearch && (
-                            <button
-                                onClick={() => setCollectionSearch('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                            >
-                                <X size={14} />
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Buscar coleções..."
+                                value={collectionSearch}
+                                onChange={(e) => setCollectionSearch(e.target.value)}
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            {collectionSearch && (
+                                <button
+                                    onClick={() => setCollectionSearch('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="relative group">
+                            <button className="h-full px-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-400 hover:text-white hover:border-gray-500 transition-all flex items-center justify-center">
+                                <ArrowUpDown size={16} />
                             </button>
-                        )}
+                            <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
+                                <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                                    <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'name' ? 'text-blue-400' : 'text-gray-300'}`}>Nome (A-Z)</button>
+                                    <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'count' ? 'text-blue-400' : 'text-gray-300'}`}>Qtd. Itens</button>
+                                    <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'date' ? 'text-blue-400' : 'text-gray-300'}`}>Mais Recentes</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -575,19 +590,19 @@ export default function CollectionsPage() {
                                     />
                                 </div>
 
-                                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+                                <div className="flex flex-wrap gap-2 mt-3 md:mt-8">
                                     {/* Type Filter */}
-                                    <div className="relative group">
+                                    <div className="relative group z-30">
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
                                             <Filter size={18} />
-                                            <span className="text-sm hidden md:inline">
+                                            <span className="text-sm">
                                                 {itemTypeFilter === 'all' ? 'Todos' :
                                                     itemTypeFilter === 'expense' ? 'Gastos' :
                                                         itemTypeFilter === 'note' ? 'Notas' :
                                                             itemTypeFilter === 'credential' ? 'Senhas' : 'Tarefas'}
                                             </span>
                                         </button>
-                                        <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
+                                        <div className="absolute right-0 pt-2 w-40 hidden group-hover:block">
                                             <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
                                                 <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Todos</button>
                                                 <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Gastos</button>
@@ -599,16 +614,16 @@ export default function CollectionsPage() {
                                     </div>
 
                                     {/* Date Filter */}
-                                    <div className="relative group">
+                                    <div className="relative group z-20">
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
                                             <Calendar size={18} />
-                                            <span className="text-sm hidden md:inline">
+                                            <span className="text-sm">
                                                 {itemDateFilter === 'all' ? 'Qualquer Data' :
                                                     itemDateFilter === 'this_month' ? 'Este Mês' :
                                                         itemDateFilter === 'last_month' ? 'Mês Passado' : 'Futuro'}
                                             </span>
                                         </button>
-                                        <div className="absolute right-0 pt-2 w-64 z-20 hidden group-hover:block">
+                                        <div className="absolute right-0 pt-2 w-64 hidden group-hover:block">
                                             <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden p-2">
                                                 <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Qualquer Data</button>
                                                 <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Este Mês</button>
@@ -643,11 +658,11 @@ export default function CollectionsPage() {
                                     </div>
 
                                     {/* Sort */}
-                                    <div className="relative group">
+                                    <div className="relative group z-10">
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
                                             <ArrowUpDown size={18} />
                                         </button>
-                                        <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
+                                        <div className="absolute right-0 pt-2 w-40 hidden group-hover:block">
                                             <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
                                                 <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Recentes</button>
                                                 <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Antigos</button>
@@ -656,12 +671,12 @@ export default function CollectionsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="w-px bg-gray-700 mx-1"></div>
+                                    <div className="w-px bg-gray-700 mx-1 hidden md:block"></div>
 
                                     <Button
                                         variant="danger"
                                         onClick={() => handleDeleteCollectionClick(selectedCollection.id)}
-                                        className="h-full px-4 bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                                        className="h-full px-4 bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 ml-auto md:ml-0"
                                         icon={Trash2}
                                     >
                                         Excluir
@@ -671,7 +686,7 @@ export default function CollectionsPage() {
                         </div>
 
                         {/* Items List - Masonry Layout with Subcategories */}
-                        <div className="flex-1 overflow-y-auto p-8 bg-gray-950">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-8 bg-gray-950">
                             {isLoadingItems ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

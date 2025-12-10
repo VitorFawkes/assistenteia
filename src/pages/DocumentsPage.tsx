@@ -154,6 +154,15 @@ export default function DocumentsPage() {
     };
 
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [sortOption, setSortOption] = useState<'date_desc' | 'date_asc' | 'name_asc' | 'size_desc'>('date_desc');
+
+    const sortedDocuments = [...documents].sort((a, b) => {
+        if (sortOption === 'date_desc') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        if (sortOption === 'date_asc') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        if (sortOption === 'name_asc') return a.filename.localeCompare(b.filename);
+        if (sortOption === 'size_desc') return (b.size_bytes || 0) - (a.size_bytes || 0);
+        return 0;
+    });
 
     // ... (fetchDocuments, handleFileUpload, etc. remain the same)
 
@@ -167,6 +176,17 @@ export default function DocumentsPage() {
                     iconColor="text-yellow-400"
                     action={
                         <div className="flex items-center gap-3">
+                            <select
+                                value={sortOption}
+                                onChange={(e) => setSortOption(e.target.value as any)}
+                                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer"
+                            >
+                                <option value="date_desc">📅 Recentes</option>
+                                <option value="date_asc">📅 Antigos</option>
+                                <option value="name_asc">🔤 Nome (A-Z)</option>
+                                <option value="size_desc">💾 Tamanho</option>
+                            </select>
+
                             <div className="bg-gray-800 p-1 rounded-lg border border-gray-700 flex">
                                 <button
                                     onClick={() => setViewMode('grid')}
@@ -218,7 +238,7 @@ export default function DocumentsPage() {
                 ) : documents.length > 0 ? (
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {documents.map(doc => (
+                            {sortedDocuments.map(doc => (
                                 <Card key={doc.id} className="p-4 flex flex-col gap-3 group relative overflow-hidden" hover>
                                     <div className="flex items-start justify-between">
                                         <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
@@ -266,7 +286,7 @@ export default function DocumentsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-700">
-                                    {documents.map(doc => (
+                                    {sortedDocuments.map(doc => (
                                         <tr key={doc.id} className="hover:bg-gray-700/30 transition-colors group">
                                             <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
                                                 {getFileIcon(doc.file_type)}

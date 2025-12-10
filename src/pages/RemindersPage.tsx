@@ -40,6 +40,7 @@ export default function RemindersPage() {
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'tomorrow' | 'week' | 'overdue' | 'completed'>('all');
+    const [sortOption, setSortOption] = useState<'due_asc' | 'due_desc' | 'created_asc' | 'created_desc' | 'alpha_asc'>('due_asc');
 
     useEffect(() => {
         if (user) {
@@ -71,6 +72,28 @@ export default function RemindersPage() {
         if (activeFilter === 'week') return isWithinInterval(date, { start: now, end: addDays(now, 7) });
 
         return true;
+    }).sort((a, b) => {
+        // 3. Sorting
+        if (sortOption === 'due_asc') {
+            if (!a.due_at) return 1;
+            if (!b.due_at) return -1;
+            return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+        }
+        if (sortOption === 'due_desc') {
+            if (!a.due_at) return 1;
+            if (!b.due_at) return -1;
+            return new Date(b.due_at).getTime() - new Date(a.due_at).getTime();
+        }
+        if (sortOption === 'created_desc') {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (sortOption === 'created_asc') {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        if (sortOption === 'alpha_asc') {
+            return a.title.localeCompare(b.title);
+        }
+        return 0;
     });
 
     const fetchReminders = async () => {
@@ -288,23 +311,37 @@ export default function RemindersPage() {
 
             {/* Filters & Search */}
             <div className="mb-6 space-y-4">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar lembretes..."
-                        className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                    {searchTerm && (
-                        <button
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                        >
-                            <X size={16} />
-                        </button>
-                    )}
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar lembretes..."
+                            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
+                    </div>
+
+                    <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as any)}
+                        className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[200px]"
+                    >
+                        <option value="due_asc">📅 Data (Mais Próximo)</option>
+                        <option value="due_desc">📅 Data (Mais Distante)</option>
+                        <option value="created_desc">✨ Criado (Mais Recente)</option>
+                        <option value="created_asc">✨ Criado (Mais Antigo)</option>
+                        <option value="alpha_asc">🔤 Alfabética (A-Z)</option>
+                    </select>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">

@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
         }
 
-        console.log('🔔 Checking for overdue reminders...');
+        console.log(`🔔 Checking for overdue reminders... Server Time: ${new Date().toISOString()}`);
 
         // Get all non-completed reminders that are due
         const { data: overdueReminders, error } = await supabase
@@ -53,11 +53,34 @@ Deno.serve(async (req: Request) => {
 
         console.log(`Found ${overdueReminders?.length || 0} overdue reminders`);
 
+        // Log to debug_logs table for visibility
+        await supabase.from('debug_logs').insert({
+            function_name: 'check-reminders',
+            level: 'info',
+            message: `Checking reminders run. Found ${overdueReminders?.length || 0} overdue.`,
+            meta: {
+                server_time: new Date().toISOString(),
+                overdue_count: overdueReminders?.length || 0
+            }
+        });
+
         let notificationsSent = 0;
         let remindersProcessed = 0;
 
         for (const reminder of overdueReminders || []) {
             try {
+                console.log(`Processing reminder ${reminder.id}: Due ${reminder.due_at}`);
+
+                await supabase.from('debug_logs').insert({
+                    function_name: 'check-reminders',
+                    level: 'info',
+                    message: `Processing reminder: ${reminder.title}`,
+                    meta: {
+                        reminder_id: reminder.id,
+                        due_at: reminder.due_at,
+                        server_time: new Date().toISOString()
+                    }
+                });
                 // Fetch instance info manually
                 const { data: instanceData } = await supabase
                     .from('whatsapp_instances')
@@ -76,9 +99,10 @@ Deno.serve(async (req: Request) => {
                     failureReason = 'Configuração de API ausente';
                 } else if (!instanceName) {
                     failureReason = 'Instância não encontrada';
-                } else if (instanceStatus !== 'connected') {
-                    failureReason = 'WhatsApp desconectado';
                 }
+                // REMOVED STRICT CHECK: instanceStatus !== 'connected'
+                // We will try to send anyway. If it fails, the API will tell us.
+                // This prevents issues where DB status is stale but WhatsApp is actually working.
 
                 // Send WhatsApp notification ONLY if instance is connected
                 if (!failureReason) {

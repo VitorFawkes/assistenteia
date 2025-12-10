@@ -22,7 +22,7 @@ export default function IntegrationsPage() {
 
     useEffect(() => {
         fetchIntegrations();
-        fetchWhatsappStatus(true); // Force sync on load
+        fetchWhatsappStatus(); // Just fetch DB state, don't force sync
 
         // Check for success param in URL
         const params = new URLSearchParams(window.location.search);
@@ -31,23 +31,6 @@ export default function IntegrationsPage() {
             fetchIntegrations();
         }
     }, []);
-
-    // Poll WhatsApp status if connecting
-    // Poll WhatsApp status if connecting
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-
-        if (whatsapp?.status === 'connecting') {
-            // Poll every 3 seconds
-            interval = setInterval(() => {
-                fetchWhatsappStatus(true);
-            }, 3000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [whatsapp?.status]);
 
     const fetchIntegrations = async () => {
         try {
@@ -221,7 +204,7 @@ export default function IntegrationsPage() {
                             <Loader2 className="animate-spin text-gray-500 w-8 h-8" />
                             <p className="text-sm text-gray-400">Gerando QR Code...</p>
                         </div>
-                    ) : whatsapp?.status === 'connected' ? (
+                    ) : whatsapp && !whatsapp.qr_code ? (
                         <div className="flex flex-col items-center gap-4">
                             <div className="flex items-center gap-2 text-green-400 bg-green-500/10 px-4 py-2 rounded-full border border-green-500/20">
                                 <Check size={18} />
@@ -236,7 +219,7 @@ export default function IntegrationsPage() {
                                 </Button>
                             </div>
                         </div>
-                    ) : whatsapp?.status === 'connecting' && whatsapp.qr_code ? (
+                    ) : whatsapp?.qr_code ? (
                         <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in">
                             <div className="bg-white p-2 rounded-lg">
                                 <img
