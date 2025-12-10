@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { CheckSquare, Plus, Search, Filter, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { CheckSquare, Plus, Search, Filter, Trash2, CheckCircle2, Circle, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -101,6 +101,37 @@ export default function TasksPage() {
             setTasks(tasks.map(t => t.id === id ? { ...t, ...updates } : t));
         } catch (error) {
             console.error('Error updating task:', error);
+        }
+    };
+
+    const toggleChecklistItem = async (taskId: string, description: string, lineIndex: number) => {
+        const lines = description.split('\n');
+        const line = lines[lineIndex];
+
+        let newLine = line;
+        if (line.includes('[ ]')) {
+            newLine = line.replace('[ ]', '[x]');
+        } else if (line.includes('[x]')) {
+            newLine = line.replace('[x]', '[ ]');
+        } else {
+            return; // Not a checklist item
+        }
+
+        lines[lineIndex] = newLine;
+        const newDescription = lines.join('\n');
+
+        // Optimistic update
+        setTasks(tasks.map(t => t.id === taskId ? { ...t, description: newDescription } : t));
+
+        try {
+            const { error } = await supabase
+                .from('tasks')
+                .update({ description: newDescription })
+                .eq('id', taskId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating checklist:', error);
         }
     };
 
@@ -269,7 +300,45 @@ export default function TasksPage() {
                                     <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
                                         {task.title}
                                     </p>
-                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+
+                                    {/* Description / Checklist Rendering */}
+                                    {task.description && (
+                                        <div className="mt-3 space-y-1 text-sm text-gray-300">
+                                            {task.description.split('\n').map((line, index) => {
+                                                const isChecklist = line.includes('[ ]') || line.includes('[x]');
+                                                if (!isChecklist) {
+                                                    return <p key={index} className="pl-1 whitespace-pre-wrap">{line}</p>;
+                                                }
+
+                                                const isChecked = line.includes('[x]');
+                                                // Remove [x], [ ], and leading dashes/spaces
+                                                const text = line.replace(/\[.\]/, '').replace(/^-/, '').trim();
+
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-start gap-3 group/item cursor-pointer py-0.5"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleChecklistItem(task.id, task.description!, index);
+                                                        }}
+                                                    >
+                                                        <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
+                                                                ? 'bg-blue-500 border-blue-500 text-white'
+                                                                : 'border-gray-500 group-hover/item:border-blue-400'
+                                                            }`}>
+                                                            {isChecked && <Check size={10} strokeWidth={3} />}
+                                                        </div>
+                                                        <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                                                            {text}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
                                         <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityColor(task.priority)}`}>
                                             {getPriorityLabel(task.priority)}
                                         </span>
