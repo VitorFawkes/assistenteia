@@ -527,9 +527,9 @@ export default function CollectionsPage() {
                                     </div>
                                 </div>
 
-                                {/* Financial Summary Widget */}
+                                {/* Financial Summary Widget - Hidden on mobile for more scroll space */}
                                 {items.some(i => i.metadata?.amount || i.metadata?.value) && (
-                                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-5 rounded-2xl border border-gray-700 shadow-xl min-w-[280px]">
+                                    <div className="hidden md:block bg-gradient-to-br from-gray-800 to-gray-900 p-5 rounded-2xl border border-gray-700 shadow-xl min-w-[280px]">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-gray-400 text-sm font-medium uppercase tracking-wider">Investimento Total</span>
                                             <div className="bg-green-500/10 p-1.5 rounded-lg">

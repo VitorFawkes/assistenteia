@@ -144,7 +144,7 @@ export default function TasksPage() {
     if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
 
     return (
-        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
             <PageHeader
                 title="Tarefas"
                 subtitle="Gerencie suas atividades e prioridades"
@@ -153,8 +153,8 @@ export default function TasksPage() {
             />
 
             {/* Add Task Form */}
-            <Card className="mb-6 md:mb-8 p-4">
-                <form onSubmit={addTask} className="flex flex-col sm:flex-row gap-3">
+            <Card className="mb-6 md:mb-8 p-4 w-full box-border">
+                <form onSubmit={addTask} className="flex flex-col gap-3 w-full">
                     <input
                         type="text"
                         value={newTaskTitle}
@@ -172,7 +172,7 @@ export default function TasksPage() {
                         <option value="high">Alta</option>
                         <option value="urgent">Urgente</option>
                     </select>
-                    <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 w-full sm:w-auto">
+                    <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 w-full shrink-0">
                         Adicionar
                     </Button>
                 </form>

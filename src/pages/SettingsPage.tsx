@@ -81,7 +81,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 p-6 overflow-auto">
+        <div className="flex flex-col h-full bg-gray-900 p-4 md:p-6 pb-28 md:pb-6 overflow-auto">
             <div className="max-w-2xl mx-auto w-full space-y-8">
 
                 <div className="flex items-center justify-between">
@@ -175,7 +175,7 @@ export default function SettingsPage() {
                         disabled={isSaving}
                         isLoading={isSaving}
                         icon={Save}
-                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500"
+                        className="w-full bg-blue-600 hover:bg-blue-500"
                     >
                         Salvar Perfil
                     </Button>

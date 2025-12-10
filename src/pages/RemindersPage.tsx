@@ -256,7 +256,7 @@ export default function RemindersPage() {
     }
 
     return (
-        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
             <PageHeader
                 title="Lembretes"
                 subtitle="Gerencie suas tarefas e compromissos"
@@ -265,8 +265,8 @@ export default function RemindersPage() {
             />
 
             {/* Add New Reminder */}
-            <Card className="mb-6 md:mb-8 p-4">
-                <form onSubmit={addReminder} className="flex flex-col sm:flex-row gap-3">
+            <Card className="mb-6 md:mb-8 p-4 w-full box-border">
+                <form onSubmit={addReminder} className="flex flex-col gap-3 w-full">
                     <input
                         type="text"
                         value={newReminder}
@@ -278,9 +278,9 @@ export default function RemindersPage() {
                         type="datetime-local"
                         value={newDate}
                         onChange={(e) => setNewDate(e.target.value)}
-                        className="bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full sm:w-auto"
+                        className="bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
                     />
-                    <Button type="submit" icon={Plus} className="w-full sm:w-auto">
+                    <Button type="submit" icon={Plus} className="w-full shrink-0">
                         Adicionar
                     </Button>
                 </form>
