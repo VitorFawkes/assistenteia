@@ -3,6 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { MessageSquare, Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
+import MobileNav from './MobileNav';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -20,10 +21,10 @@ export default function Layout() {
 
     return (
         <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
-            {/* Sidebar */}
+            {/* Sidebar - Desktop Only */}
             <aside
                 className={clsx(
-                    "bg-gray-800 border-r border-gray-700 transition-all duration-300 flex flex-col",
+                    "hidden md:flex bg-gray-800 border-r border-gray-700 transition-all duration-300 flex-col",
                     isSidebarOpen ? "w-64" : "w-20"
                 )}
             >
@@ -93,9 +94,25 @@ export default function Layout() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto relative flex flex-col">
+            <main className="flex-1 overflow-y-auto relative flex flex-col pb-24 md:pb-0">
+                {/* Mobile Header */}
+                <div className="md:hidden p-4 border-b border-gray-800 bg-gray-900/95 backdrop-blur flex items-center justify-between sticky top-0 z-20">
+                    <div className="font-bold text-xl bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                        Assistente IA
+                    </div>
+                    <button
+                        onClick={signOut}
+                        className="p-2 text-gray-400 hover:text-white"
+                    >
+                        <LogOut size={20} />
+                    </button>
+                </div>
+
                 <Outlet />
             </main>
+
+            {/* Mobile Navigation */}
+            <MobileNav />
         </div>
     );
 }

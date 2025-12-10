@@ -27,6 +27,26 @@ export default function BrainPage() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'memories' | 'rules' | 'settings'>('memories');
 
+    // Mobile detection with matchMedia API (more reliable than innerWidth)
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.matchMedia('(max-width: 767px)').matches;
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(max-width: 767px)');
+        const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+
+        // Set initial value
+        setIsMobile(mediaQuery.matches);
+
+        // Listen for changes
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
+
     // Memories State
     const [memories, setMemories] = useState<MemoryVector[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -200,47 +220,91 @@ export default function BrainPage() {
 
     return (
         <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
-            <div className="flex flex-col md:flex-row h-full">
-                {/* Sidebar */}
-                <div className="w-full md:w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-2">
-                    <div className="mb-6 px-2">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <Brain className="text-purple-500" />
-                            Cérebro
-                        </h2>
-                        <p className="text-xs text-gray-400 mt-1">Gerencie a inteligência da IA</p>
+            {/* Mobile Tab Navigation - Only rendered on mobile */}
+            {isMobile && (
+                <div className="bg-gray-800 border-b border-gray-700 p-3 shrink-0 flex flex-col">
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                        <Brain className="text-purple-500" size={24} />
+                        <h2 className="text-lg font-bold text-white">Cérebro</h2>
                     </div>
-
-                    <Button
-                        variant={activeTab === 'memories' ? 'primary' : 'ghost'}
-                        onClick={() => setActiveTab('memories')}
-                        className={`w-full justify-start ${activeTab === 'memories' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                        icon={Sparkles}
-                    >
-                        Memórias (RAG)
-                    </Button>
-
-                    <Button
-                        variant={activeTab === 'rules' ? 'primary' : 'ghost'}
-                        onClick={() => setActiveTab('rules')}
-                        className={`w-full justify-start ${activeTab === 'rules' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                        icon={BookOpen}
-                    >
-                        Regras & Prefs
-                    </Button>
-
-                    <Button
-                        variant={activeTab === 'settings' ? 'primary' : 'ghost'}
-                        onClick={() => setActiveTab('settings')}
-                        className={`w-full justify-start ${activeTab === 'settings' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                        icon={Settings}
-                    >
-                        Configurações Avançadas
-                    </Button>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                        <button
+                            onClick={() => setActiveTab('memories')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'memories'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'bg-gray-700 text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            <Sparkles size={16} />
+                            Memórias
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('rules')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'rules'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'bg-gray-700 text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            <BookOpen size={16} />
+                            Regras
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('settings')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'settings'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'bg-gray-700 text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            <Settings size={16} />
+                            Config
+                        </button>
+                    </div>
                 </div>
+            )}
+
+            <div className="flex flex-1 min-h-0">
+                {/* Desktop Sidebar - Only rendered on desktop */}
+                {!isMobile && (
+                    <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-2 shrink-0">
+                        <div className="mb-6 px-2">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Brain className="text-purple-500" />
+                                Cérebro
+                            </h2>
+                            <p className="text-xs text-gray-400 mt-1">Gerencie a inteligência da IA</p>
+                        </div>
+
+                        <Button
+                            variant={activeTab === 'memories' ? 'primary' : 'ghost'}
+                            onClick={() => setActiveTab('memories')}
+                            className={`w-full justify-start ${activeTab === 'memories' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
+                            icon={Sparkles}
+                        >
+                            Memórias (RAG)
+                        </Button>
+
+                        <Button
+                            variant={activeTab === 'rules' ? 'primary' : 'ghost'}
+                            onClick={() => setActiveTab('rules')}
+                            className={`w-full justify-start ${activeTab === 'rules' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
+                            icon={BookOpen}
+                        >
+                            Regras & Prefs
+                        </Button>
+
+                        <Button
+                            variant={activeTab === 'settings' ? 'primary' : 'ghost'}
+                            onClick={() => setActiveTab('settings')}
+                            className={`w-full justify-start ${activeTab === 'settings' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
+                            icon={Settings}
+                        >
+                            Configurações Avançadas
+                        </Button>
+                    </div>
+                )}
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-auto p-6">
+                <div className="flex-1 overflow-auto p-4 md:p-6">
                     {activeTab === 'memories' && (
                         <div className="max-w-4xl mx-auto">
                             <div className="flex justify-between items-center mb-6">
@@ -310,27 +374,27 @@ export default function BrainPage() {
 
                             <Card className="p-4 mb-8 bg-gray-800/50 border-purple-500/20">
                                 <h3 className="text-lg font-medium text-white mb-4">Adicionar Nova Regra</h3>
-                                <div className="flex gap-4">
+                                <div className="flex flex-col md:flex-row gap-3">
                                     <input
                                         type="text"
                                         placeholder="Tópico (ex: Tom de voz)"
                                         value={newRuleKey}
                                         onChange={(e) => setNewRuleKey(e.target.value)}
-                                        className="w-1/3 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        className="w-full md:w-1/3 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                                     />
                                     <input
                                         type="text"
                                         placeholder="Regra (ex: Sempre seja formal)"
                                         value={newRuleValue}
                                         onChange={(e) => setNewRuleValue(e.target.value)}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                                     />
                                     <Button
                                         onClick={addRule}
                                         isLoading={isSavingRule}
                                         disabled={!newRuleKey || !newRuleValue}
                                         icon={Plus}
-                                        className="bg-purple-600 hover:bg-purple-500"
+                                        className="bg-purple-600 hover:bg-purple-500 w-full md:w-auto"
                                     >
                                         Adicionar
                                     </Button>

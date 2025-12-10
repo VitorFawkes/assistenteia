@@ -207,7 +207,7 @@ export default function ChatPage() {
     return (
         <div className="flex flex-col h-full bg-gray-900">
             {/* Header / Search */}
-            <div className="p-4 border-b border-gray-800 bg-gray-900/95 backdrop-blur z-10">
+            <div className="p-2 md:p-4 border-b border-gray-800 bg-gray-900/95 backdrop-blur z-10">
                 <div className="max-w-3xl mx-auto flex flex-col gap-3">
                     <input
                         type="text"
@@ -270,7 +270,7 @@ export default function ChatPage() {
                         </button>
 
                         {showDatePicker && (
-                            <div className="absolute top-full left-0 mt-2 w-full md:w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-xl p-4 z-20">
+                            <div className="absolute top-full left-0 right-0 md:right-auto mt-2 w-full md:w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-xl p-4 z-20">
                                 <div className="grid grid-cols-2 gap-2 mb-4">
                                     <button
                                         onClick={() => {

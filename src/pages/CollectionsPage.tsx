@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown, Square, CheckSquare as CheckSquareIcon, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -394,10 +394,32 @@ export default function CollectionsPage() {
         }
     };
 
+    const handleToggleCheck = async (item: CollectionItem, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newChecked = !item.metadata?.checked;
+        const newMetadata = { ...item.metadata, checked: newChecked };
+
+        // Optimistic update
+        setItems(items.map(i => i.id === item.id ? { ...i, metadata: newMetadata } : i));
+
+        try {
+            const { error } = await supabase
+                .from('collection_items')
+                .update({ metadata: newMetadata })
+                .eq('id', item.id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error toggling check:', error);
+            // Revert on error
+            setItems(items.map(i => i.id === item.id ? { ...i, metadata: item.metadata } : i));
+        }
+    };
+
     return (
-        <div className="flex h-full">
-            {/* Sidebar - Collections List */}
-            <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div className="flex h-full overflow-hidden">
+            {/* Sidebar - Collections List - Full width on mobile when no collection selected */}
+            <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-800 md:border-r border-gray-700 flex-col shrink-0`}>
                 <div className="p-6 border-b border-gray-700">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -471,19 +493,28 @@ export default function CollectionsPage() {
                 </div>
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col bg-gray-900">
+            {/* Main Content Area - Hidden on mobile when no collection selected */}
+            <div className={`${selectedCollection ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-gray-900 min-w-0`}>
                 {selectedCollection ? (
                     <>
+                        {/* Mobile Back Button */}
+                        <button
+                            onClick={() => setSelectedCollection(null)}
+                            className="md:hidden flex items-center gap-2 px-4 py-3 text-gray-400 hover:text-white bg-gray-800/50 border-b border-gray-800 transition-colors"
+                        >
+                            <ArrowLeft size={20} />
+                            <span className="font-medium">Voltar às Coleções</span>
+                        </button>
+
                         {/* Header with Financial Widget */}
                         <div className="p-4 md:p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
-                            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-4 mb-2">
-                                        <div className="text-5xl filter drop-shadow-lg">{selectedCollection.icon || '📁'}</div>
-                                        <div>
-                                            <h2 className="text-4xl font-bold text-white tracking-tight flex items-center gap-3">
-                                                {selectedCollection.name}
+                            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 md:gap-6">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 md:gap-4 mb-2">
+                                        <div className="text-3xl md:text-5xl filter drop-shadow-lg shrink-0">{selectedCollection.icon || '📁'}</div>
+                                        <div className="min-w-0">
+                                            <h2 className="text-2xl md:text-4xl font-bold text-white tracking-tight flex items-center gap-2 md:gap-3 truncate">
+                                                <span className="truncate">{selectedCollection.name}</span>
                                                 <button
                                                     onClick={() => openEditModal(selectedCollection)}
                                                     className="text-gray-600 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -522,19 +553,19 @@ export default function CollectionsPage() {
                             </div>
 
                             {/* Controls Bar */}
-                            <div className="flex flex-col md:flex-row gap-4 justify-between items-center mt-4 md:mt-8">
-                                <div className="relative w-full md:w-96 group">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={20} />
+                            <div className="flex flex-col gap-3 mt-4 md:mt-8">
+                                <div className="relative w-full group">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
                                     <input
                                         type="text"
-                                        placeholder="Buscar em todas as notas..."
+                                        placeholder="Buscar..."
                                         value={itemSearch}
                                         onChange={(e) => setItemSearch(e.target.value)}
-                                        className="w-full bg-gray-800/50 border border-gray-700 text-white pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder-gray-600"
+                                        className="w-full bg-gray-800/50 border border-gray-700 text-white pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder-gray-600 text-sm"
                                     />
                                 </div>
 
-                                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
                                     {/* Type Filter */}
                                     <div className="relative group">
                                         <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
@@ -708,6 +739,20 @@ export default function CollectionsPage() {
                                                                     <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg mt-1">
                                                                         <CheckCircle size={16} />
                                                                     </div>
+                                                                ) : item.metadata?.type === 'shopping_item' ? (
+                                                                    <div
+                                                                        onClick={(e) => handleToggleCheck(item, e)}
+                                                                        className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                                                                    >
+                                                                        {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
+                                                                    </div>
+                                                                ) : item.metadata?.type === 'list_item' ? (
+                                                                    <div
+                                                                        onClick={(e) => handleToggleCheck(item, e)}
+                                                                        className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
+                                                                    >
+                                                                        {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
+                                                                    </div>
                                                                 ) : (
                                                                     <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg mt-1">
                                                                         <FileText size={16} />
@@ -759,6 +804,35 @@ export default function CollectionsPage() {
                                                                                     </div>
                                                                                 )}
                                                                             </div>
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'shopping_item' ? (
+                                                                        <div className="flex items-center gap-3">
+                                                                            <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
+                                                                                {item.content}
+                                                                            </p>
+                                                                            {item.metadata?.quantity && (
+                                                                                <span className="text-xs font-bold bg-blue-600/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                                                                    {item.metadata.quantity}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'list_item' ? (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
+                                                                                    {item.content}
+                                                                                </p>
+                                                                                {item.metadata?.rating && (
+                                                                                    <span className="text-xs font-bold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">
+                                                                                        {'⭐'.repeat(item.metadata.rating)}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {item.metadata?.notes && (
+                                                                                <p className="text-xs text-gray-400 italic">
+                                                                                    {item.metadata.notes}
+                                                                                </p>
+                                                                            )}
                                                                         </div>
                                                                     ) : (
                                                                         <div>
@@ -854,7 +928,7 @@ export default function CollectionsPage() {
                         </div>
 
                         {filteredCollections.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                                 {filteredCollections.map(collection => (
                                     <Card
                                         key={collection.id}

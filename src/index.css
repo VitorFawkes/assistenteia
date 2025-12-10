@@ -1,5 +1,96 @@
 @import "tailwindcss";
 
+/* ============================================
+   MOBILE RESPONSIVENESS UTILITIES
+   ============================================ */
+
+/* Ensure proper viewport height on mobile browsers */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Hide scrollbar utility for horizontal scrolling areas */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* iOS safe area padding for bottom navigation */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+/* Touch-friendly minimum sizes */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent horizontal overflow */
+.overflow-x-safe {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ============================================
+   EXPLICIT MOBILE/DESKTOP VISIBILITY FIXES
+   Tailwind v4 md: prefix sometimes needs reinforcement
+   ============================================ */
+
+/* Mobile-only elements: visible on mobile, hidden on md+ */
+.mobile-only {
+  display: flex;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Desktop-only elements: hidden on mobile, visible on md+ */
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .desktop-only {
+    display: flex !important;
+  }
+}
+
+/* DATA ATTRIBUTE BASED - HIGHEST PRIORITY */
+/* For elements with data-mobile="true" - show only on mobile */
+[data-mobile="true"] {
+  display: flex !important;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  [data-mobile="true"] {
+    display: none !important;
+  }
+}
+
+/* For elements with data-desktop="true" - show only on desktop */
+[data-desktop="true"] {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  [data-desktop="true"] {
+    display: flex !important;
+    flex-direction: column;
+  }
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -17,10 +108,9 @@
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
-  min-height: 100vh;
+  background-color: #111827;
+  /* gray-900 to match app theme */
 }
 
 h1 {

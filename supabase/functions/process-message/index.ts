@@ -137,14 +137,21 @@ Deno.serve(async (req: Request) => {
                                     section: { type: 'string', description: 'Seção visual na lista (ex: Transporte, Alimentação)' },
                                     category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
                                     date: { type: 'string', description: 'Data do evento (ISO)' },
-                                    type: { type: 'string', enum: ['expense', 'note', 'task', 'credential'], description: 'Tipo do item' },
+                                    type: { type: 'string', enum: ['expense', 'note', 'task', 'credential', 'shopping_item', 'list_item'], description: 'Tipo do item' },
                                     // Novos campos para Credenciais/Tarefas/Gastos
                                     username: { type: 'string', description: 'Para credenciais: usuário/login' },
                                     password: { type: 'string', description: 'Para credenciais: senha/código' },
                                     url: { type: 'string', description: 'Para credenciais: link de acesso' },
                                     status: { type: 'string', enum: ['todo', 'done'], description: 'Para tarefas: estado atual' },
                                     due_date: { type: 'string', description: 'Para tarefas: data limite (ISO)' },
-                                    date: { type: 'string', description: 'Para GASTOS ou EVENTOS: data de ocorrência (ISO). Se não informado, usar data atual.' }
+                                    date: { type: 'string', description: 'Para GASTOS ou EVENTOS: data de ocorrência (ISO). Se não informado, usar data atual.' },
+                                    // Novos campos para Shopping List
+                                    quantity: { type: 'string', description: 'Para compras: quantidade (ex: "2kg", "3 un")' },
+                                    checked: { type: 'boolean', description: 'Para compras/tarefas/listas: se já foi feito/concluído (default: false)' },
+                                    // Novos campos para List Item (listas genéricas)
+                                    icon: { type: 'string', description: 'Emoji opcional para o item' },
+                                    notes: { type: 'string', description: 'Observação adicional' },
+                                    rating: { type: 'number', description: 'Avaliação 1-5 (para filmes, livros, lugares, etc)' }
                                 }
                             },
                             // Critérios para encontrar item para update/delete
@@ -489,6 +496,64 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
   - \`credential\`: Senhas, códigos, logins (tem username, password, url).
   - \`task\`: Coisas a fazer (tem status, due_date).
   - \`note\`: Texto livre.
+  - \`shopping_item\`: Item de compra (tem quantity, checked, category).
+  - \`list_item\`: Item de lista genérica checkável (mala, filmes, livros, lugares, receitas, etc).
+
+### 4. LISTAS DE COMPRAS (SHOPPING LISTS):
+- **IDENTIFICAÇÃO**: Se o usuário disser "Lista de compras", "Comprar X, Y, Z", "Preciso de arroz", trate como COMPRA.
+- **COLEÇÃO**: Use ou crie uma coleção chamada "Lista de Compras" (ou "Mercado", "Feira" se específico).
+- **METADATA**:
+  - \`type\`: "shopping_item"
+  - \`quantity\`: Extraia a quantidade (ex: "2kg", "3 caixas"). Se não tiver, deixe null.
+  - \`category\`: Classifique o item (ex: "Hortifruti", "Limpeza", "Carnes", "Bebidas"). ISSO É MUITO IMPORTANTE PARA ORGANIZAR A LISTA.
+  - \`section\`: Use a mesma string da \`category\` para agrupar visualmente na lista.
+- **EXEMPLO**:
+  User: "Adiciona 2kg de arroz e detergente na lista"
+  Action:
+  \`manage_items({ action: 'add', collection_name: 'Lista de Compras', content: 'Arroz', metadata: { type: 'shopping_item', quantity: '2kg', category: 'Mercearia', section: 'Mercearia' } })\`
+  \`manage_items({ action: 'add', collection_name: 'Lista de Compras', content: 'Detergente', metadata: { type: 'shopping_item', quantity: '1 un', category: 'Limpeza', section: 'Limpeza' } })\`
+
+### 5. LISTAS GENÉRICAS (QUALQUER TIPO DE LISTA CHECKÁVEL) - IMPORTANTE:
+- **IDENTIFICAÇÃO**: Se o usuário falar sobre empacotamento/mala, filmes para ver, livros para ler, lugares para visitar, receitas, presentes, exercícios, ou qualquer lista de "coisas para fazer/ver/ter", use \`list_item\`.
+- **COLEÇÃO**: Crie uma coleção com nome descritivo e emoji apropriado:
+  - Mala/Empacotamento → "Mala [Destino] 🧳"
+  - Filmes → "Filmes para Ver 🎬" ou "Watchlist 🎬"
+  - Livros → "Livros para Ler 📚" ou "Leituras 📚"
+  - Lugares → "Lugares [Cidade] 📍"
+  - Receitas → "Receitas para Testar 🍳"
+  - Presentes → "Ideias de Presente 🎁"
+  - Exercícios → "Treino [Nome] 💪"
+- **METADATA**:
+  - \`type\`: "list_item"
+  - \`checked\`: false (padrão, usuário marca quando fizer)
+  - \`section\`: Agrupe por categoria quando fizer sentido
+  - \`notes\`: Observações extras se o usuário mencionar (autor, plataforma, quem recomendou, etc)
+  - \`rating\`: Se o usuário avaliar algo (1-5)
+  - \`url\`: Se tiver link relevante
+- **EXEMPLOS**:
+  User: "Leva passaporte, carregador e roupas de frio pra viagem"
+  Action:
+  \`manage_collections({ action: 'create', name: 'Mala Viagem', icon: '🧳' })\`
+  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Passaporte', metadata: { type: 'list_item', checked: false, section: 'Documentos' } })\`
+  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Carregador', metadata: { type: 'list_item', checked: false, section: 'Eletrônicos' } })\`
+  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Roupas de frio', metadata: { type: 'list_item', checked: false, section: 'Roupas' } })\`
+
+  User: "Quero assistir Oppenheimer e Duna 2"
+  Action:
+  \`manage_collections({ action: 'create', name: 'Filmes para Ver', icon: '🎬' })\`
+  \`manage_items({ action: 'add', collection_name: 'Filmes para Ver', content: 'Oppenheimer', metadata: { type: 'list_item', checked: false } })\`
+  \`manage_items({ action: 'add', collection_name: 'Filmes para Ver', content: 'Duna 2', metadata: { type: 'list_item', checked: false } })\`
+
+  User: "O João recomendou o livro Sapiens"
+  Action:
+  \`manage_items({ action: 'add', collection_name: 'Livros para Ler', content: 'Sapiens', metadata: { type: 'list_item', checked: false, notes: 'Recomendação do João' } })\`
+
+  User: "Lugares para visitar em Paris: Torre Eiffel, Louvre e Montmartre"
+  Action:
+  \`manage_collections({ action: 'create', name: 'Lugares Paris', icon: '📍' })\`
+  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Torre Eiffel', metadata: { type: 'list_item', checked: false } })\`
+  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Louvre', metadata: { type: 'list_item', checked: false } })\`
+  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Montmartre', metadata: { type: 'list_item', checked: false } })\`
 
 ### 3. EXEMPLOS DE "TOTAL AUTONOMIA":
 

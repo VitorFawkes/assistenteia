@@ -36,7 +36,7 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
     };
 
     return (
-        <div className="p-4 bg-gray-900 border-t border-gray-800">
+        <div className="p-2 md:p-4 bg-gray-900 border-t border-gray-800">
             {selectedFile && (
                 <div className="mb-2 p-2 bg-gray-800 rounded-lg flex items-center justify-between max-w-xs">
                     <span className="text-sm text-gray-300 truncate">{selectedFile.name}</span>
