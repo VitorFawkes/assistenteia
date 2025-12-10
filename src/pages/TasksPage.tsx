@@ -29,11 +29,11 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [newTaskTitle, setNewTaskTitle] = useState('');
-    const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+    const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('todo');
 
-    const [sortOption, setSortOption] = useState<'created_desc' | 'created_asc' | 'priority_desc' | 'priority_asc' | 'alpha_asc'>('created_desc');
+    const [sortOption, setSortOption] = useState<'created_desc' | 'created_asc' | 'alpha_asc'>('created_desc');
 
     useEffect(() => {
         if (user) {
@@ -69,7 +69,7 @@ export default function TasksPage() {
                 .insert([{
                     user_id: user?.id,
                     title: newTaskTitle,
-                    priority: newTaskPriority,
+                    priority: 'medium', // Default priority
                     status: 'todo'
                 }])
                 .select()
@@ -78,7 +78,6 @@ export default function TasksPage() {
             if (error) throw error;
             setTasks([data, ...tasks]);
             setNewTaskTitle('');
-            setNewTaskPriority('medium');
         } catch (error) {
             console.error('Error adding task:', error);
         }
@@ -141,8 +140,42 @@ export default function TasksPage() {
             const { error } = await supabase.from('tasks').delete().eq('id', id);
             if (error) throw error;
             setTasks(tasks.filter(t => t.id !== id));
+            if (selectedTasks.has(id)) {
+                const newSelected = new Set(selectedTasks);
+                newSelected.delete(id);
+                setSelectedTasks(newSelected);
+            }
         } catch (error) {
             console.error('Error deleting task:', error);
+        }
+    };
+
+    const toggleSelectTask = (id: string) => {
+        const newSelected = new Set(selectedTasks);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedTasks(newSelected);
+    };
+
+    const deleteSelectedTasks = async () => {
+        if (selectedTasks.size === 0) return;
+        if (!confirm(`Tem certeza que deseja excluir ${selectedTasks.size} tarefas?`)) return;
+
+        try {
+            const { error } = await supabase
+                .from('tasks')
+                .delete()
+                .in('id', Array.from(selectedTasks));
+
+            if (error) throw error;
+
+            setTasks(tasks.filter(t => !selectedTasks.has(t.id)));
+            setSelectedTasks(new Set());
+        } catch (error) {
+            console.error('Error deleting tasks:', error);
         }
     };
 
@@ -159,39 +192,11 @@ export default function TasksPage() {
         if (sortOption === 'created_asc') {
             return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         }
-        if (sortOption === 'priority_desc') {
-            const priorityMap = { urgent: 4, high: 3, medium: 2, low: 1 };
-            return (priorityMap[b.priority] || 0) - (priorityMap[a.priority] || 0);
-        }
-        if (sortOption === 'priority_asc') {
-            const priorityMap = { urgent: 4, high: 3, medium: 2, low: 1 };
-            return (priorityMap[a.priority] || 0) - (priorityMap[b.priority] || 0);
-        }
         if (sortOption === 'alpha_asc') {
             return a.title.localeCompare(b.title);
         }
         return 0;
     });
-
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'urgent': return 'text-red-500 bg-red-500/10 border-red-500/20';
-            case 'high': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
-            case 'medium': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-            case 'low': return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
-            default: return 'text-gray-400';
-        }
-    };
-
-    const getPriorityLabel = (priority: string) => {
-        switch (priority) {
-            case 'urgent': return 'Urgente';
-            case 'high': return 'Alta';
-            case 'medium': return 'Média';
-            case 'low': return 'Baixa';
-            default: return priority;
-        }
-    };
 
     if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
 
@@ -199,14 +204,14 @@ export default function TasksPage() {
         <div className="p-4 md:p-6 pb-28 md:pb-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
             <PageHeader
                 title="Tarefas"
-                subtitle="Gerencie suas atividades e prioridades"
+                subtitle="Gerencie suas atividades"
                 icon={CheckSquare}
                 iconColor="text-green-400"
             />
 
             {/* Add Task Form */}
             <Card className="mb-6 md:mb-8 p-4 w-full box-border">
-                <form onSubmit={addTask} className="flex flex-col gap-3 w-full">
+                <form onSubmit={addTask} className="flex gap-3 w-full">
                     <input
                         type="text"
                         value={newTaskTitle}
@@ -214,23 +219,13 @@ export default function TasksPage() {
                         placeholder="Nova tarefa..."
                         className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
-                    <select
-                        value={newTaskPriority}
-                        onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                        className="bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    >
-                        <option value="low">Baixa</option>
-                        <option value="medium">Média</option>
-                        <option value="high">Alta</option>
-                        <option value="urgent">Urgente</option>
-                    </select>
-                    <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 w-full shrink-0">
+                    <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 shrink-0">
                         Adicionar
                     </Button>
                 </form>
             </Card>
 
-            {/* Filters */}
+            {/* Filters & Actions */}
             <div className="mb-6 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1">
@@ -244,17 +239,28 @@ export default function TasksPage() {
                         />
                     </div>
 
-                    <select
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value as any)}
-                        className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[200px]"
-                    >
-                        <option value="created_desc">✨ Mais Recentes</option>
-                        <option value="created_asc">📅 Mais Antigas</option>
-                        <option value="priority_desc">🔥 Maior Prioridade</option>
-                        <option value="priority_asc">❄️ Menor Prioridade</option>
-                        <option value="alpha_asc">🔤 Alfabética (A-Z)</option>
-                    </select>
+                    <div className="flex gap-2">
+                        {selectedTasks.size > 0 && (
+                            <Button
+                                variant="danger"
+                                onClick={deleteSelectedTasks}
+                                className="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 whitespace-nowrap"
+                                icon={Trash2}
+                            >
+                                Excluir ({selectedTasks.size})
+                            </Button>
+                        )}
+
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value as any)}
+                            className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[160px]"
+                        >
+                            <option value="created_desc">✨ Mais Recentes</option>
+                            <option value="created_asc">📅 Mais Antigas</option>
+                            <option value="alpha_asc">🔤 Alfabética (A-Z)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -287,8 +293,18 @@ export default function TasksPage() {
                     </div>
                 ) : (
                     filteredTasks.map(task => (
-                        <Card key={task.id} className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''}`} hover>
+                        <Card key={task.id} className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
                             <div className="flex items-start gap-3">
+                                {/* Selection Checkbox */}
+                                <div className="pt-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedTasks.has(task.id)}
+                                        onChange={() => toggleSelectTask(task.id)}
+                                        className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
+                                    />
+                                </div>
+
                                 <button
                                     onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
                                     className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
@@ -339,9 +355,6 @@ export default function TasksPage() {
                                     )}
 
                                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityColor(task.priority)}`}>
-                                            {getPriorityLabel(task.priority)}
-                                        </span>
                                         <span className="text-xs text-gray-600">
                                             {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
                                         </span>
