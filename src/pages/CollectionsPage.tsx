@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown, Square, CheckSquare as CheckSquareIcon, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +34,7 @@ interface CollectionItem {
 
 export default function CollectionsPage() {
     const { user } = useAuth();
+    const location = useLocation();
     const [collections, setCollections] = useState<Collection[]>([]);
     const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
     const [items, setItems] = useState<CollectionItem[]>([]);
@@ -416,8 +418,16 @@ export default function CollectionsPage() {
         }
     };
 
+    // Reset selectedCollection when navigating to /collections via bottom nav
+    useEffect(() => {
+        // When location changes and we're on /collections, reset selection
+        if (location.pathname === '/collections') {
+            setSelectedCollection(null);
+        }
+    }, [location.key]); // location.key changes on each navigation
+
     return (
-        <div className="flex h-full overflow-hidden">
+        <div className="flex h-full overflow-hidden pb-20 md:pb-0">
             {/* Sidebar - Collections List - Full width on mobile when no collection selected */}
             <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-800 md:border-r border-gray-700 flex-col shrink-0`}>
                 <div className="p-6 border-b border-gray-700">

@@ -144,7 +144,7 @@ export default function TasksPage() {
     if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
 
     return (
-        <div className="p-4 md:p-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
+        <div className="p-4 md:p-6 pb-28 md:pb-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
             <PageHeader
                 title="Tarefas"
                 subtitle="Gerencie suas atividades e prioridades"
@@ -221,54 +221,35 @@ export default function TasksPage() {
                     </div>
                 ) : (
                     filteredTasks.map(task => (
-                        <Card key={task.id} className={`p-4 flex items-center justify-between group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''}`} hover>
-                            <div className="flex items-center gap-4 flex-1">
+                        <Card key={task.id} className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''}`} hover>
+                            <div className="flex items-start gap-3">
                                 <button
                                     onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                                    className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors`}
+                                    className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
                                 >
-                                    {task.status === 'done' ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                                    {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
                                 </button>
 
-                                <div className="flex-1">
-                                    <p className={`text-lg font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
                                         {task.title}
                                     </p>
-                                    <div className="flex items-center gap-3 mt-1">
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
                                         <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityColor(task.priority)}`}>
                                             {getPriorityLabel(task.priority)}
                                         </span>
-                                        {task.description && (
-                                            <span className="text-xs text-gray-500 truncate max-w-[200px]">
-                                                {task.description}
-                                            </span>
-                                        )}
                                         <span className="text-xs text-gray-600">
-                                            {format(new Date(task.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                                            {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
                                         </span>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-                                {task.status !== 'done' && (
-                                    <select
-                                        value={task.status}
-                                        onChange={(e) => updateStatus(task.id, e.target.value as any)}
-                                        className="bg-gray-800 text-xs text-gray-300 border border-gray-700 rounded px-2 py-1 focus:outline-none"
-                                    >
-                                        <option value="todo">A Fazer</option>
-                                        <option value="in_progress">Fazendo</option>
-                                        <option value="done">Feito</option>
-                                    </select>
-                                )}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <button
                                     onClick={() => deleteTask(task.id)}
-                                    className="text-gray-500 hover:text-red-400"
-                                    icon={Trash2}
-                                />
+                                    className="text-gray-500 hover:text-red-400 p-1 shrink-0"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
                             </div>
                         </Card>
                     ))

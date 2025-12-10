@@ -219,7 +219,7 @@ export default function BrainPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
+        <div className="flex flex-col h-full bg-gray-900 overflow-hidden pb-20 md:pb-0">
             {/* Mobile Tab Navigation - Only rendered on mobile */}
             {isMobile && (
                 <div className="bg-gray-800 border-b border-gray-700 p-3 shrink-0 flex flex-col">
