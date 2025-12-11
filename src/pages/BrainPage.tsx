@@ -184,13 +184,13 @@ export default function BrainPage() {
         if (data) {
             setSettings({
                 custom_system_prompt: data.custom_system_prompt || '',
-                ai_model: data.ai_model || 'gpt-4o'
+                ai_model: data.ai_model || 'gpt-5.1-preview'
             });
         } else {
             // Default settings if none exist
             setSettings({
                 custom_system_prompt: '',
-                ai_model: 'gpt-4o'
+                ai_model: 'gpt-5.1-preview'
             });
         }
     };
