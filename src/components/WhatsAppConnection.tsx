@@ -17,6 +17,15 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
     useEffect(() => {
         checkInstanceStatus();
 
+        // Polling for status updates (Backup for Webhook)
+        let pollInterval: any;
+        if (status === 'connecting') {
+            pollInterval = setInterval(() => {
+                console.log('Polling status...');
+                checkInstanceStatus();
+            }, 3000);
+        }
+
         // Real-time subscription for status updates
         const channel = supabase
             .channel('whatsapp_status_changes')
@@ -41,8 +50,9 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
 
         return () => {
             supabase.removeChannel(channel);
+            if (pollInterval) clearInterval(pollInterval);
         };
-    }, [userId]);
+    }, [userId, status]);
 
     const checkInstanceStatus = async () => {
         try {

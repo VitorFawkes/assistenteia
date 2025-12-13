@@ -40,31 +40,20 @@ Deno.serve(async (req: Request) => {
                 console.log(`Configuring instance ${targetName}...`);
                 const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
 
-                // 1. Fetch Current Webhook Config (to debug and merge)
-                let currentConfig = {};
-                try {
-                    const currentResponse = await fetch(`${evolutionApiUrl}/webhook/find/${targetName}`, {
-                        method: 'GET',
-                        headers: { 'apikey': evolutionApiKey }
-                    });
-                    if (currentResponse.ok) {
-                        const data = await currentResponse.json();
-                        currentConfig = data.webhook || {};
-                        console.log('Current Webhook Config:', JSON.stringify(currentConfig));
-                    }
-                } catch (e) {
-                    console.warn('Failed to fetch current webhook config:', e);
-                }
-
-                // 2. Set Webhook (Merge with required settings)
+                // 2. Set Webhook (Clean payload, NO MERGE)
+                // Evolution API v2 /webhook/set expects flat camelCase body
                 const webhookPayload = {
-                    ...currentConfig,
                     enabled: true,
                     url: webhookUrl,
                     webhookByEvents: true,
                     webhookBase64: true,
-                    webhook_base64: true, // Send both to be safe
-                    events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
+                    events: [
+                        "QRCODE_UPDATED",
+                        "MESSAGES_UPSERT",
+                        "MESSAGES_UPDATE",
+                        "MESSAGES_DELETE",
+                        "CONNECTION_UPDATE"
+                    ]
                 };
 
                 console.log('Setting Webhook with payload:', JSON.stringify(webhookPayload));
@@ -143,13 +132,38 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            // Scenario B: Exists but Disconnected OR Doesn't Exist
+            // Scenario B: Exists but Disconnected -> DELETE and RECREATE
+            // This ensures we don't get stuck in a zombie state (e.g. 'connecting' forever without QR)
+            if (instanceExists && evolutionState !== 'open') {
+                console.log(`Instance ${instanceName} exists but is ${evolutionState}. Deleting to start fresh...`);
+                try {
+                    await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+                        method: 'DELETE',
+                        headers: { 'apikey': evolutionApiKey }
+                    });
+                } catch (e) { /* ignore */ }
+
+                try {
+                    await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+                        method: 'DELETE',
+                        headers: { 'apikey': evolutionApiKey }
+                    });
+                } catch (e) {
+                    console.warn('Failed to delete instance (might already be gone):', e);
+                }
+
+                // Wait a bit for Evolution to clean up
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                instanceExists = false;
+            }
+
             if (!instanceExists) {
-                // Create if not exists
+                // Create new instance
                 console.log(`Creating new instance for ${instanceName}...`);
                 const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
 
-                await fetch(`${evolutionApiUrl}/instance/create`, {
+                // Evolution API v2 /instance/create expects nested webhook object with base64/byEvents
+                const createResponse = await fetch(`${evolutionApiUrl}/instance/create`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
                     body: JSON.stringify({
@@ -160,23 +174,27 @@ Deno.serve(async (req: Request) => {
                         webhook: {
                             enabled: true,
                             url: webhookUrl,
-                            webhookByEvents: true,
-                            webhookBase64: true,
-                            events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE", "CONNECTION_UPDATE"]
+                            byEvents: true, // Correct key for create
+                            base64: true,   // Correct key for create
+                            events: [
+                                "QRCODE_UPDATED",
+                                "MESSAGES_UPSERT",
+                                "MESSAGES_UPDATE",
+                                "MESSAGES_DELETE",
+                                "CONNECTION_UPDATE"
+                            ]
                         }
                     })
                 });
 
+                if (!createResponse.ok) {
+                    const errText = await createResponse.text();
+                    throw new Error(`Failed to create instance: ${errText}`);
+                }
+
                 // FORCE CONFIGURATION IMMEDIATELY AFTER CREATION
                 console.log('Force configuring instance after creation...');
                 await configureInstance(instanceName);
-            } else {
-                // Instance exists but is NOT open (disconnected or connecting)
-                console.log(`Instance ${instanceName} exists but is ${evolutionState}. Ensuring configuration...`);
-                await configureInstance(instanceName);
-
-                // If it's 'connecting', we might just need to fetch the QR code.
-                // If it's 'close', calling connect usually generates a new QR.
             }
 
             // Always configure before fetching QR (Redundant but safe)
