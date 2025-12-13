@@ -86,7 +86,7 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
                 return;
             }
 
-            const { error } = await supabase.functions.invoke('whatsapp-manager', {
+            const { data, error } = await supabase.functions.invoke('whatsapp-manager', {
                 body: {
                     action: 'create_instance',
                     userId: userId,
@@ -97,8 +97,16 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
 
             if (error) throw error;
 
+            if (data) {
+                if (data.qr_code) {
+                    setQrCode(data.qr_code);
+                    setStatus('connecting');
+                } else if (data.status === 'connected') {
+                    setStatus('connected');
+                }
+            }
+
             setInstanceName(targetInstanceName);
-            // Status will update via Realtime
 
         } catch (error) {
             console.error('Error connecting:', error);
