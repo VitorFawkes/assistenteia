@@ -15,12 +15,14 @@ export default function IntegrationsPage() {
     const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
+        console.log('IntegrationsPage mounted');
         fetchIntegrations();
 
         // Get User ID
         supabase.auth.getUser().then(({ data }) => {
+            console.log('User ID fetched:', data.user?.id);
             if (data.user) setUserId(data.user.id);
-        });
+        }).catch(err => console.error('Error fetching user:', err));
 
         // Check for success param in URL
         const params = new URLSearchParams(window.location.search);

@@ -168,29 +168,50 @@ Deno.serve(async (req: Request) => {
                 });
 
                 // FORCE CONFIGURATION IMMEDIATELY AFTER CREATION
-                // Some Evolution versions ignore the webhook payload in create
                 console.log('Force configuring instance after creation...');
                 await configureInstance(instanceName);
+            } else {
+                // Instance exists but is NOT open (disconnected or connecting)
+                console.log(`Instance ${instanceName} exists but is ${evolutionState}. Ensuring configuration...`);
+                await configureInstance(instanceName);
+
+                // If it's 'connecting', we might just need to fetch the QR code.
+                // If it's 'close', calling connect usually generates a new QR.
             }
 
             // Always configure before fetching QR (Redundant but safe)
             await configureInstance(instanceName);
 
-            // Fetch QR Code
+            // Fetch QR Code with Retry Logic
             console.log(`Fetching QR for ${instanceName}...`);
-            const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
-                method: 'GET',
-                headers: { 'apikey': evolutionApiKey }
-            });
-
             let qrCode: string | undefined;
-            if (qrResponse.ok) {
-                const qrData = await qrResponse.json();
-                qrCode = qrData.base64 || qrData.qrcode;
+            let attempts = 0;
+            const maxAttempts = 5;
+
+            while (!qrCode && attempts < maxAttempts) {
+                attempts++;
+                try {
+                    const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+                        method: 'GET',
+                        headers: { 'apikey': evolutionApiKey }
+                    });
+
+                    if (qrResponse.ok) {
+                        const qrData = await qrResponse.json();
+                        qrCode = qrData.base64 || qrData.qrcode;
+                    }
+                } catch (e) {
+                    console.warn(`Attempt ${attempts} to fetch QR failed:`, e);
+                }
+
+                if (!qrCode) {
+                    console.log(`QR Code not ready yet, waiting... (${attempts}/${maxAttempts})`);
+                    await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
+                }
             }
 
             if (!qrCode) {
-                throw new Error('Failed to generate QR Code. Please try again.');
+                throw new Error('Failed to generate QR Code after multiple attempts. Please try again.');
             }
 
             // Upsert Connecting
