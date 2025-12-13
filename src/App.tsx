@@ -9,6 +9,7 @@ import BrainPage from './pages/BrainPage';
 import DocumentsPage from './pages/DocumentsPage';
 import SettingsPage from './pages/SettingsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import CalendarPage from './pages/CalendarPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 
@@ -33,6 +34,7 @@ function App() {
             <Route path="documents" element={<DocumentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

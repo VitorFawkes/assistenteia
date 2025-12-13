@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
         const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
         if (authError || !user) throw new Error('Unauthorized');
 
-        const { action } = await req.json();
+        const { action, instanceName: reqInstanceName, type } = await req.json();
         const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL');
         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY'); // Global Key
 
@@ -31,7 +31,8 @@ Deno.serve(async (req: Request) => {
             throw new Error('Evolution API configuration missing');
         }
 
-        const instanceName = user.id; // Instance Name IS the User ID
+        const instanceName = reqInstanceName || user.id; // Use provided name or default to user.id
+        const instanceType = type || 'assistant'; // Default to assistant
 
         // --- SHARED HELPER: Configure Instance ---
         const configureInstance = async (targetName: string) => {
@@ -133,6 +134,7 @@ Deno.serve(async (req: Request) => {
                     instance_name: instanceName,
                     status: 'connected',
                     qr_code: null,
+                    type: instanceType,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
 
@@ -197,6 +199,7 @@ Deno.serve(async (req: Request) => {
                 instance_name: instanceName,
                 status: 'connecting',
                 qr_code: qrCode,
+                type: instanceType,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
@@ -277,12 +280,14 @@ Deno.serve(async (req: Request) => {
                         const webhookData = await webhookCheck.json();
                         const currentWebhook = webhookData.webhook || {};
 
-                        // Check if base64 is enabled
-                        if (!currentWebhook.webhookBase64 && !currentWebhook.webhook_base64) {
-                            console.warn('⚠️ Webhook Base64 is DISABLED! Enforcing configuration...');
+                        // Check if base64 is enabled (handle both casing styles just in case)
+                        const isBase64Enabled = currentWebhook.webhookBase64 === true || currentWebhook.webhook_base64 === true;
+
+                        if (!isBase64Enabled) {
+                            console.warn('⚠️ Webhook Base64 is DISABLED! Enforcing configuration now...');
                             needsConfig = true;
                         } else {
-                            console.log('✅ Webhook Base64 is enabled.');
+                            console.log('✅ Webhook Base64 is confirmed enabled.');
                         }
                     } else {
                         console.warn('⚠️ Failed to check webhook config. Enforcing just in case...');

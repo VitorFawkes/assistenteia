@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { Clock, Brain, Folder, CheckSquare, Settings } from 'lucide-react';
+import { Clock, Brain, Folder, CheckSquare, Settings, Calendar } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function MobileNav() {
     const navItems = [
         { icon: Clock, label: 'Lembretes', path: '/' },
         { icon: CheckSquare, label: 'Tarefas', path: '/tasks' },
+        { icon: Calendar, label: 'Agenda', path: '/calendar' },
         { icon: Folder, label: 'Coleções', path: '/collections' },
         { icon: Brain, label: 'Cérebro', path: '/brain' },
         { icon: Settings, label: 'Config', path: '/settings' },

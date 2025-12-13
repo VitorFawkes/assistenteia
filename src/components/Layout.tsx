@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug } from 'lucide-react';
+import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug, Calendar } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
@@ -12,6 +12,7 @@ export default function Layout() {
     const navItems = [
         { icon: CheckSquare, label: 'Tarefas', path: '/tasks' },
         { icon: Clock, label: 'Lembretes', path: '/reminders' },
+        { icon: Calendar, label: 'Calendário', path: '/calendar' },
         { icon: Folder, label: 'Coleções', path: '/collections' },
         { icon: Brain, label: 'Cérebro', path: '/brain' },
         { icon: FileText, label: 'Documentos', path: '/documents' },

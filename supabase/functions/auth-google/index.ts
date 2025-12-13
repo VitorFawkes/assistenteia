@@ -30,13 +30,15 @@ serve(async (req) => {
         const scopes = [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/calendar.events',
-            'https://www.googleapis.com/auth/userinfo.email'
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/gmail.modify'
         ].join(' ');
 
         const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&access_type=offline&prompt=consent`;
 
-        return new Response(JSON.stringify({ url: authUrl }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        return new Response(null, {
+            status: 302,
+            headers: { ...corsHeaders, Location: authUrl },
         });
     }
 
@@ -84,12 +86,20 @@ serve(async (req) => {
             // Standard way: Pass `state={userId}` in the auth URL.
 
             // Let's check if we have state
+            // Decode state
             const state = url.searchParams.get('state');
-            if (!state) {
-                return new Response('Missing state (user_id)', { status: 400 });
-            }
+            if (!state) return new Response('Missing state', { status: 400 });
 
-            const userId = state; // Assuming state IS the user_id
+            let userId, redirectTo;
+            try {
+                const decoded = JSON.parse(atob(state));
+                userId = decoded.userId;
+                redirectTo = decoded.redirectTo;
+            } catch (e) {
+                // Fallback for old state format (just userId)
+                userId = state;
+                redirectTo = 'https://bvjfiismidgzmdmrotee.supabase.co/integrations?success=true';
+            }
 
             // Save to Supabase
             const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -110,9 +120,12 @@ serve(async (req) => {
             if (dbError) throw dbError;
 
             // Redirect back to the app
+            const redirectUrl = new URL(redirectTo);
+            redirectUrl.searchParams.set('success', 'true');
+
             return new Response(null, {
                 status: 302,
-                headers: { Location: 'https://bvjfiismidgzmdmrotee.supabase.co/integrations?success=true' } // Replace with actual app URL
+                headers: { Location: redirectUrl.toString() }
             });
 
         } catch (err: any) {

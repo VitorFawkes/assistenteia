@@ -30,13 +30,16 @@ serve(async (req) => {
         const scopes = [
             'Calendars.ReadWrite',
             'User.Read',
+            'Mail.ReadWrite',
+            'Mail.Send',
             'offline_access'
         ].join(' ');
 
         const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${MICROSOFT_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_mode=query&scope=${encodeURIComponent(scopes)}&state=${url.searchParams.get('state') || ''}`;
 
-        return new Response(JSON.stringify({ url: authUrl }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        return new Response(null, {
+            status: 302,
+            headers: { ...corsHeaders, Location: authUrl },
         });
     }
 
@@ -56,7 +59,7 @@ serve(async (req) => {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
                     client_id: MICROSOFT_CLIENT_ID,
-                    scope: 'Calendars.ReadWrite User.Read offline_access',
+                    scope: 'Calendars.ReadWrite User.Read Mail.ReadWrite Mail.Send offline_access',
                     code,
                     redirect_uri: REDIRECT_URI,
                     grant_type: 'authorization_code',
@@ -67,6 +70,17 @@ serve(async (req) => {
             const tokens = await tokenResponse.json();
             if (tokens.error) throw new Error(tokens.error_description || tokens.error);
 
+            // Decode state
+            let userId, redirectTo;
+            try {
+                const decoded = JSON.parse(atob(state));
+                userId = decoded.userId;
+                redirectTo = decoded.redirectTo;
+            } catch (e) {
+                userId = state;
+                redirectTo = 'https://bvjfiismidgzmdmrotee.supabase.co/integrations?success=true';
+            }
+
             const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
             const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
             const supabase = createClient(supabaseUrl, supabaseKey);
@@ -74,7 +88,7 @@ serve(async (req) => {
             const { error: dbError } = await supabase
                 .from('user_integrations')
                 .upsert({
-                    user_id: state,
+                    user_id: userId,
                     provider: 'microsoft',
                     access_token: tokens.access_token,
                     refresh_token: tokens.refresh_token,
@@ -84,9 +98,12 @@ serve(async (req) => {
 
             if (dbError) throw dbError;
 
+            const redirectUrl = new URL(redirectTo);
+            redirectUrl.searchParams.set('success', 'true');
+
             return new Response(null, {
                 status: 302,
-                headers: { Location: 'https://bvjfiismidgzmdmrotee.supabase.co/integrations?success=true' }
+                headers: { Location: redirectUrl.toString() }
             });
 
         } catch (err: any) {
