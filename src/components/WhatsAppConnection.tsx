@@ -14,15 +14,56 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
     const [isLoading, setIsLoading] = useState(false);
     const [instanceName, setInstanceName] = useState<string | null>(null);
 
+    const checkInstanceStatus = async () => {
+        try {
+            const { data } = await supabase
+                .from('whatsapp_instances')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('type', 'user_personal')
+                .maybeSingle();
+
+            if (data) {
+                setStatus(data.status);
+                setQrCode(data.qr_code);
+                setInstanceName(data.instance_name);
+            }
+        } catch (error) {
+            console.error('Error checking status:', error);
+        }
+    };
+
+    const syncWithEvolution = async () => {
+        try {
+            console.log('Syncing status with Evolution...');
+            const { error } = await supabase.functions.invoke('whatsapp-manager', {
+                body: {
+                    action: 'get_status',
+                    instanceName: `user_${userId}`,
+                    type: 'user_personal'
+                }
+            });
+
+            if (error) console.error('Sync failed:', error);
+
+            // Always fetch latest DB state after sync attempt
+            checkInstanceStatus();
+        } catch (e) {
+            console.error('Sync error:', e);
+        }
+    };
+
     useEffect(() => {
+        // Initial check and sync
         checkInstanceStatus();
+        syncWithEvolution();
 
         // Polling for status updates (Backup for Webhook)
+        // We poll the BACKEND to force a check against Evolution
         let pollInterval: any;
         if (status === 'connecting') {
             pollInterval = setInterval(() => {
-                console.log('Polling status...');
-                checkInstanceStatus();
+                syncWithEvolution();
             }, 3000);
         }
 
@@ -53,25 +94,6 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
             if (pollInterval) clearInterval(pollInterval);
         };
     }, [userId, status]);
-
-    const checkInstanceStatus = async () => {
-        try {
-            const { data } = await supabase
-                .from('whatsapp_instances')
-                .select('*')
-                .eq('user_id', userId)
-                .eq('type', 'user_personal')
-                .maybeSingle();
-
-            if (data) {
-                setStatus(data.status);
-                setQrCode(data.qr_code);
-                setInstanceName(data.instance_name);
-            }
-        } catch (error) {
-            console.error('Error checking status:', error);
-        }
-    };
 
     const handleConnect = async () => {
         setIsLoading(true);
