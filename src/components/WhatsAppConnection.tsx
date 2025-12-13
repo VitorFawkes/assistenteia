@@ -171,7 +171,15 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
                 ) : status === 'connecting' && qrCode ? (
                     <div className="flex flex-col items-center gap-4">
                         <div className="bg-white p-4 rounded-xl">
-                            <QRCodeSVG value={qrCode} size={200} />
+                            {qrCode.length > 200 || qrCode.startsWith('data:') ? (
+                                <img
+                                    src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
+                                    alt="QR Code WhatsApp"
+                                    className="w-[200px] h-[200px]"
+                                />
+                            ) : (
+                                <QRCodeSVG value={qrCode} size={200} />
+                            )}
                         </div>
                         <p className="text-gray-400 text-sm text-center max-w-xs">
                             Abra o WhatsApp no seu celular, vá em <strong>Aparelhos Conectados {'>'} Conectar Aparelho</strong> e escaneie o código.
