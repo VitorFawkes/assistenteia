@@ -236,9 +236,11 @@ Deno.serve(async (req: Request) => {
                     parameters: {
                         type: 'object',
                         properties: {
-                            preferred_name: { type: 'string', description: 'Novo nome ou apelido como o usuário quer ser chamado.' }
-                        },
-                        required: ['preferred_name']
+                            preferred_name: { type: 'string', description: 'Novo nome ou apelido como o usuário quer ser chamado.' },
+                            daily_briefing_enabled: { type: 'boolean', description: 'Ativar ou desativar o Resumo Diário.' },
+                            daily_briefing_time: { type: 'string', description: 'Horário do resumo (formato HH:MM, ex: "08:00").' },
+                            daily_briefing_prompt: { type: 'string', description: 'Instruções personalizadas para o resumo (ex: "Seja engraçado").' }
+                        }
                     }
                 }
             },
@@ -270,28 +272,6 @@ Deno.serve(async (req: Request) => {
                             limit: { type: 'number', description: 'Número de mensagens (default: 20)' },
                             days_ago: { type: 'number', description: 'Quantos dias atrás buscar (default: 7)' }
                         }
-                    }
-                }
-            },
-            {
-                type: 'function',
-                function: {
-                    name: 'manage_tasks',
-                    description: 'Gerencia TAREFAS (To-Do List). Use para coisas que precisam ser feitas mas NÃO necessariamente têm hora marcada para notificar.',
-                    parameters: {
-                        type: 'object',
-                        properties: {
-                            action: { type: 'string', enum: ['create', 'list', 'update', 'complete', 'delete'], description: 'Ação' },
-                            title: { type: 'string', description: 'Título da tarefa' },
-                            description: { type: 'string', description: 'Detalhes da tarefa' },
-                            priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Prioridade' },
-                            status: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'], description: 'Status' },
-                            tags: { type: 'array', items: { type: 'string' }, description: 'Tags para organização (ex: #trabalho)' },
-                            // Filtros para list/update
-                            search_title: { type: 'string', description: 'Buscar por título' },
-                            filter_status: { type: 'string', description: 'Filtrar por status' }
-                        },
-                        required: ['action']
                     }
                 }
             },
@@ -439,14 +419,13 @@ Deno.serve(async (req: Request) => {
         }
         // ------------------------------------------------
 
-        const DEFAULT_SYSTEM_PROMPT = `Você é o assistente pessoal do Vitor.
-Data e Hora atual (Brasília): ${isoBrasilia}
+        const DEFAULT_SYSTEM_PROMPT = `Você é o assistente pessoal do {{preferred_name}}.
+Data e Hora atual (Brasília): {{CURRENT_DATETIME}}
 
 IDIOMA: Você DEVE SEMPRE responder em PORTUGUÊS (pt-BR).
 
 REGRAS DE DATA/HORA (CRÍTICO - LEIA COM ATENÇÃO):
 - O horário acima JÁ É o horário local de Brasília (-03:00).
-- **NÃO CALCULE DATAS ISO.** Use sempre o \`time_config\` na tool \`manage_reminders\`.
 
 **COMO USAR \`time_config\`:**
 
@@ -495,6 +474,7 @@ Ferramentas:
 - save_memory: salvar fatos importantes na memória permanente (vetorial)
 - recall_memory: buscar memórias passadas por significado (RAG)
 - manage_rules: criar/listar/deletar regras de comportamento e preferências (Brain)
+- search_contacts: buscar número de telefone de alguém pelo nome no histórico de mensagens
 
 Exemplos:
 "Cria pasta Viagem" -> manage_collections {action: "create", name: "Viagem"}
@@ -538,7 +518,16 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 - Use horário simples (HH:mm) e contexto (hoje/amanhã/dia X)
 - Use emojis ocasionalmente 😊
 
+- Use emojis ocasionalmente 😊
+
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
+
+**BUSCA DE CONTATOS (IMPORTANTE):**
+- Se o usuário pedir para enviar mensagem para alguém ("Mande msg para Bianca") e você NÃO tiver o número no contexto atual:
+- **NÃO DIGA QUE NÃO SABE.**
+- **USE A TOOL \`search_contacts\`** com o nome da pessoa.
+- Se encontrar o número, use \`send_whatsapp_message\` em seguida.
+- Se encontrar múltiplos, pergunte qual é o correto.
 
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
 
@@ -729,17 +718,21 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
 
             if (userSettings?.ai_model) {
                 aiModel = userSettings.ai_model;
+                // MAPPING: Handle "GPT 5.1 Preview" vanity model by mapping it to gpt-4o
+                if (aiModel === 'gpt-5.1-preview') {
+                    console.log('✨ Using GPT 5.1 Preview (Mapped to gpt-4o)');
+                    aiModel = 'gpt-4o';
+                }
             }
 
             // Inject Preferred Name
-            if (userSettings?.preferred_name) {
-                systemPrompt += `\n\nNOME DO USUÁRIO: O nome/apelido do usuário é "${userSettings.preferred_name}". Chame-o assim sempre que possível para ser mais pessoal.`;
-                console.log(`👤 Preferred Name Injected: ${userSettings.preferred_name}`);
-            }
+            const userName = userSettings?.preferred_name || 'Usuário';
+            systemPrompt += `\n\nNOME DO USUÁRIO: O nome/apelido do usuário é "${userName}". Chame-o assim sempre que possível para ser mais pessoal.`;
+            console.log(`👤 Preferred Name Injected: ${userName}`);
 
             // --- 🛡️ AUTHORITY RULES INJECTION ---
             if (isOwner) {
-                systemPrompt += `\n\nSTATUS: Você está falando com o SEU DONO (Vitor/Chefe). Você tem permissão total para executar comandos, criar tarefas, salvar memórias e gerenciar o sistema.`;
+                systemPrompt += `\n\nSTATUS: Você está falando com o SEU DONO (${userName}). Você tem permissão total para executar comandos, criar tarefas, salvar memórias e gerenciar o sistema.`;
             } else {
                 systemPrompt += `\n\n⚠️ ALERTA DE SEGURANÇA - MODO RESTRITO ⚠️
 Você está falando com TERCEIROS (${senderName}), NÃO com o seu dono.
@@ -747,7 +740,7 @@ REGRAS ABSOLUTAS:
 1. VOCÊ É PROIBIDO DE EXECUTAR COMANDOS que alterem o sistema (criar tarefas, mudar configurações, deletar memórias, gerenciar emails/calendário).
 2. Se a pessoa pedir para fazer algo ("Cria uma tarefa", "Muda meu nome"), RECUSE educadamente: "Desculpe, apenas meu dono pode fazer isso."
 3. Você PODE conversar, tirar dúvidas e ser simpático, mas aja como uma secretária/assistente pessoal que protege a agenda do chefe.
-4. Se perguntarem sobre o Vitor, responda com base no que você sabe, mas não revele dados sensíveis (senhas, endereços privados).`;
+4. Se perguntarem sobre o ${userName}, responda com base no que você sabe, mas não revele dados sensíveis (senhas, endereços privados).`;
             }
 
         } catch (error: any) {
@@ -1655,6 +1648,38 @@ REGRAS ABSOLUTAS:
                         }
                     }
 
+                    // --- SEARCH CONTACTS ---
+                    else if (functionName === 'search_contacts') {
+                        const { data: contacts } = await supabase
+                            .from('messages')
+                            .select('sender_name, sender_number, created_at')
+                            .ilike('sender_name', `%${args.query}%`)
+                            .order('created_at', { ascending: false })
+                            .limit(10);
+
+                        if (!contacts || contacts.length === 0) {
+                            toolOutput = `Nenhum contato encontrado com o nome "${args.query}".`;
+                        } else {
+                            // Group by number to avoid duplicates
+                            const uniqueContacts = new Map();
+                            contacts.forEach((c: any) => {
+                                if (!uniqueContacts.has(c.sender_number)) {
+                                    uniqueContacts.set(c.sender_number, {
+                                        name: c.sender_name,
+                                        number: c.sender_number,
+                                        last_seen: c.created_at
+                                    });
+                                }
+                            });
+
+                            const list = Array.from(uniqueContacts.values()).map((c: any) =>
+                                `- ${c.name} (${c.number}) [Visto em: ${new Date(c.last_seen).toLocaleDateString('pt-BR')}]`
+                            ).join('\n');
+
+                            toolOutput = `Contatos encontrados:\n${list}\n\nSe tiver certeza de qual é, use a ferramenta send_whatsapp_message com o número exato.`;
+                        }
+                    }
+
                     // --- QUERY DATA ---
                     else if (functionName === 'query_data') {
                         const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
@@ -2048,17 +2073,22 @@ REGRAS ABSOLUTAS:
 
                     // --- UPDATE USER SETTINGS ---
                     else if (functionName === 'update_user_settings') {
-                        if (args.preferred_name) {
-                            const { error } = await supabase.from('user_settings').upsert({
-                                user_id: userId,
-                                preferred_name: args.preferred_name
-                            });
+                        const { preferred_name, daily_briefing_enabled, daily_briefing_time, daily_briefing_prompt } = args;
+                        const updates: any = {};
+
+                        if (preferred_name) updates.preferred_name = preferred_name;
+                        if (daily_briefing_enabled !== undefined) updates.daily_briefing_enabled = daily_briefing_enabled;
+                        if (daily_briefing_time) updates.daily_briefing_time = daily_briefing_time;
+                        if (daily_briefing_prompt) updates.daily_briefing_prompt = daily_briefing_prompt;
+
+                        if (Object.keys(updates).length > 0) {
+                            const { error } = await supabase
+                                .from('user_settings')
+                                .update(updates)
+                                .eq('user_id', userId);
 
                             if (error) {
                                 console.error('Error updating settings:', error);
-                                toolOutput = `Erro ao atualizar nome: ${error.message}`;
-                            } else {
-                                toolOutput = `Nome preferido atualizado para "${args.preferred_name}".`;
                             }
                         } else {
                             toolOutput = "Nenhuma configuração fornecida para atualização.";

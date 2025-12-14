@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { Brain, Sparkles, Search, Trash2, Plus, BookOpen, Settings, CheckCircle2 } from 'lucide-react';
+import { Brain, Sparkles, Search, Trash2, Plus, BookOpen, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,7 +25,7 @@ interface UserRule {
 
 export default function BrainPage() {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'memories' | 'rules' | 'settings'>('memories');
+    const [activeTab, setActiveTab] = useState<'memories' | 'rules'>('memories');
 
     // Mobile detection with matchMedia API (more reliable than innerWidth)
     const [isMobile, setIsMobile] = useState(() => {
@@ -59,9 +59,7 @@ export default function BrainPage() {
     const [isSavingRule, setIsSavingRule] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // Settings State
-    const [settings, setSettings] = useState<{ custom_system_prompt: string; ai_model: string } | null>(null);
-    const [isSavingSettings, setIsSavingSettings] = useState(false);
+
 
     useEffect(() => {
         if (user) {
@@ -69,8 +67,8 @@ export default function BrainPage() {
                 fetchMemories();
             } else if (activeTab === 'rules') {
                 fetchRules();
-            } else if (activeTab === 'settings') {
-                fetchSettings();
+            } else if (activeTab === 'rules') {
+                fetchRules();
             }
         }
     }, [user, activeTab]);
@@ -170,53 +168,7 @@ export default function BrainPage() {
         }
     };
 
-    // --- SETTINGS LOGIC ---
-    const fetchSettings = async () => {
-        if (!user) return;
-        const { data, error } = await supabase
-            .from('user_settings')
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle();
 
-        if (error) console.error('Error fetching settings:', error);
-
-        if (data) {
-            setSettings({
-                custom_system_prompt: data.custom_system_prompt || '',
-                ai_model: data.ai_model || 'gpt-5.1-preview'
-            });
-        } else {
-            // Default settings if none exist
-            setSettings({
-                custom_system_prompt: '',
-                ai_model: 'gpt-5.1-preview'
-            });
-        }
-    };
-
-    const saveSettings = async () => {
-        if (!user || !settings) return;
-        setIsSavingSettings(true);
-        try {
-            const { error } = await supabase
-                .from('user_settings')
-                .upsert({
-                    user_id: user.id,
-                    custom_system_prompt: settings.custom_system_prompt,
-                    ai_model: settings.ai_model
-                });
-
-            if (error) throw error;
-            setShowSuccess(true);
-            setTimeout(() => setShowSuccess(false), 3000);
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            alert('Erro ao salvar configurações. Verifique se a tabela user_settings existe.');
-        } finally {
-            setIsSavingSettings(false);
-        }
-    };
 
     return (
         <div className="flex flex-col h-full bg-gray-900 overflow-hidden pb-20 md:pb-0">
@@ -248,16 +200,7 @@ export default function BrainPage() {
                             <BookOpen size={16} />
                             Regras
                         </button>
-                        <button
-                            onClick={() => setActiveTab('settings')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'settings'
-                                ? 'bg-purple-600 text-white shadow-lg'
-                                : 'bg-gray-700 text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            <Settings size={16} />
-                            Config
-                        </button>
+
                     </div>
                 </div>
             )}
@@ -292,14 +235,7 @@ export default function BrainPage() {
                             Regras & Prefs
                         </Button>
 
-                        <Button
-                            variant={activeTab === 'settings' ? 'primary' : 'ghost'}
-                            onClick={() => setActiveTab('settings')}
-                            className={`w-full justify-start ${activeTab === 'settings' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                            icon={Settings}
-                        >
-                            Configurações Avançadas
-                        </Button>
+
                     </div>
                 )}
 
@@ -434,75 +370,7 @@ export default function BrainPage() {
                         </div>
                     )}
 
-                    {activeTab === 'settings' && settings && (
-                        <div className="max-w-4xl mx-auto">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white">Configurações Avançadas</h2>
-                                    <p className="text-gray-400">Controle total sobre o modelo e o prompt do sistema.</p>
-                                </div>
-                                <Button
-                                    onClick={saveSettings}
-                                    isLoading={isSavingSettings}
-                                    className="bg-green-600 hover:bg-green-500"
-                                    icon={CheckCircle2}
-                                >
-                                    Salvar Alterações
-                                </Button>
-                            </div>
 
-                            <div className="space-y-6">
-                                <Card className="p-6">
-                                    <h3 className="text-lg font-medium text-white mb-4">Modelo de Inteligência Artificial</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {[
-                                            { id: 'gpt-4o', name: 'GPT-4o (Recomendado)', desc: 'O modelo mais inteligente e rápido.' },
-                                            { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', desc: 'Versão anterior de alta capacidade.' },
-                                            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', desc: 'Mais rápido e econômico, menos inteligente.' },
-                                            { id: 'gpt-5.1-preview', name: 'GPT 5.1 (Preview)', desc: 'Acesso antecipado (Experimental).' }
-                                        ].map(model => (
-                                            <div
-                                                key={model.id}
-                                                onClick={() => setSettings({ ...settings, ai_model: model.id })}
-                                                className={`cursor-pointer p-4 rounded-xl border transition-all ${settings.ai_model === model.id
-                                                    ? 'bg-purple-600/20 border-purple-500 ring-1 ring-purple-500'
-                                                    : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                                                    }`}
-                                            >
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className={`font-medium ${settings.ai_model === model.id ? 'text-purple-400' : 'text-white'}`}>
-                                                        {model.name}
-                                                    </span>
-                                                    {settings.ai_model === model.id && <CheckCircle2 size={18} className="text-purple-500" />}
-                                                </div>
-                                                <p className="text-xs text-gray-400">{model.desc}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                                        <p className="text-xs text-blue-300 flex items-center gap-2">
-                                            <Sparkles size={14} />
-                                            O modelo selecionado será usado para todas as novas conversas.
-                                        </p>
-                                    </div>
-                                </Card>
-
-                                <Card className="p-6">
-                                    <h3 className="text-lg font-medium text-white mb-2">System Prompt (Prompt Mestre)</h3>
-                                    <p className="text-sm text-gray-400 mb-4">
-                                        Este é o "cérebro" da IA. Cuidado ao editar. Se deixar em branco, o sistema usará o prompt padrão otimizado.
-                                        Use <code>{'{{CURRENT_DATETIME}}'}</code> para injetar a hora atual.
-                                    </p>
-                                    <textarea
-                                        value={settings.custom_system_prompt}
-                                        onChange={(e) => setSettings({ ...settings, custom_system_prompt: e.target.value })}
-                                        className="w-full h-96 bg-gray-900 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed"
-                                        placeholder="Cole aqui o prompt do sistema..."
-                                    />
-                                </Card>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 

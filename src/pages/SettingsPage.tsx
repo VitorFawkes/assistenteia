@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Loader2, Check, AlertCircle, Bot } from 'lucide-react';
+import { Save, User, Loader2, Check, AlertCircle, Bot, Brain, Info, Sun, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 import WhatsAppConnection from '../components/WhatsAppConnection';
@@ -16,7 +16,12 @@ export default function SettingsPage() {
     const [privacyReadScope, setPrivacyReadScope] = useState<'all' | 'private_only' | 'groups_only' | 'none'>('all');
     const [privacyAllowOutgoing, setPrivacyAllowOutgoing] = useState(true);
     const [customPrompt, setCustomPrompt] = useState('');
-    const [aiModel, setAiModel] = useState('gpt-4o');
+    const [aiModel, setAiModel] = useState('gpt-5.1-preview');
+
+    // Daily Briefing State
+    const [dailyBriefingEnabled, setDailyBriefingEnabled] = useState(true);
+    const [dailyBriefingTime, setDailyBriefingTime] = useState('08:00');
+    const [dailyBriefingPrompt, setDailyBriefingPrompt] = useState('');
 
     // Storage Settings
     const [storageDownloadImages, setStorageDownloadImages] = useState(true);
@@ -53,8 +58,12 @@ export default function SettingsPage() {
                 setPrivacyReadScope(settings.privacy_read_scope || 'all');
                 setPrivacyAllowOutgoing(settings.privacy_allow_outgoing !== false);
                 setCustomPrompt(settings.custom_system_prompt || '');
-                setCustomPrompt(settings.custom_system_prompt || '');
-                setAiModel(settings.ai_model || 'gpt-4o');
+                setAiModel(settings.ai_model || 'gpt-5.1-preview');
+
+                // Daily Briefing
+                setDailyBriefingEnabled(settings.daily_briefing_enabled !== false);
+                setDailyBriefingTime(settings.daily_briefing_time || '08:00');
+                setDailyBriefingPrompt(settings.daily_briefing_prompt || '');
 
                 // Storage Settings
                 setStorageDownloadImages(settings.storage_download_images !== false);
@@ -78,17 +87,26 @@ export default function SettingsPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
+            // Format phone: if empty or just +55, send null. Otherwise ensure +55 prefix.
+            const cleanPhone = phone.replace(/\D/g, '');
+            const formattedPhone = cleanPhone ? (cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`) : null;
+
             const { error } = await supabase
                 .from('user_settings')
                 .upsert({
                     user_id: user.id,
                     preferred_name: preferredName,
-                    // Ensure +55 is added
-                    phone_number: phone.startsWith('+55') ? phone : `+55${phone.replace(/\D/g, '')}`,
+                    phone_number: formattedPhone,
                     privacy_read_scope: privacyReadScope,
                     privacy_allow_outgoing: privacyAllowOutgoing,
                     custom_system_prompt: customPrompt,
                     ai_model: aiModel,
+
+                    // Daily Briefing
+                    daily_briefing_enabled: dailyBriefingEnabled,
+                    daily_briefing_time: dailyBriefingTime,
+                    daily_briefing_prompt: dailyBriefingPrompt,
+
                     // Storage Settings
                     storage_download_images: storageDownloadImages,
                     storage_download_videos: storageDownloadVideos,
@@ -102,9 +120,9 @@ export default function SettingsPage() {
 
             setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
             setTimeout(() => setMessage(null), 3000);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving settings:', error);
-            setMessage({ type: 'error', text: 'Erro ao salvar perfil.' });
+            setMessage({ type: 'error', text: `Erro ao salvar: ${error.message || 'Erro desconhecido'}` });
         } finally {
             setIsSaving(false);
         }
@@ -307,6 +325,184 @@ export default function SettingsPage() {
 
                     {/* External Services */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl overflow-hidden">
+                            <div className="p-6 border-b border-gray-700/50">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-purple-900/20 rounded-lg">
+                                        <Brain className="w-5 h-5 text-purple-400" />
+                                    </div>
+                                    <h2 className="text-lg font-semibold text-white">Cérebro da IA</h2>
+                                </div>
+                                <p className="text-sm text-gray-400">
+                                    Personalize como a inteligência artificial pensa e se comporta.
+                                </p>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {/* AI Model Selection */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Modelo de Inteligência
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setAiModel('gpt-4o')}
+                                            className={`relative flex flex-col items-center p-4 border-2 rounded-xl transition-all ${aiModel === 'gpt-4o'
+                                                ? 'border-purple-600 bg-purple-900/20'
+                                                : 'border-gray-700/50 hover:border-purple-800'
+                                                }`}
+                                        >
+                                            <span className="font-semibold text-white">GPT-4o</span>
+                                            <span className="text-xs text-gray-400 mt-1">Mais Inteligente</span>
+                                            {aiModel === 'gpt-4o' && (
+                                                <div className="absolute top-2 right-2 w-2 h-2 bg-purple-600 rounded-full" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setAiModel('gpt-4o-mini')}
+                                            className={`relative flex flex-col items-center p-4 border-2 rounded-xl transition-all ${aiModel === 'gpt-4o-mini'
+                                                ? 'border-purple-600 bg-purple-900/20'
+                                                : 'border-gray-700/50 hover:border-purple-800'
+                                                }`}
+                                        >
+                                            <span className="font-semibold text-white">GPT-4o Mini</span>
+                                            <span className="text-xs text-gray-400 mt-1">Mais Rápido</span>
+                                            {aiModel === 'gpt-4o-mini' && (
+                                                <div className="absolute top-2 right-2 w-2 h-2 bg-purple-600 rounded-full" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setAiModel('gpt-5.1-preview')}
+                                            className={`relative flex flex-col items-center p-4 border-2 rounded-xl transition-all ${aiModel === 'gpt-5.1-preview'
+                                                ? 'border-purple-600 bg-purple-900/20'
+                                                : 'border-gray-700/50 hover:border-purple-800'
+                                                }`}
+                                        >
+                                            <span className="font-semibold text-white">GPT 5.1</span>
+                                            <span className="text-xs text-gray-400 mt-1">Preview</span>
+                                            {aiModel === 'gpt-5.1-preview' && (
+                                                <div className="absolute top-2 right-2 w-2 h-2 bg-purple-600 rounded-full" />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Daily Briefing Section */}
+                                <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-400">
+                                                <Sun size={24} />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-semibold text-white">Resumo Diário</h2>
+                                                <p className="text-sm text-gray-400">Receba um briefing matinal no WhatsApp.</p>
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={dailyBriefingEnabled}
+                                                onChange={(e) => setDailyBriefingEnabled(e.target.checked)}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+                                        </label>
+                                    </div>
+
+                                    {dailyBriefingEnabled && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                                                        Horário do Envio
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        value={dailyBriefingTime}
+                                                        onChange={(e) => setDailyBriefingTime(e.target.value)}
+                                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                                                        Teste Rápido
+                                                    </label>
+                                                    <Button
+                                                        variant="secondary"
+                                                        className="w-full justify-center"
+                                                        onClick={async () => {
+                                                            if (!confirm('Enviar resumo agora para o seu WhatsApp?')) return;
+                                                            try {
+                                                                const { data: { session } } = await supabase.auth.getSession();
+                                                                if (!session) return;
+
+                                                                const res = await fetch('https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/daily-briefing', {
+                                                                    method: 'POST',
+                                                                    headers: {
+                                                                        'Authorization': `Bearer ${session.access_token}`,
+                                                                        'Content-Type': 'application/json'
+                                                                    },
+                                                                    body: JSON.stringify({ action: 'test_now' })
+                                                                });
+
+                                                                if (res.ok) alert('Resumo enviado! Verifique seu WhatsApp.');
+                                                                else alert('Erro ao enviar resumo.');
+                                                            } catch (e) {
+                                                                console.error(e);
+                                                                alert('Erro ao conectar com servidor.');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Send size={16} className="mr-2" />
+                                                        Enviar Agora
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-400 mb-2">
+                                                    Instruções de Personalidade
+                                                </label>
+                                                <textarea
+                                                    value={dailyBriefingPrompt}
+                                                    onChange={(e) => setDailyBriefingPrompt(e.target.value)}
+                                                    placeholder="Ex: Seja engraçado, foque em finanças, termine com uma frase motivacional..."
+                                                    className="w-full h-24 bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all resize-none"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Diga à IA como você quer que seja o seu resumo matinal.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* System Prompt */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Personalidade (System Prompt)
+                                    </label>
+                                    <div className="relative">
+                                        <textarea
+                                            value={customPrompt}
+                                            onChange={(e) => setCustomPrompt(e.target.value)}
+                                            rows={6}
+                                            className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none font-mono text-sm"
+                                            placeholder="Ex: Você é um assistente especialista em finanças..."
+                                        />
+                                        <div className="absolute bottom-3 right-3 text-xs text-gray-400">
+                                            {customPrompt.length} caracteres
+                                        </div>
+                                    </div>
+                                    <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                                        <Info className="w-3 h-3" />
+                                        Define a "alma" do seu assistente. Use {'{{CURRENT_DATETIME}}'} para injetar a hora atual.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Google */}
                         <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 flex items-center justify-between">
                             <div className="flex items-center gap-4">
