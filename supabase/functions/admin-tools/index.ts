@@ -10,10 +10,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 Deno.serve(async (req: Request) => {
     try {
-        const { email } = await req.json();
+        const { email, action = 'delete' } = await req.json();
         if (!email) throw new Error('Email is required');
 
-        console.log(`Searching for user with email: ${email}`);
+        console.log(`Processing ${action} for email: ${email}`);
 
         // 1. Find User ID
         // We can query auth.users using admin client? No, auth.admin.listUsers() is better or direct query if we have access.
@@ -33,37 +33,70 @@ Deno.serve(async (req: Request) => {
         const instanceName = `user_${userId}`;
         console.log(`Found User ID: ${userId}, Instance: ${instanceName}`);
 
-        // 2. Delete from DB
-        const { error: dbError } = await supabase
-            .from('whatsapp_instances')
-            .delete()
-            .eq('user_id', userId);
+        if (action === 'check_status') {
+            const statusResponse = await fetch(`${evolutionApiUrl}/instance/connectionState/${instanceName}`, {
+                method: 'GET',
+                headers: { 'apikey': evolutionApiKey }
+            });
 
-        if (dbError) console.error('DB Delete Error:', dbError);
-        else console.log('Deleted from DB');
+            let statusData = {};
+            if (statusResponse.ok) {
+                statusData = await statusResponse.json();
+            } else {
+                statusData = { error: statusResponse.status, text: await statusResponse.text() };
+            }
 
-        // 3. Delete from Evolution API
-        // Logout
-        await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
-            method: 'DELETE',
-            headers: { 'apikey': evolutionApiKey }
-        });
+            // Also check DB status
+            const { data: dbInstance } = await supabase
+                .from('whatsapp_instances')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
 
-        // Delete
-        const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
-            method: 'DELETE',
-            headers: { 'apikey': evolutionApiKey }
-        });
+            return new Response(JSON.stringify({
+                success: true,
+                userId,
+                instanceName,
+                evolutionStatus: statusData,
+                dbStatus: dbInstance
+            }), { headers: { 'Content-Type': 'application/json' } });
+        }
 
-        const deleteResult = await deleteResponse.text();
-        console.log('Evolution Delete Result:', deleteResult);
+        if (action === 'delete') {
+            // 2. Delete from DB
+            const { error: dbError } = await supabase
+                .from('whatsapp_instances')
+                .delete()
+                .eq('user_id', userId);
 
-        return new Response(JSON.stringify({
-            success: true,
-            userId,
-            instanceName,
-            evolutionResult: deleteResult
-        }), { headers: { 'Content-Type': 'application/json' } });
+            if (dbError) console.error('DB Delete Error:', dbError);
+            else console.log('Deleted from DB');
+
+            // 3. Delete from Evolution API
+            // Logout
+            await fetch(`${evolutionApiUrl}/instance/logout/${instanceName}`, {
+                method: 'DELETE',
+                headers: { 'apikey': evolutionApiKey }
+            });
+
+            // Delete
+            const deleteResponse = await fetch(`${evolutionApiUrl}/instance/delete/${instanceName}`, {
+                method: 'DELETE',
+                headers: { 'apikey': evolutionApiKey }
+            });
+
+            const deleteResult = await deleteResponse.text();
+            console.log('Evolution Delete Result:', deleteResult);
+
+            return new Response(JSON.stringify({
+                success: true,
+                userId,
+                instanceName,
+                evolutionResult: deleteResult
+            }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });
 
     } catch (error: any) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });

@@ -7,6 +7,9 @@ interface ProcessMessageRequest {
     mediaType?: 'image' | 'audio' | 'document';
     userId: string;
     messageId?: string;
+    is_owner?: boolean;
+    sender_name?: string;
+    sender_number?: string;
 }
 
 function calculateDueAt(args: any, brasiliaTime: Date, overrideDueAt: string | null): string | null {
@@ -78,7 +81,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { content, mediaUrl, mediaType, userId, messageId }: ProcessMessageRequest = await req.json();
+        const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number }: ProcessMessageRequest = await req.json();
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -93,6 +96,12 @@ Deno.serve(async (req: Request) => {
         }
 
         let processedText = content || '';
+
+        // --- 🧠 AUTHORITY & CONTEXT INJECTION ---
+        const isOwner = is_owner !== false; // Default to true if undefined (backward compatibility)
+        const senderName = sender_name || 'Desconhecido';
+
+        console.log(`👤 Sender: ${senderName} (${sender_number || '?'}) | Is Owner: ${isOwner}`);
 
         // ESTRATÉGIA: Usar transcrição da Evolution (se disponível), senão tentar Whisper como fallback
         console.log('📝 Initial content received:', processedText || 'EMPTY');
@@ -229,6 +238,37 @@ Deno.serve(async (req: Request) => {
                             preferred_name: { type: 'string', description: 'Novo nome ou apelido como o usuário quer ser chamado.' }
                         },
                         required: ['preferred_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'send_whatsapp_message',
+                    description: 'Envia uma mensagem de WhatsApp para um número específico. Use APENAS se o usuário pedir explicitamente ("Mande mensagem para X").',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            number: { type: 'string', description: 'Número do destinatário (com DDI e DDD, ex: 5511999999999)' },
+                            message: { type: 'string', description: 'Conteúdo da mensagem' }
+                        },
+                        required: ['number', 'message']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'query_messages',
+                    description: 'Consulta o histórico de mensagens do WhatsApp. Use para resumir conversas ou lembrar o que foi dito.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            sender_number: { type: 'string', description: 'Filtrar por número do remetente' },
+                            sender_name: { type: 'string', description: 'Filtrar por nome do remetente' },
+                            limit: { type: 'number', description: 'Número de mensagens (default: 20)' },
+                            days_ago: { type: 'number', description: 'Quantos dias atrás buscar (default: 7)' }
+                        }
                     }
                 }
             },
@@ -696,6 +736,19 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                 console.log(`👤 Preferred Name Injected: ${userSettings.preferred_name}`);
             }
 
+            // --- 🛡️ AUTHORITY RULES INJECTION ---
+            if (isOwner) {
+                systemPrompt += `\n\nSTATUS: Você está falando com o SEU DONO (Vitor/Chefe). Você tem permissão total para executar comandos, criar tarefas, salvar memórias e gerenciar o sistema.`;
+            } else {
+                systemPrompt += `\n\n⚠️ ALERTA DE SEGURANÇA - MODO RESTRITO ⚠️
+Você está falando com TERCEIROS (${senderName}), NÃO com o seu dono.
+REGRAS ABSOLUTAS:
+1. VOCÊ É PROIBIDO DE EXECUTAR COMANDOS que alterem o sistema (criar tarefas, mudar configurações, deletar memórias, gerenciar emails/calendário).
+2. Se a pessoa pedir para fazer algo ("Cria uma tarefa", "Muda meu nome"), RECUSE educadamente: "Desculpe, apenas meu dono pode fazer isso."
+3. Você PODE conversar, tirar dúvidas e ser simpático, mas aja como uma secretária/assistente pessoal que protege a agenda do chefe.
+4. Se perguntarem sobre o Vitor, responda com base no que você sabe, mas não revele dados sensíveis (senhas, endereços privados).`;
+            }
+
         } catch (error: any) {
             console.error('Error loading user settings:', error);
         }
@@ -1009,6 +1062,12 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                 let toolOutput = "";
 
                 try {
+                    // 🛑 SECURITY GUARD: AUTHORITY CHECK
+                    if (!isOwner) {
+                        console.warn(`🛑 BLOCKED TOOL EXECUTION: ${functionName} called by non-owner (${senderName})`);
+                        throw new Error(`⛔ Ação Bloqueada: Apenas o dono (${userSettings?.preferred_name || 'Vitor'}) pode executar comandos.`);
+                    }
+
                     // --- MANAGE COLLECTIONS ---
                     if (functionName === 'manage_collections') {
                         if (args.action === 'create') {
@@ -1909,6 +1968,80 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                                 const memoryText = memories.map((m: any) => `- ${m.content} (Similaridade: ${(m.similarity * 100).toFixed(0)}%)`).join('\n');
                                 toolOutput = `Memórias Encontradas:\n${memoryText}`;
                             }
+                        }
+                    }
+
+                    // --- SEND WHATSAPP MESSAGE ---
+                    else if (functionName === 'send_whatsapp_message') {
+                        // 🛑 PRIVACY CHECK: OUTGOING ALLOWED?
+                        if (userSettings?.privacy_allow_outgoing === false) {
+                            console.warn(`🛑 BLOCKED OUTGOING MESSAGE: User disabled outgoing messages.`);
+                            throw new Error(`⛔ Ação Bloqueada: Você configurou sua privacidade para NÃO permitir que a IA envie mensagens para outras pessoas.`);
+                        }
+
+                        console.log(`📤 Sending WhatsApp message to ${args.number}`);
+
+                        // Sanitize number (remove non-digits)
+                        const targetNumber = args.number.replace(/\D/g, '');
+                        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!;
+                        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
+                        // Assuming instance name is stored or passed. For now, defaulting to 'user_personal' or fetching from DB?
+                        // Better: Fetch the active instance for this user.
+                        const { data: instances } = await supabase.from('whatsapp_instances').select('instance_name').eq('user_id', userId).eq('status', 'connected').limit(1);
+                        const instanceName = instances?.[0]?.instance_name || 'user_personal'; // Fallback
+
+                        const sendRes = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': evolutionApiKey
+                            },
+                            body: JSON.stringify({
+                                number: targetNumber,
+                                options: { delay: 1200, presence: 'composing' },
+                                textMessage: { text: args.message }
+                            })
+                        });
+
+                        if (!sendRes.ok) {
+                            const errText = await sendRes.text();
+                            console.error('❌ Failed to send outgoing message:', errText);
+                            toolOutput = `Erro ao enviar mensagem: ${errText}`;
+                        } else {
+                            toolOutput = `Mensagem enviada com sucesso para ${args.number}.`;
+                        }
+                    }
+
+                    // --- QUERY MESSAGES (HISTORY) ---
+                    else if (functionName === 'query_messages') {
+                        console.log(`🔎 Querying messages history...`);
+                        let query = supabase.from('messages')
+                            .select('sender_name, sender_number, content, message_timestamp, is_from_me')
+                            .order('message_timestamp', { ascending: false })
+                            .limit(args.limit || 20);
+
+                        if (args.sender_number) query = query.eq('sender_number', args.sender_number);
+                        if (args.sender_name) query = query.ilike('sender_name', `%${args.sender_name}%`);
+
+                        // Time filter
+                        const days = args.days_ago || 7;
+                        const dateLimit = new Date();
+                        dateLimit.setDate(dateLimit.getDate() - days);
+                        query = query.gte('message_timestamp', dateLimit.toISOString());
+
+                        const { data: msgs, error } = await query;
+
+                        if (error) {
+                            toolOutput = `Erro ao buscar mensagens: ${error.message}`;
+                        } else if (!msgs || msgs.length === 0) {
+                            toolOutput = "Nenhuma mensagem encontrada com esses critérios.";
+                        } else {
+                            // Format for AI
+                            toolOutput = msgs.reverse().map((m: any) => {
+                                const dir = m.is_from_me ? 'Eu (Dono)' : (m.sender_name || m.sender_number);
+                                const time = new Date(m.message_timestamp).toLocaleString('pt-BR');
+                                return `[${time}] ${dir}: ${m.content}`;
+                            }).join('\n');
                         }
                     }
 

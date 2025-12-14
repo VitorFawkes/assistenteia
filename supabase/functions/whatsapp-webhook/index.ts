@@ -8,6 +8,41 @@ const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper to upload media
+async function uploadMediaToStorage(base64: string, mimeType: string, folder: string, fileName: string) {
+    try {
+        // Convert Base64 to Uint8Array
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const filePath = `${folder}/${fileName}`;
+        const { data, error } = await supabase.storage
+            .from('whatsapp-media')
+            .upload(filePath, bytes, {
+                contentType: mimeType,
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabase.storage
+            .from('whatsapp-media')
+            .getPublicUrl(filePath);
+
+        return {
+            path: filePath,
+            publicUrl: publicUrlData.publicUrl,
+            size: bytes.length
+        };
+    } catch (error) {
+        console.error('❌ Upload failed:', error);
+        return null;
+    }
+}
+
 Deno.serve(async (req: Request) => {
     try {
         const body = await req.json();
@@ -33,13 +68,13 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ success: true, status: newStatus }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        // 1. FILTER: Only process messages.upsert
-        if (event !== 'messages.upsert') {
+        // 1. FILTER: Only process messages.upsert OR messages.update
+        if (event !== 'messages.upsert' && event !== 'messages.update') {
             return new Response(JSON.stringify({ ignored: true }), { headers: { 'Content-Type': 'application/json' } });
         }
 
         const message = data;
-        if (!message || !message.key) {
+        if (!message) {
             return new Response(JSON.stringify({ error: 'No message data' }), { headers: { 'Content-Type': 'application/json' } });
         }
 
@@ -48,12 +83,10 @@ Deno.serve(async (req: Request) => {
             function_name: 'whatsapp-webhook',
             level: 'info',
             message: 'Webhook received',
-            meta: { event, instance, key: message.key }
+            meta: { event, instance, key: message.key || (Array.isArray(message) ? 'batch_update' : 'unknown') }
         });
 
-        // 1.5 CHECK INSTANCE TYPE
-        const { remoteJid } = message.key;
-
+        // 1.5 FETCH INSTANCE DATA (Early)
         const { data: instanceData } = await supabase
             .from('whatsapp_instances')
             .select('user_id, type, settings')
@@ -65,18 +98,73 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'Instance not found' }), { status: 404 });
         }
 
+        // --- HANDLE STATUS UPDATES ---
+        if (event === 'messages.update') {
+            // Fetch settings to check if tracking is enabled
+            if (instanceData?.user_id) {
+                const { data: settings } = await supabase
+                    .from('user_settings')
+                    .select('storage_track_status')
+                    .eq('user_id', instanceData.user_id)
+                    .single();
+
+                if (settings?.storage_track_status === false) {
+                    console.log('🚫 Status tracking disabled by user preference.');
+                    return new Response(JSON.stringify({ ignored: 'tracking_disabled' }), { headers: { 'Content-Type': 'application/json' } });
+                }
+            }
+
+            const updates = Array.isArray(data) ? data : [data];
+            for (const update of updates) {
+                const { key, update: statusUpdate } = update;
+                if (!key || !statusUpdate || !statusUpdate.status) continue;
+
+                const statusMap: Record<number, string> = {
+                    2: 'sent',
+                    3: 'delivered',
+                    4: 'read',
+                    5: 'read' // Played
+                };
+
+                const newStatus = statusMap[statusUpdate.status];
+                if (newStatus) {
+                    console.log(`📨 Status Update: Msg ${key.id} -> ${newStatus}`);
+                    await supabase
+                        .from('messages')
+                        .update({ status: newStatus })
+                        .eq('wa_message_id', key.id);
+                }
+            }
+            return new Response(JSON.stringify({ success: true, type: 'status_update' }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // 2. CHECK INSTANCE TYPE & EXTRACT JID
+        // For upsert, message is an object with key
+        if (!message.key) {
+            // If we are here and it's not status update, it might be an issue, or maybe we just return
+            // But we already filtered events.
+            // If it's upsert, it MUST have key.
+            if (event === 'messages.upsert') {
+                return new Response(JSON.stringify({ error: 'No message key' }), { headers: { 'Content-Type': 'application/json' } });
+            }
+            // If it's update, we already handled it and returned.
+        }
+
+        const { remoteJid } = message.key;
+
         const instanceType = instanceData.type || 'assistant'; // Default to assistant
         console.log(`🤖 Instance Type: ${instanceType}`);
 
         let userData = null;
+        let userSettings: any = null;
+        let skipAIResponse = false;
 
         // =================================================================================
         // PATH A: ASSISTANT BOT (Legacy / Shared Bot)
         // Logic: Identify user by their phone number sending the message.
         // =================================================================================
         if (instanceType === 'assistant') {
-            // 2. IDENTIFY USER BY PHONE NUMBER
-
+            // ... (existing assistant logic) ...
             // Extract phone number from JID (remove @s.whatsapp.net)
             const senderPhone = remoteJid.split('@')[0];
             const formattedPhone = '+' + senderPhone;
@@ -122,33 +210,47 @@ Deno.serve(async (req: Request) => {
 
             console.log(`👤 [Personal Mode] Processing for User ID: ${userData.user_id}`);
 
-            // SCENARIO 1: NOTE TO SELF (User talking to themselves)
-            // This is treated as a direct command to the AI.
-            if (fromMe && remoteJid.includes('@s.whatsapp.net') && remoteJid.split('@')[0] === instance.split('_')[1]) {
-                // Wait, instance name is user_{id}, not phone number.
-                // Actually, "Note to Self" usually has fromMe=true and remoteJid="MyNumber@s.whatsapp.net"
-                // OR remoteJid="status@broadcast" (ignore)
+            // 1. Fetch User Settings (Phone + Bot Mode)
+            const { data: settings } = await supabase
+                .from('user_settings')
+                .select('phone_number, bot_mode, privacy_read_scope, storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents, storage_track_status')
+                .eq('user_id', userData.user_id)
+                .single();
 
-                console.log('📝 Note to Self detected. AI will reply.');
-                // Proceed to processing...
+            userSettings = settings;
+
+            if (!userSettings?.phone_number) {
+                console.warn('⚠️ User phone number not found. Cannot verify Note to Self.');
+                return new Response(JSON.stringify({ ignored: 'no_phone_number' }), { headers: { 'Content-Type': 'application/json' } });
             }
-            // SCENARIO 2: MESSAGE FROM OTHERS (Groups or DM)
-            else {
-                // We SAVE the message (encrypted ideally, but standard save for now)
-                // But we DO NOT reply unless explicitly asked (which is hard to detect here without reading content).
-                // For now, "Passive Mode" is enforced for all external messages.
 
-                console.log('📩 Message from others. Saving but NOT replying.');
+            // Normalize numbers
+            const userPhone = userSettings.phone_number.replace(/\D/g, '');
+            const targetPhone = remoteJid.split('@')[0].replace(/\D/g, '');
+            const privacyReadScope = userSettings.privacy_read_scope || 'all';
 
-                // TODO: Save logic is shared below.
-                // But we must prevent the AI from generating a response.
+            // --- PRIVACY SCOPE CHECK ---
+            const isGroup = remoteJid.includes('@g.us');
 
-                // We can use a special flag or just return early after saving?
-                // If we return early, we duplicate the save logic.
-                // Let's set a flag "skipAIResponse".
+            if (privacyReadScope === 'private_only' && isGroup) {
+                console.log('🛑 Privacy Setting: Ignoring GROUP message (Scope: private_only)');
+                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
+            }
+            if (privacyReadScope === 'groups_only' && !isGroup) {
+                console.log('🛑 Privacy Setting: Ignoring PRIVATE message (Scope: groups_only)');
+                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
+            }
+
+            // LOGIC MATRIX
+            const isNoteToSelf = fromMe && targetPhone === userPhone;
+
+            if (isNoteToSelf) {
+                console.log('🧠 Note to Self detected. AI WILL reply.');
+            } else {
+                console.log(`🤐 Not a Note to Self (Target: ${targetPhone}). Saving but NOT replying.`);
+                skipAIResponse = true;
             }
         }
-
         console.log(`✅ User identified: ${userData.user_id}`);
         console.log('✅ Processing Message');
 
@@ -156,72 +258,150 @@ Deno.serve(async (req: Request) => {
         const msgContent = message.message;
         if (!msgContent) return new Response(JSON.stringify({ ignored: 'no_content' }));
 
+        // --- HANDLE REACTIONS ---
+        if (msgContent.reactionMessage) {
+            const reaction = msgContent.reactionMessage;
+            const targetId = reaction.key.id;
+            const reactorPhone = reaction.key.participant ? reaction.key.participant.split('@')[0] : remoteJid.split('@')[0];
+            const emoji = reaction.text;
+
+            console.log(`❤️ Reaction detected: ${emoji} on msg ${targetId} by ${reactorPhone}`);
+
+            // Find original message
+            const { data: originalMsg } = await supabase
+                .from('messages')
+                .select('id')
+                .eq('wa_message_id', targetId)
+                .maybeSingle();
+
+            if (originalMsg) {
+                await supabase.from('message_reactions').upsert({
+                    message_id: originalMsg.id,
+                    reactor_phone: reactorPhone,
+                    reaction: emoji
+                }, { onConflict: 'message_id, reactor_phone' });
+                console.log('✅ Reaction saved to DB');
+            } else {
+                console.warn('⚠️ Original message for reaction not found in DB');
+            }
+            return new Response(JSON.stringify({ success: true, type: 'reaction' }));
+        }
+
+        // --- HANDLE EDITS ---
+        if (msgContent.protocolMessage && (msgContent.protocolMessage.type === 14 || msgContent.protocolMessage.type === 'EDIT_MESSAGE')) {
+            const protocol = msgContent.protocolMessage;
+            const targetId = protocol.key.id;
+            const editedContent = protocol.editedMessage?.conversation || protocol.editedMessage?.extendedTextMessage?.text;
+
+            if (editedContent) {
+                console.log(`✏️ Edit detected on msg ${targetId}: "${editedContent}"`);
+
+                // Find original message
+                const { data: originalMsg } = await supabase
+                    .from('messages')
+                    .select('id, content, original_content')
+                    .eq('wa_message_id', targetId)
+                    .maybeSingle();
+
+                if (originalMsg) {
+                    await supabase.from('messages').update({
+                        content: editedContent,
+                        is_edited: true,
+                        original_content: originalMsg.original_content || originalMsg.content // Keep the very first content
+                    }).eq('id', originalMsg.id);
+                    console.log('✅ Message updated in DB');
+                } else {
+                    console.warn('⚠️ Original message for edit not found in DB');
+                }
+            }
+            return new Response(JSON.stringify({ success: true, type: 'edit' }));
+        }
+
         let content = '';
         let mediaType = null;
         let mediaBase64 = null;
+        let mimeType = null;
+        let fileName = null;
 
         // Text
         content = msgContent.conversation || msgContent.extendedTextMessage?.text || '';
 
-        // Audio
-        if (msgContent.audioMessage) {
-            mediaType = 'audio';
-            console.log('🎤 Audio message detected');
+        // Media Handling Strategy
+        const mediaMessage = msgContent.imageMessage || msgContent.videoMessage || msgContent.documentMessage || msgContent.audioMessage || msgContent.stickerMessage;
 
-            // Strategy: Check payload -> Fallback to Fetch
-            if (message.base64) {
-                mediaBase64 = message.base64;
-                console.log('✅ Base64 found in payload');
-            } else {
-                console.log('⚠️ Base64 MISSING in payload. Fetching from Evolution...');
+        // Check User Preferences
+        let shouldDownload = true;
+        if (msgContent.imageMessage && userSettings?.storage_download_images === false) shouldDownload = false;
+        if (msgContent.videoMessage && userSettings?.storage_download_videos === false) shouldDownload = false;
+        if (msgContent.audioMessage && userSettings?.storage_download_audio === false) shouldDownload = false;
+        if (msgContent.documentMessage && userSettings?.storage_download_documents === false) shouldDownload = false;
 
-                // Call Evolution to get Base64
-                // Endpoint: /chat/getBase64FromMediaMessage/{instance}
-                // Body: { message: { ... } }
-                try {
-                    const fetchResponse = await fetch(`${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instance}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': evolutionApiKey
-                        },
-                        body: JSON.stringify({
-                            message: message,
-                            convertToMp4: false
-                        })
-                    });
+        if (mediaMessage) {
+            if (msgContent.imageMessage) { mediaType = 'image'; mimeType = msgContent.imageMessage.mimetype; content = msgContent.imageMessage.caption || ''; }
+            else if (msgContent.videoMessage) { mediaType = 'video'; mimeType = msgContent.videoMessage.mimetype; content = msgContent.videoMessage.caption || ''; }
+            else if (msgContent.documentMessage) { mediaType = 'document'; mimeType = msgContent.documentMessage.mimetype; fileName = msgContent.documentMessage.fileName; content = msgContent.documentMessage.caption || ''; }
+            else if (msgContent.audioMessage) { mediaType = 'audio'; mimeType = msgContent.audioMessage.mimetype; }
+            else if (msgContent.stickerMessage) { mediaType = 'sticker'; mimeType = msgContent.stickerMessage.mimetype; }
 
-                    if (fetchResponse.ok) {
-                        const fetchData = await fetchResponse.json();
-                        if (fetchData.base64) {
-                            mediaBase64 = fetchData.base64;
-                            console.log('✅ Base64 fetched successfully from Evolution');
+            console.log(`📎 Media detected: ${mediaType} (${mimeType}). Download allowed: ${shouldDownload}`);
+
+            // 1. Get Base64 (Only if allowed)
+            if (shouldDownload) {
+                if (message.base64) {
+                    mediaBase64 = message.base64;
+                    console.log('✅ Base64 found in payload');
+                } else {
+                    console.log('⚠️ Base64 MISSING. Fetching from Evolution...');
+                    try {
+                        const fetchResponse = await fetch(`${evolutionApiUrl}/chat/getBase64FromMediaMessage/${instance}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                            body: JSON.stringify({ message: message, convertToMp4: false })
+                        });
+
+                        if (fetchResponse.ok) {
+                            const fetchData = await fetchResponse.json();
+                            if (fetchData.base64) {
+                                mediaBase64 = fetchData.base64;
+                                console.log('✅ Base64 fetched from Evolution');
+                            }
                         } else {
-                            console.error('❌ Evolution returned no base64');
+                            console.error(`❌ Evolution fetch failed: ${fetchResponse.status}`);
                         }
-                    } else {
-                        console.error(`❌ Failed to fetch base64: ${fetchResponse.status}`);
-                        const errText = await fetchResponse.text();
-                        console.error('Error details:', errText);
+                    } catch (e) {
+                        console.error('❌ Exception fetching base64:', e);
                     }
-                } catch (e) {
-                    console.error('❌ Exception fetching base64:', e);
                 }
+            } else {
+                console.log('🚫 Media download skipped by user preference.');
             }
         }
-        // Image (Optional, but good to have)
-        else if (msgContent.imageMessage) {
-            mediaType = 'image';
-            content = msgContent.imageMessage.caption || '';
-            // Same logic for image base64 if needed, but focusing on audio for now
-        }
 
-        // 4. PREPARE PAYLOAD FOR PROCESS-MESSAGE
+        // 4. UPLOAD TO STORAGE & PREPARE PAYLOAD
         let finalMediaUrl = null;
-        if (mediaType === 'audio' && mediaBase64) {
-            // Construct Data URI
-            // Audio messages are usually ogg/opus
-            finalMediaUrl = `data:audio/ogg;base64,${mediaBase64}`;
+        let storagePath = null;
+        let fileSize = 0;
+
+        if (mediaType && mediaBase64) {
+            // Generate Filename
+            const ext = mimeType?.split('/')[1]?.split(';')[0] || 'bin';
+            const uniqueId = crypto.randomUUID();
+            const safeFileName = fileName || `${mediaType}_${uniqueId}.${ext}`;
+            const folder = `${userData.user_id}/${mediaType}s`; // Organize by user and type
+
+            console.log(`📤 Uploading ${mediaType} to Storage...`);
+            const uploadResult = await uploadMediaToStorage(mediaBase64, mimeType || 'application/octet-stream', folder, safeFileName);
+
+            if (uploadResult) {
+                console.log('✅ Upload success:', uploadResult.publicUrl);
+                finalMediaUrl = uploadResult.publicUrl;
+                storagePath = uploadResult.path;
+                fileSize = uploadResult.size;
+            } else {
+                console.error('❌ Upload failed. Media will not be saved.');
+            }
+        } else if (mediaType && !mediaBase64) {
+            console.warn('⚠️ Media detected but no Base64 available. Skipping upload.');
         }
 
         // 5. CALL PROCESS-MESSAGE
@@ -229,14 +409,42 @@ Deno.serve(async (req: Request) => {
 
         console.log(`🚀 Forwarding to process-message. Content: "${content}", Media: ${mediaType}`);
 
-        // 4.5 INSERT MESSAGE INTO DATABASE (Fix for visibility)
-        // We must save the user's message so it appears in the chat history
+        // 4.5 INSERT MESSAGE INTO DATABASE
+        // Extract Metadata
+        const { fromMe, id: waMessageId, participant } = message.key;
+        const pushName = message.pushName || (fromMe ? 'Me' : 'Unknown');
+        const isGroup = remoteJid.includes('@g.us');
+        const senderNumber = isGroup ? (participant ? participant.split('@')[0] : 'Unknown') : remoteJid.split('@')[0];
+        const messageTimestamp = message.messageTimestamp ? new Date(Number(message.messageTimestamp) * 1000).toISOString() : new Date().toISOString();
+
+        // Extract Quoted Context
+        const contextInfo = message.message?.extendedTextMessage?.contextInfo || message.message?.imageMessage?.contextInfo || message.message?.audioMessage?.contextInfo || message.message?.videoMessage?.contextInfo;
+        const quotedMessageId = contextInfo?.stanzaId || null;
+        // Try to get quoted text from various message types
+        const quotedMessage = contextInfo?.quotedMessage;
+        const quotedContent = quotedMessage?.conversation || quotedMessage?.extendedTextMessage?.text || (quotedMessage?.imageMessage ? '[Imagem]' : null) || (quotedMessage?.audioMessage ? '[Áudio]' : null) || (quotedMessage?.videoMessage ? '[Vídeo]' : null) || null;
+
         const { data: insertedMessage, error: insertError } = await supabase.from('messages').insert({
             user_id: userData.user_id,
-            role: 'user',
+            role: 'user', // Default to user for incoming messages
             content: content || (mediaType ? `[${mediaType.toUpperCase()}]` : null),
-            media_url: finalMediaUrl || null, // Prefer Data URI if available
-            media_type: mediaType || null
+            media_url: finalMediaUrl || null,
+            media_type: mediaType || null,
+            // New Metadata
+            sender_number: senderNumber,
+            sender_name: pushName,
+            is_group: isGroup,
+            is_from_me: fromMe,
+            wa_message_id: waMessageId,
+            message_timestamp: messageTimestamp,
+            // Threading
+            quoted_message_id: quotedMessageId,
+            quoted_content: quotedContent,
+            // Rich Media
+            file_path: storagePath,
+            file_name: fileName,
+            mime_type: mimeType,
+            file_size: fileSize
         }).select('id').single();
 
         if (insertError) {
@@ -251,22 +459,6 @@ Deno.serve(async (req: Request) => {
             console.log('✅ User message saved to DB:', insertedMessage?.id);
         }
 
-        // CHECK IF WE SHOULD SKIP AI RESPONSE (Personal Mode - External Messages)
-        // We need to determine this based on the logic above.
-        // Let's reconstruct the condition:
-        let skipAIResponse = false;
-        if (instanceType === 'user_personal') {
-            const { fromMe } = message.key;
-            if (!fromMe) {
-                skipAIResponse = true;
-                console.log('🛑 Personal Mode: External message saved. AI will NOT reply.');
-            }
-        }
-
-        if (skipAIResponse) {
-            return new Response(JSON.stringify({ success: true, action: 'saved_only' }), { headers: { 'Content-Type': 'application/json' } });
-        }
-
         await supabase.from('debug_logs').insert({
             function_name: 'whatsapp-webhook',
             level: 'info',
@@ -274,20 +466,23 @@ Deno.serve(async (req: Request) => {
             meta: { content, mediaType, userId: userData.user_id, messageId: insertedMessage?.id }
         });
 
-        // Call the Edge Function
-        const { data: processData, error: processError } = await supabase.functions.invoke('process-message', {
+        // Call Edge Function
+        const { data: processData, error: invokeError } = await supabase.functions.invoke('process-message', {
             body: {
-                content: content,
+                content,
                 mediaUrl: finalMediaUrl,
-                mediaType: mediaType,
+                mediaType,
                 userId: userData.user_id,
-                messageId: insertedMessage?.id
+                messageId: message.key.id,
+                // Context for Authority
+                is_owner: fromMe,
+                sender_name: pushName,
+                sender_number: senderNumber
             }
         });
 
-        if (processError) {
-            console.error('❌ Error invoking process-message:', processError);
-            throw processError;
+        if (invokeError) {
+            console.error('❌ Error invoking process-message:', invokeError);
         }
 
         if (processData && processData.response) {
@@ -302,16 +497,15 @@ Deno.serve(async (req: Request) => {
                 },
                 body: JSON.stringify({
                     number: remoteJid,
-                    text: processData.response,
-                    delay: 1200,
-                    linkPreview: true
+                    options: { delay: 1200, presence: 'composing' },
+                    textMessage: { text: processData.response }
                 })
             });
 
             if (!sendResponse.ok) {
                 console.error('❌ Failed to send WhatsApp response:', await sendResponse.text());
             } else {
-                console.log('✅ Response sent to WhatsApp');
+                console.log('✅ Response sent to WhatsApp!');
             }
         }
 
