@@ -123,311 +123,247 @@ export default function SettingsPage() {
 
     return (
         <div className="flex flex-col h-full bg-gray-900 p-4 md:p-6 pb-28 md:pb-6 overflow-auto">
-            <div className="max-w-2xl mx-auto w-full space-y-8">
+            <div className="max-w-3xl mx-auto w-full space-y-8">
 
-                <div className="flex items-center justify-between">
+                {/* Header & Main Save */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Meu Perfil</h1>
-                        <p className="text-gray-400">Gerencie suas informações pessoais e de contato.</p>
+                        <h1 className="text-3xl font-bold text-white mb-2">Configurações da IA</h1>
+                        <p className="text-gray-400">Personalize como sua assistente interage e armazena dados.</p>
                     </div>
+                    <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        isLoading={isSaving}
+                        icon={Save}
+                        className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
+                    >
+                        Salvar Alterações
+                    </Button>
                 </div>
 
                 {message && (
-                    <div className={`p-4 rounded-xl flex items-center gap-3 ${message.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    <div className={`p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
                         }`}>
                         {message.type === 'success' ? <Check size={20} /> : <AlertCircle size={20} />}
                         {message.text}
                     </div>
                 )}
 
-                <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8 space-y-8">
-
-                    {/* Email (Read Only) */}
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-blue-500/10 rounded-xl mt-1">
-                            <Mail className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-400 mb-2">
-                                Email (Conta)
-                            </label>
-                            <input
-                                type="text"
-                                value={email}
-                                disabled
-                                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-gray-500 cursor-not-allowed"
-                            />
-                        </div>
+                {/* SECTION 1: PERFIL & CONTATO */}
+                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-8 backdrop-blur-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                        <User className="w-6 h-6 text-purple-400" />
+                        <h2 className="text-xl font-bold text-white">Seu Perfil</h2>
                     </div>
 
-                    <div className="h-px bg-gray-700/50" />
-
-                    {/* Preferred Name */}
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-purple-500/10 rounded-xl mt-1">
-                            <User className="w-6 h-6 text-purple-400" />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-white mb-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Preferred Name */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
                                 Como devo te chamar?
                             </label>
                             <input
                                 type="text"
                                 value={preferredName}
                                 onChange={(e) => setPreferredName(e.target.value)}
-                                placeholder="Ex: Chefe, Vitor, Mestre..."
-                                className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none"
+                                placeholder="Ex: Chefe, Vitor..."
+                                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all outline-none placeholder:text-gray-600"
                             />
-                            <p className="text-xs text-gray-500 mt-2">
-                                A IA usará este nome para se referir a você nas conversas.
-                            </p>
                         </div>
-                    </div>
 
-                    <div className="h-px bg-gray-700/50" />
-
-                    {/* Phone */}
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-green-500/10 rounded-xl mt-1">
-                            <Phone className="w-6 h-6 text-green-400" />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-sm font-medium text-white mb-2">
-                                Telefone / WhatsApp
+                        {/* Phone */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Seu WhatsApp (com DDD)
                             </label>
-                            <input
-                                type="tel"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                placeholder="11 99999-9999"
-                                className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="tel"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    placeholder="11 999999999"
+                                    className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 pl-12 text-white focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition-all outline-none placeholder:text-gray-600"
+                                />
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium pointer-events-none">
+                                    +55
+                                </div>
+                            </div>
                             <p className="text-xs text-gray-500 mt-2">
-                                OBRIGATÓRIO: Digite apenas o DDD e o número (ex: 11999999999). O código do país (+55) será adicionado automaticamente.
+                                Usado para identificar quando <b>você</b> fala com a IA ("Note to Self").
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECTION 2: PRIVACIDADE & COMPORTAMENTO */}
+                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-8 backdrop-blur-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                        <Bot className="w-6 h-6 text-indigo-400" />
+                        <h2 className="text-xl font-bold text-white">Privacidade da IA</h2>
+                    </div>
+
+                    {/* Read Scope */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wider">
+                            O que a IA pode ler?
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {[
+                                { id: 'all', label: 'Tudo', desc: 'Lê grupos e privados.' },
+                                { id: 'private_only', label: 'Só Privado', desc: 'Ignora grupos.' },
+                                { id: 'groups_only', label: 'Só Grupos', desc: 'Ignora privados.' },
+                                { id: 'none', label: 'Nenhuma', desc: 'Lê apenas você (Note to Self).' },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => setPrivacyReadScope(opt.id as any)}
+                                    className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${privacyReadScope === opt.id
+                                        ? 'bg-indigo-500/20 border-indigo-500/50 text-white shadow-lg shadow-indigo-500/10'
+                                        : 'bg-gray-900/30 border-gray-700/50 text-gray-400 hover:bg-gray-800 hover:border-gray-600'
+                                        }`}
+                                >
+                                    <div className={`font-bold mb-1 ${privacyReadScope === opt.id ? 'text-indigo-300' : 'text-gray-300'}`}>
+                                        {opt.label}
+                                    </div>
+                                    <div className="text-xs opacity-70 leading-relaxed">
+                                        {opt.desc}
+                                    </div>
+                                    {privacyReadScope === opt.id && (
+                                        <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="h-px bg-gray-700/30" />
+
+                    {/* Outgoing Permission */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="font-medium text-white">Permitir envio para terceiros?</div>
+                            <div className="text-sm text-gray-400 mt-1 max-w-md">
+                                Se ativado, você pode pedir para a IA enviar mensagens para outras pessoas.
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setPrivacyAllowOutgoing(!privacyAllowOutgoing)}
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-700'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${privacyAllowOutgoing ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
+                    </div>
+                </div>
+
+                {/* SECTION 3: ARMAZENAMENTO (COFRE) */}
+                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-6 backdrop-blur-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <Save className="w-6 h-6 text-blue-400" />
+                        <div>
+                            <h2 className="text-xl font-bold text-white">Cofre Pessoal</h2>
+                            <p className="text-sm text-gray-400">
+                                O que devo salvar quando <b>você</b> me envia arquivos?
                             </p>
                         </div>
                     </div>
 
-                    <div className="h-px bg-gray-700/50" />
+                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 mb-6">
+                        <p className="text-xs text-blue-300 flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>
+                                <b>Nota:</b> Para economizar espaço, mídias de terceiros (Grupos/Outros) <b>nunca</b> são baixadas, exceto áudios (para transcrição). Estas opções abaixo controlam apenas o seu "Note to Self".
+                            </span>
+                        </p>
+                    </div>
 
-                    {/* Behavior Rules Section */}
-                    <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8 space-y-8">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-indigo-500/10 rounded-xl">
-                                <Bot className="w-6 h-6 text-indigo-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-white">Regras de Comportamento</h2>
-                                <p className="text-gray-400">Defina exatamente como a IA deve agir, ler e responder.</p>
-                            </div>
-                        </div>
-
-                        <div className="h-px bg-gray-700/50" />
-
-                        {/* 1. Read Scope (O que ela lê?) */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                1. O que a IA pode ler?
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {[
+                            { label: 'Minhas Imagens', state: storageDownloadImages, setter: setStorageDownloadImages },
+                            { label: 'Meus Vídeos', state: storageDownloadVideos, setter: setStorageDownloadVideos },
+                            { label: 'Meus Áudios', state: storageDownloadAudio, setter: setStorageDownloadAudio },
+                            { label: 'Meus Documentos', state: storageDownloadDocuments, setter: setStorageDownloadDocuments },
+                        ].map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-gray-900/30 p-4 rounded-xl border border-gray-700/30">
+                                <span className="text-sm text-gray-300 font-medium">{item.label}</span>
                                 <button
-                                    onClick={() => setPrivacyReadScope('all')}
-                                    className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'all'
-                                        ? 'bg-indigo-500/10 border-indigo-500/50 text-white ring-1 ring-indigo-500/50'
-                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:bg-gray-800'
-                                        }`}
+                                    onClick={() => item.setter(!item.state)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${item.state ? 'bg-blue-500' : 'bg-gray-700'}`}
                                 >
-                                    <div className="font-bold mb-1">Tudo (Padrão)</div>
-                                    <div className="text-xs opacity-80 leading-relaxed">
-                                        Lê mensagens privadas e de grupos.
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setPrivacyReadScope('private_only')}
-                                    className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'private_only'
-                                        ? 'bg-indigo-500/10 border-indigo-500/50 text-white ring-1 ring-indigo-500/50'
-                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:bg-gray-800'
-                                        }`}
-                                >
-                                    <div className="font-bold mb-1">Apenas Privado</div>
-                                    <div className="text-xs opacity-80 leading-relaxed">
-                                        Ignora grupos. Foca apenas em conversas 1x1.
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setPrivacyReadScope('groups_only')}
-                                    className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'groups_only'
-                                        ? 'bg-indigo-500/10 border-indigo-500/50 text-white ring-1 ring-indigo-500/50'
-                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:bg-gray-800'
-                                        }`}
-                                >
-                                    <div className="font-bold mb-1">Apenas Grupos</div>
-                                    <div className="text-xs opacity-80 leading-relaxed">
-                                        Ignora mensagens privadas. Foca apenas em grupos.
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setPrivacyReadScope('none')}
-                                    className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'none'
-                                        ? 'bg-indigo-500/10 border-indigo-500/50 text-white ring-1 ring-indigo-500/50'
-                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:bg-gray-800'
-                                        }`}
-                                >
-                                    <div className="font-bold mb-1">Nenhuma</div>
-                                    <div className="text-xs opacity-80 leading-relaxed">
-                                        Ignora tudo. Lê apenas "Note to Self".
-                                    </div>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${item.state ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
                             </div>
-                        </div>
+                        ))}
+                    </div>
+                </div>
 
-                        <div className="h-px bg-gray-700/50" />
+                {/* SECTION 4: CONEXÕES */}
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-white">Integrações</h2>
 
-                        {/* 3. Outgoing Permission (Ela pode iniciar?) */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                2. Permissões de Envio
-                            </h3>
-                            <div className="flex items-center justify-between bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                    {/* WhatsApp */}
+                    {userId && <WhatsAppConnection userId={userId} />}
+
+                    {/* External Services */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Google */}
+                        <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white rounded-xl shadow-lg shadow-white/5">
+                                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-white">Permitir enviar mensagens para outros?</div>
-                                    <div className="text-sm text-gray-400 mt-1">
-                                        Se ligado, você pode pedir: <i>"Mande uma mensagem para o João..."</i> e ela enviará.
-                                        <br />
-                                        Se desligado, ela recusará esse tipo de pedido por segurança.
-                                    </div>
+                                    <h3 className="font-bold text-white">Google</h3>
+                                    <p className="text-xs text-gray-400">Agenda & Email</p>
                                 </div>
-                                <button
-                                    onClick={() => setPrivacyAllowOutgoing(!privacyAllowOutgoing)}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-600'
-                                        }`}
-                                >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${privacyAllowOutgoing ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                    />
-                                </button>
                             </div>
+                            <Button
+                                onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-google/login'}
+                                className="bg-gray-700/50 hover:bg-gray-600 text-white border border-gray-600"
+                                size="sm"
+                            >
+                                Conectar
+                            </Button>
                         </div>
 
-                        <div className="h-px bg-gray-700/50" />
-
-                        {/* 4. Data & Storage (Omniscient Database) */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                3. Dados e Armazenamento
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Download Media Toggles */}
-                                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 space-y-4">
-                                    <div className="font-medium text-white mb-2">Baixar Mídia Automaticamente</div>
-
-                                    {[
-                                        { label: 'Imagens', state: storageDownloadImages, setter: setStorageDownloadImages },
-                                        { label: 'Vídeos', state: storageDownloadVideos, setter: setStorageDownloadVideos },
-                                        { label: 'Áudios', state: storageDownloadAudio, setter: setStorageDownloadAudio },
-                                        { label: 'Documentos', state: storageDownloadDocuments, setter: setStorageDownloadDocuments },
-                                    ].map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-400">{item.label}</span>
-                                            <button
-                                                onClick={() => item.setter(!item.state)}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${item.state ? 'bg-blue-500' : 'bg-gray-600'}`}
-                                            >
-                                                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${item.state ? 'translate-x-5' : 'translate-x-1'}`} />
-                                            </button>
-                                        </div>
-                                    ))}
+                        {/* Microsoft */}
+                        <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-[#00a4ef]/10 rounded-xl">
+                                    <svg className="w-6 h-6 text-[#00a4ef]" viewBox="0 0 23 23" fill="currentColor">
+                                        <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" />
+                                    </svg>
                                 </div>
-
-                                {/* Status Tracking Toggle */}
-                                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 space-y-4">
-                                    <div className="font-medium text-white mb-2">Rastreamento</div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-sm text-white">Rastrear Status (Lido/Entregue)</div>
-                                            <div className="text-xs text-gray-500 mt-1">Saber se a mensagem chegou.</div>
-                                        </div>
-                                        <button
-                                            onClick={() => setStorageTrackStatus(!storageTrackStatus)}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${storageTrackStatus ? 'bg-blue-500' : 'bg-gray-600'}`}
-                                        >
-                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${storageTrackStatus ? 'translate-x-5' : 'translate-x-1'}`} />
-                                        </button>
-                                    </div>
+                                <div>
+                                    <h3 className="font-bold text-white">Outlook</h3>
+                                    <p className="text-xs text-gray-400">Agenda & Email</p>
                                 </div>
                             </div>
+                            <Button
+                                onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-microsoft/login'}
+                                className="bg-gray-700/50 hover:bg-gray-600 text-white border border-gray-600"
+                                size="sm"
+                            >
+                                Conectar
+                            </Button>
                         </div>
                     </div>
+                </div>
 
-
-                    {/* WhatsApp Connection (New) */}
-                    <div className="space-y-4">
-                        <h2 className="text-2xl font-bold text-white">Conexão WhatsApp</h2>
-                        {userId && <WhatsAppConnection userId={userId} />}
-                    </div>
-
-                    {/* Integrations Section */}
-                    <div>
-                        <h2 className="text-2xl font-bold text-white mb-4">Outras Integrações</h2>
-                        <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8 space-y-6">
-
-                            {/* Google Integration */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-white rounded-xl">
-                                        <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-white">Google</h3>
-                                        <p className="text-sm text-gray-400">Gmail, Calendar</p>
-                                    </div>
-                                </div>
-                                <Button
-                                    onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-google/login'}
-                                    className="bg-gray-700 hover:bg-gray-600 text-white"
-                                >
-                                    Conectar
-                                </Button>
-                            </div>
-
-                            <div className="h-px bg-gray-700/50" />
-
-                            {/* Microsoft Integration */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-[#00a4ef]/10 rounded-xl">
-                                        <svg className="w-6 h-6 text-[#00a4ef]" viewBox="0 0 23 23" fill="currentColor">
-                                            <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-white">Outlook / Microsoft</h3>
-                                        <p className="text-sm text-gray-400">Email, Calendar</p>
-                                    </div>
-                                </div>
-                                <Button
-                                    onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-microsoft/login'}
-                                    className="bg-gray-700 hover:bg-gray-600 text-white"
-                                >
-                                    Conectar
-                                </Button>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                        <Button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            isLoading={isSaving}
-                            icon={Save}
-                            className="w-full bg-blue-600 hover:bg-blue-500"
-                        >
-                            Salvar Perfil
-                        </Button>
-                    </div>
+                <div className="flex justify-end pt-8">
+                    <Button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        isLoading={isSaving}
+                        icon={Save}
+                        className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 px-8 py-3 text-lg shadow-xl shadow-blue-900/20"
+                    >
+                        Salvar Tudo
+                    </Button>
                 </div>
             </div>
         </div>
