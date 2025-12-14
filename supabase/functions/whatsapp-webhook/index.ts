@@ -512,7 +512,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Handle AI Response (if any)
-        if (processData && processData.response) {
+        if (!skipAIResponse && processData && processData.response) {
             console.log('🤖 AI Response:', processData.response);
 
             // Send response back via Evolution API
