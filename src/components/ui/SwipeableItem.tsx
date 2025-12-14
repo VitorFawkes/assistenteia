@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Trash2, Check, Archive } from 'lucide-react';
+import { Trash2, Check } from 'lucide-react';
 
 interface SwipeableItemProps {
     children: React.ReactNode;
@@ -25,7 +25,6 @@ export default function SwipeableItem({
     disabled = false
 }: SwipeableItemProps) {
     const [offsetX, setOffsetX] = useState(0);
-    const [isSwiping, setIsSwiping] = useState(false);
     const startX = useRef<number | null>(null);
     const startY = useRef<number | null>(null);
     const itemRef = useRef<HTMLDivElement>(null);
@@ -34,7 +33,6 @@ export default function SwipeableItem({
         if (disabled) return;
         startX.current = e.touches[0].clientX;
         startY.current = e.touches[0].clientY;
-        setIsSwiping(true);
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
@@ -78,8 +76,8 @@ export default function SwipeableItem({
         }
 
         // Reset
+        // Reset
         setOffsetX(0);
-        setIsSwiping(false);
         startX.current = null;
         startY.current = null;
     };
