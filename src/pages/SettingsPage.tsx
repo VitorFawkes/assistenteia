@@ -50,7 +50,9 @@ export default function SettingsPage() {
             if (data) {
                 const settings = data as any;
                 setPreferredName(settings.preferred_name || '');
-                setPhone(settings.phone_number || '');
+                // Strip +55 for display
+                const rawPhone = settings.phone_number || '';
+                setPhone(rawPhone.startsWith('+55') ? rawPhone.slice(3) : rawPhone);
                 setPrivacyReadScope(settings.privacy_read_scope || 'all');
                 setPrivacyAllowOutgoing(settings.privacy_allow_outgoing !== false);
                 setCustomPrompt(settings.custom_system_prompt || '');
@@ -84,7 +86,8 @@ export default function SettingsPage() {
                 .upsert({
                     user_id: userId,
                     preferred_name: preferredName,
-                    phone_number: phone,
+                    // Ensure +55 is added
+                    phone_number: phone.startsWith('+55') ? phone : `+55${phone.replace(/\D/g, '')}`,
                     privacy_read_scope: privacyReadScope,
                     privacy_allow_outgoing: privacyAllowOutgoing,
                     custom_system_prompt: customPrompt,
@@ -196,11 +199,11 @@ export default function SettingsPage() {
                                 type="tel"
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
-                                placeholder="+55 11 99999-9999"
+                                placeholder="11 99999-9999"
                                 className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
                             />
                             <p className="text-xs text-gray-500 mt-2">
-                                OBRIGATÓRIO: Use o formato internacional (ex: +5511999999999). É assim que o Bot te identifica.
+                                OBRIGATÓRIO: Digite apenas o DDD e o número (ex: 11999999999). O código do país (+55) será adicionado automaticamente.
                             </p>
                         </div>
                     </div>
