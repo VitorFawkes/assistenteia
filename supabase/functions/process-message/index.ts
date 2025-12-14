@@ -239,7 +239,8 @@ Deno.serve(async (req: Request) => {
                             preferred_name: { type: 'string', description: 'Novo nome ou apelido como o usuário quer ser chamado.' },
                             daily_briefing_enabled: { type: 'boolean', description: 'Ativar ou desativar o Resumo Diário.' },
                             daily_briefing_time: { type: 'string', description: 'Horário do resumo (formato HH:MM, ex: "08:00").' },
-                            daily_briefing_prompt: { type: 'string', description: 'Instruções personalizadas para o resumo (ex: "Seja engraçado").' }
+                            daily_briefing_prompt: { type: 'string', description: 'Instruções personalizadas para o resumo (ex: "Seja engraçado").' },
+                            ai_name: { type: 'string', description: 'Novo nome para a IA (ex: "Jarvis").' }
                         }
                     }
                 }
@@ -702,7 +703,7 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
         try {
             const { data } = await supabase
                 .from('user_settings')
-                .select('custom_system_prompt, ai_model, preferred_name')
+                .select('custom_system_prompt, ai_model, preferred_name, ai_name')
                 .eq('user_id', userId)
                 .maybeSingle();
 
@@ -723,6 +724,12 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                     console.log('✨ Using GPT 5.1 Preview (Mapped to gpt-4o)');
                     aiModel = 'gpt-4o';
                 }
+            }
+
+            // Inject AI Name
+            const aiName = userSettings?.ai_name;
+            if (aiName) {
+                systemPrompt += `\n\nSEU NOME: Seu nome é "${aiName}". Se apresente assim se perguntarem.`;
             }
 
             // Inject Preferred Name
@@ -2073,13 +2080,14 @@ REGRAS ABSOLUTAS:
 
                     // --- UPDATE USER SETTINGS ---
                     else if (functionName === 'update_user_settings') {
-                        const { preferred_name, daily_briefing_enabled, daily_briefing_time, daily_briefing_prompt } = args;
+                        const { preferred_name, daily_briefing_enabled, daily_briefing_time, daily_briefing_prompt, ai_name } = args;
                         const updates: any = {};
 
                         if (preferred_name) updates.preferred_name = preferred_name;
                         if (daily_briefing_enabled !== undefined) updates.daily_briefing_enabled = daily_briefing_enabled;
                         if (daily_briefing_time) updates.daily_briefing_time = daily_briefing_time;
-                        if (daily_briefing_prompt) updates.daily_briefing_prompt = daily_briefing_prompt;
+                        if (args.daily_briefing_prompt !== undefined) updates.daily_briefing_prompt = args.daily_briefing_prompt;
+                        if (args.ai_name !== undefined) updates.ai_name = args.ai_name;
 
                         if (Object.keys(updates).length > 0) {
                             const { error } = await supabase
@@ -2089,9 +2097,13 @@ REGRAS ABSOLUTAS:
 
                             if (error) {
                                 console.error('Error updating settings:', error);
+                                toolOutput = `Erro ao atualizar configurações: ${error.message}`;
+                            } else {
+                                const updatedFields = Object.keys(updates).join(', ');
+                                toolOutput = `Configurações atualizadas com sucesso: ${updatedFields}.`;
                             }
                         } else {
-                            toolOutput = "Nenhuma configuração fornecida para atualização.";
+                            toolOutput = "Nenhuma alteração solicitada.";
                         }
                     }
                 } catch (error: any) {

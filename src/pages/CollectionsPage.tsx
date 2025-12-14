@@ -9,6 +9,7 @@ import Card from '../components/ui/Card';
 
 import Button from '../components/ui/Button';
 import EditItemModal from '../components/collections/EditItemModal';
+import SwipeableItem from '../components/ui/SwipeableItem';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -396,8 +397,8 @@ export default function CollectionsPage() {
         }
     };
 
-    const handleToggleCheck = async (item: CollectionItem, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleToggleCheck = async (item: CollectionItem, e?: React.MouseEvent) => {
+        e?.stopPropagation();
         const newChecked = !item.metadata?.checked;
         const newMetadata = { ...item.metadata, checked: newChecked };
 
@@ -717,7 +718,7 @@ export default function CollectionsPage() {
                                                 )}
                                             </div>
 
-                                            <div className="bg-gray-800/40 rounded-lg border border-gray-800 overflow-hidden">
+                                            <div className="">
                                                 {groupedItems[category].map((item) => {
                                                     const hasAmount = item.metadata?.amount || item.metadata?.value;
                                                     const amount = Number(item.metadata?.amount || item.metadata?.value || 0);
@@ -742,162 +743,174 @@ export default function CollectionsPage() {
                                                     };
 
                                                     return (
-                                                        <div
+                                                        <SwipeableItem
                                                             key={item.id}
-                                                            className="flex flex-col gap-2 p-4 border-b border-gray-800 last:border-b-0 hover:bg-gray-700/30 transition-colors cursor-pointer group"
-                                                            onClick={() => {
-                                                                setItemToEdit(item);
-                                                                setIsEditItemModalOpen(true);
-                                                            }}
+                                                            onSwipeLeft={() => setItemToDelete(item.id)}
+                                                            onSwipeRight={
+                                                                (item.metadata?.type === 'shopping_item' || item.metadata?.type === 'list_item' || item.metadata?.type === 'task')
+                                                                    ? () => handleToggleCheck(item)
+                                                                    : undefined
+                                                            }
+                                                            leftActionIcon={<CheckSquareIcon size={24} />}
+                                                            leftActionColor="bg-blue-600"
+                                                            rightActionColor="bg-red-600"
                                                         >
-                                                            <div className="flex items-start gap-4">
-                                                                {/* Icon */}
-                                                                {item.metadata?.type === 'expense' || hasAmount ? (
-                                                                    <div className="bg-green-500/10 text-green-400 p-2 rounded-lg mt-1">
-                                                                        <DollarSign size={16} />
-                                                                    </div>
-                                                                ) : item.metadata?.type === 'credential' ? (
-                                                                    <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg mt-1">
-                                                                        <Lock size={16} />
-                                                                    </div>
-                                                                ) : item.metadata?.type === 'task' ? (
-                                                                    <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg mt-1">
-                                                                        <CheckCircle size={16} />
-                                                                    </div>
-                                                                ) : item.metadata?.type === 'shopping_item' ? (
-                                                                    <div
-                                                                        onClick={(e) => handleToggleCheck(item, e)}
-                                                                        className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
-                                                                    >
-                                                                        {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
-                                                                    </div>
-                                                                ) : item.metadata?.type === 'list_item' ? (
-                                                                    <div
-                                                                        onClick={(e) => handleToggleCheck(item, e)}
-                                                                        className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
-                                                                    >
-                                                                        {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg mt-1">
-                                                                        <FileText size={16} />
-                                                                    </div>
-                                                                )}
-
-                                                                <div className="flex-1 min-w-0">
-                                                                    {isCredential ? (
-                                                                        <div className="space-y-2">
-                                                                            <p className="text-gray-200 font-medium">{item.content}</p>
-                                                                            <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50 flex flex-col gap-2">
-                                                                                {item.metadata?.username && (
-                                                                                    <div className="flex items-center justify-between text-sm">
-                                                                                        <span className="text-gray-500">Usuário:</span>
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="text-gray-300 font-mono">{item.metadata.username}</span>
-                                                                                            <button
-                                                                                                onClick={(e) => copyToClipboard(item.metadata.username, e)}
-                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
-                                                                                                title="Copiar usuário"
-                                                                                            >
-                                                                                                <Copy size={12} />
-                                                                                            </button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                                {item.metadata?.password && (
-                                                                                    <div className="flex items-center justify-between text-sm">
-                                                                                        <span className="text-gray-500">Senha:</span>
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-transparent bg-white/10 px-2 rounded blur-[2px] select-none'}`}>
-                                                                                                {isRevealed ? item.metadata.password : '••••••••••••'}
-                                                                                            </span>
-                                                                                            <button
-                                                                                                onClick={toggleReveal}
-                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
-                                                                                                title={isRevealed ? "Ocultar" : "Revelar"}
-                                                                                            >
-                                                                                                {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => copyToClipboard(item.metadata.password, e)}
-                                                                                                className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
-                                                                                                title="Copiar senha"
-                                                                                            >
-                                                                                                <Copy size={12} />
-                                                                                            </button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
+                                                            <div
+                                                                className="flex flex-col gap-2 p-4 cursor-pointer group"
+                                                                onClick={() => {
+                                                                    setItemToEdit(item);
+                                                                    setIsEditItemModalOpen(true);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-start gap-4">
+                                                                    {/* Icon */}
+                                                                    {item.metadata?.type === 'expense' || hasAmount ? (
+                                                                        <div className="bg-green-500/10 text-green-400 p-2 rounded-lg mt-1">
+                                                                            <DollarSign size={16} />
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'credential' ? (
+                                                                        <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg mt-1">
+                                                                            <Lock size={16} />
+                                                                        </div>
+                                                                    ) : item.metadata?.type === 'task' ? (
+                                                                        <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg mt-1">
+                                                                            <CheckCircle size={16} />
                                                                         </div>
                                                                     ) : item.metadata?.type === 'shopping_item' ? (
-                                                                        <div className="flex items-center gap-3">
-                                                                            <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
-                                                                                {item.content}
-                                                                            </p>
-                                                                            {item.metadata?.quantity && (
-                                                                                <span className="text-xs font-bold bg-blue-600/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">
-                                                                                    {item.metadata.quantity}
-                                                                                </span>
-                                                                            )}
+                                                                        <div
+                                                                            onClick={(e) => handleToggleCheck(item, e)}
+                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                                                                        >
+                                                                            {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
                                                                         </div>
                                                                     ) : item.metadata?.type === 'list_item' ? (
-                                                                        <div className="flex flex-col gap-1">
+                                                                        <div
+                                                                            onClick={(e) => handleToggleCheck(item, e)}
+                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
+                                                                        >
+                                                                            {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg mt-1">
+                                                                            <FileText size={16} />
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="flex-1 min-w-0">
+                                                                        {isCredential ? (
+                                                                            <div className="space-y-2">
+                                                                                <p className="text-gray-200 font-medium">{item.content}</p>
+                                                                                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50 flex flex-col gap-2">
+                                                                                    {item.metadata?.username && (
+                                                                                        <div className="flex items-center justify-between text-sm">
+                                                                                            <span className="text-gray-500">Usuário:</span>
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="text-gray-300 font-mono">{item.metadata.username}</span>
+                                                                                                <button
+                                                                                                    onClick={(e) => copyToClipboard(item.metadata.username, e)}
+                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    title="Copiar usuário"
+                                                                                                >
+                                                                                                    <Copy size={12} />
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {item.metadata?.password && (
+                                                                                        <div className="flex items-center justify-between text-sm">
+                                                                                            <span className="text-gray-500">Senha:</span>
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-transparent bg-white/10 px-2 rounded blur-[2px] select-none'}`}>
+                                                                                                    {isRevealed ? item.metadata.password : '••••••••••••'}
+                                                                                                </span>
+                                                                                                <button
+                                                                                                    onClick={toggleReveal}
+                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    title={isRevealed ? "Ocultar" : "Revelar"}
+                                                                                                >
+                                                                                                    {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    onClick={(e) => copyToClipboard(item.metadata.password, e)}
+                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    title="Copiar senha"
+                                                                                                >
+                                                                                                    <Copy size={12} />
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : item.metadata?.type === 'shopping_item' ? (
                                                                             <div className="flex items-center gap-3">
                                                                                 <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
                                                                                     {item.content}
                                                                                 </p>
-                                                                                {item.metadata?.rating && (
-                                                                                    <span className="text-xs font-bold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">
-                                                                                        {'⭐'.repeat(item.metadata.rating)}
+                                                                                {item.metadata?.quantity && (
+                                                                                    <span className="text-xs font-bold bg-blue-600/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                                                                        {item.metadata.quantity}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
-                                                                            {item.metadata?.notes && (
-                                                                                <p className="text-xs text-gray-400 italic">
-                                                                                    {item.metadata.notes}
+                                                                        ) : item.metadata?.type === 'list_item' ? (
+                                                                            <div className="flex flex-col gap-1">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
+                                                                                        {item.content}
+                                                                                    </p>
+                                                                                    {item.metadata?.rating && (
+                                                                                        <span className="text-xs font-bold bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">
+                                                                                            {'⭐'.repeat(item.metadata.rating)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                {item.metadata?.notes && (
+                                                                                    <p className="text-xs text-gray-400 italic">
+                                                                                        {item.metadata.notes}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div>
+                                                                                <p className="text-gray-200 text-sm font-light whitespace-pre-wrap leading-relaxed">
+                                                                                    {item.content.split('|').map((part, i) => (
+                                                                                        <span key={i} className={i > 0 ? "block mt-1 text-gray-400" : ""}>
+                                                                                            {part.trim()}
+                                                                                        </span>
+                                                                                    ))}
                                                                                 </p>
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className="flex items-center gap-2 mt-2">
+                                                                            <span className="text-xs text-gray-500">{format(parseDate(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                                            {item.metadata?.category && (
+                                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                                                                                    {item.metadata.category}
+                                                                                </span>
                                                                             )}
                                                                         </div>
-                                                                    ) : (
-                                                                        <div>
-                                                                            <p className="text-gray-200 text-sm font-light whitespace-pre-wrap leading-relaxed">
-                                                                                {item.content.split('|').map((part, i) => (
-                                                                                    <span key={i} className={i > 0 ? "block mt-1 text-gray-400" : ""}>
-                                                                                        {part.trim()}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </p>
+                                                                    </div>
+
+                                                                    {hasAmount && (
+                                                                        <div className="text-green-400 font-bold text-sm whitespace-nowrap">
+                                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
                                                                         </div>
                                                                     )}
 
-                                                                    <div className="flex items-center gap-2 mt-2">
-                                                                        <span className="text-xs text-gray-500">{format(parseDate(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
-                                                                        {item.metadata?.category && (
-                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                                                                                {item.metadata.category}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteItemClick(item.id);
+                                                                        }}
+                                                                        className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
                                                                 </div>
-
-                                                                {hasAmount && (
-                                                                    <div className="text-green-400 font-bold text-sm whitespace-nowrap">
-                                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)}
-                                                                    </div>
-                                                                )}
-
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleDeleteItemClick(item.id);
-                                                                    }}
-                                                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </button>
                                                             </div>
-                                                        </div>
+                                                        </SwipeableItem>
                                                     );
                                                 })}
                                             </div>
@@ -1020,50 +1033,67 @@ export default function CollectionsPage() {
                         )}
                     </div>
                 )}
+                {/* Mobile FAB */}
+                <button
+                    onClick={() => {
+                        setCollectionForm({ name: '', description: '', icon: '📁' });
+                        setIsCreateModalOpen(true);
+                    }}
+                    className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center z-40 active:scale-95 transition-transform"
+                >
+                    <Plus size={28} />
+                </button>
             </div>
 
-            {/* Create/Edit Collection Modal */}
+            {/* Create/Edit Collection Modal - Bottom Sheet on Mobile, Centered on Desktop */}
             {
                 (isCreateModalOpen || isEditModalOpen) && (
-                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
-                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
+                        <div
+                            className="bg-gray-900 md:bg-gray-800 border-t md:border border-gray-700 rounded-t-3xl md:rounded-2xl p-6 w-full md:max-w-md md:mx-4 shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 duration-300"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex justify-center md:hidden mb-6">
+                                <div className="w-12 h-1.5 bg-gray-700 rounded-full"></div>
+                            </div>
+
                             <h3 className="text-xl font-bold text-white mb-6">
                                 {isEditModalOpen ? 'Editar Coleção' : 'Nova Coleção'}
                             </h3>
 
-                            <div className="space-y-4">
+                            <div className="space-y-5">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Nome</label>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Nome</label>
                                     <input
                                         type="text"
                                         value={collectionForm.name}
                                         onChange={(e) => setCollectionForm({ ...collectionForm, name: e.target.value })}
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-gray-800 md:bg-gray-900 border border-gray-700 md:border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                                         placeholder="Ex: Viagem para Paris"
                                         autoFocus
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Descrição (Opcional)</label>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Descrição (Opcional)</label>
                                     <textarea
                                         value={collectionForm.description}
                                         onChange={(e) => setCollectionForm({ ...collectionForm, description: e.target.value })}
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+                                        className="w-full bg-gray-800 md:bg-gray-900 border border-gray-700 md:border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none text-base"
                                         placeholder="Detalhes sobre esta coleção..."
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Ícone</label>
-                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                        {['📁', '✈️', '💼', '🏠', '🎓', '💡', '📅', '🛒', '🎵', '📷', '🍔', '💪'].map(icon => (
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">Ícone</label>
+                                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
+                                        {['📁', '✈️', '💼', '🏠', '🎓', '💡', '📅', '🛒', '🎵', '📷', '🍔', '💪', '💰', '🏥', '🎮'].map(icon => (
                                             <button
                                                 key={icon}
                                                 onClick={() => setCollectionForm({ ...collectionForm, icon })}
-                                                className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-colors ${collectionForm.icon === icon
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-900 text-gray-400 hover:bg-gray-700'
+                                                className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl transition-all ${collectionForm.icon === icon
+                                                    ? 'bg-blue-600 text-white scale-110 shadow-lg shadow-blue-900/50'
+                                                    : 'bg-gray-800 md:bg-gray-900 text-gray-400 hover:bg-gray-700'
                                                     }`}
                                             >
                                                 {icon}
@@ -1077,14 +1107,16 @@ export default function CollectionsPage() {
                                 <Button
                                     variant="secondary"
                                     onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}
+                                    className="flex-1 md:flex-none justify-center py-3"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={isEditModalOpen ? handleEditCollection : handleCreateCollection}
                                     disabled={!collectionForm.name}
+                                    className="flex-1 md:flex-none justify-center py-3 bg-blue-600 hover:bg-blue-500"
                                 >
-                                    {isEditModalOpen ? 'Salvar Alterações' : 'Criar Coleção'}
+                                    {isEditModalOpen ? 'Salvar' : 'Criar'}
                                 </Button>
                             </div>
                         </div>

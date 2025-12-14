@@ -175,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
             const { data: foundUser, error: userError } = await supabase
                 .from('user_settings')
-                .select('user_id, bot_mode')
+                .select('user_id, bot_mode, ai_name')
                 .or(`phone_number.eq.${formattedPhone},phone_number.eq.${senderPhone}`)
                 .maybeSingle();
 
@@ -215,7 +215,7 @@ Deno.serve(async (req: Request) => {
             // 1. Fetch User Settings (Phone + Bot Mode)
             const { data: settings } = await supabase
                 .from('user_settings')
-                .select('phone_number, bot_mode, privacy_read_scope, storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents, storage_track_status')
+                .select('phone_number, bot_mode, privacy_read_scope, storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents, storage_track_status, ai_name')
                 .eq('user_id', userData.user_id)
                 .single();
 
@@ -525,7 +525,7 @@ Deno.serve(async (req: Request) => {
                 body: JSON.stringify({
                     number: remoteJid,
                     options: { delay: 1200, presence: 'composing' },
-                    text: processData.response
+                    text: (userData?.ai_name ? `${userData.ai_name}: ` : '') + processData.response
                 })
             });
 

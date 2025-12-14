@@ -7,6 +7,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import SwipeableItem from '../components/ui/SwipeableItem';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -32,6 +33,7 @@ export default function TasksPage() {
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('todo');
+    const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
 
     const [sortOption, setSortOption] = useState<'created_desc' | 'created_asc' | 'alpha_asc'>('created_desc');
 
@@ -78,6 +80,7 @@ export default function TasksPage() {
             if (error) throw error;
             setTasks([data, ...tasks]);
             setNewTaskTitle('');
+            setIsAddTaskOpen(false);
         } catch (error) {
             console.error('Error adding task:', error);
         }
@@ -293,85 +296,132 @@ export default function TasksPage() {
                     </div>
                 ) : (
                     filteredTasks.map(task => (
-                        <Card key={task.id} className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
-                            <div className="flex items-start gap-3">
-                                {/* Selection Checkbox */}
-                                <div className="pt-1">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedTasks.has(task.id)}
-                                        onChange={() => toggleSelectTask(task.id)}
-                                        className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
-                                    />
-                                </div>
+                        <SwipeableItem
+                            key={task.id}
+                            onSwipeRight={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+                            onSwipeLeft={() => deleteTask(task.id)}
+                            leftActionIcon={task.status === 'done' ? <Circle size={24} /> : <CheckCircle2 size={24} />}
+                            leftActionColor={task.status === 'done' ? 'bg-gray-600' : 'bg-green-600'}
+                            rightActionColor="bg-red-600"
+                        >
+                            <Card className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
+                                <div className="flex items-start gap-3">
+                                    {/* Selection Checkbox */}
+                                    <div className="pt-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTasks.has(task.id)}
+                                            onChange={() => toggleSelectTask(task.id)}
+                                            className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
+                                        />
+                                    </div>
 
-                                <button
-                                    onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                                    className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
-                                >
-                                    {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
-                                </button>
+                                    <button
+                                        onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+                                        className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
+                                    >
+                                        {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+                                    </button>
 
-                                <div className="flex-1 min-w-0">
-                                    <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
-                                        {task.title}
-                                    </p>
+                                    <div className="flex-1 min-w-0">
+                                        <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
+                                            {task.title}
+                                        </p>
 
-                                    {/* Description / Checklist Rendering */}
-                                    {task.description && (
-                                        <div className="mt-3 space-y-1 text-sm text-gray-300">
-                                            {task.description.split('\n').map((line, index) => {
-                                                const isChecklist = line.includes('[ ]') || line.includes('[x]');
-                                                if (!isChecklist) {
-                                                    return <p key={index} className="pl-1 whitespace-pre-wrap">{line}</p>;
-                                                }
+                                        {/* Description / Checklist Rendering */}
+                                        {task.description && (
+                                            <div className="mt-3 space-y-1 text-sm text-gray-300">
+                                                {task.description.split('\n').map((line, index) => {
+                                                    const isChecklist = line.includes('[ ]') || line.includes('[x]');
+                                                    if (!isChecklist) {
+                                                        return <p key={index} className="pl-1 whitespace-pre-wrap">{line}</p>;
+                                                    }
 
-                                                const isChecked = line.includes('[x]');
-                                                // Remove [x], [ ], and leading dashes/spaces
-                                                const text = line.replace(/\[.\]/, '').replace(/^-/, '').trim();
+                                                    const isChecked = line.includes('[x]');
+                                                    // Remove [x], [ ], and leading dashes/spaces
+                                                    const text = line.replace(/\[.\]/, '').replace(/^-/, '').trim();
 
-                                                return (
-                                                    <div
-                                                        key={index}
-                                                        className="flex items-start gap-3 group/item cursor-pointer py-0.5"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleChecklistItem(task.id, task.description!, index);
-                                                        }}
-                                                    >
-                                                        <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            className="flex items-start gap-3 group/item cursor-pointer py-0.5"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleChecklistItem(task.id, task.description!, index);
+                                                            }}
+                                                        >
+                                                            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
                                                                 ? 'bg-blue-500 border-blue-500 text-white'
                                                                 : 'border-gray-500 group-hover/item:border-blue-400'
-                                                            }`}>
-                                                            {isChecked && <Check size={10} strokeWidth={3} />}
+                                                                }`}>
+                                                                {isChecked && <Check size={10} strokeWidth={3} />}
+                                                            </div>
+                                                            <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                                                                {text}
+                                                            </span>
                                                         </div>
-                                                        <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                                                            {text}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                                            <span className="text-xs text-gray-600">
+                                                {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
+                                            </span>
                                         </div>
-                                    )}
-
-                                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                                        <span className="text-xs text-gray-600">
-                                            {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
-                                        </span>
                                     </div>
-                                </div>
 
-                                <button
-                                    onClick={() => deleteTask(task.id)}
-                                    className="text-gray-500 hover:text-red-400 p-1 shrink-0"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        </Card>
+                                    <button
+                                        onClick={() => deleteTask(task.id)}
+                                        className="text-gray-500 hover:text-red-400 p-1 shrink-0"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </Card>
+                        </SwipeableItem>
                     ))
                 )}
             </div>
+
+            {/* Mobile FAB */}
+            <button
+                onClick={() => setIsAddTaskOpen(true)}
+                className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center z-40 active:scale-95 transition-transform"
+            >
+                <Plus size={28} />
+            </button>
+
+            {/* Add Task Bottom Sheet */}
+            {isAddTaskOpen && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center md:hidden" onClick={() => setIsAddTaskOpen(false)}>
+                    <div
+                        className="bg-gray-900 border-t border-gray-700 rounded-t-3xl p-6 w-full shadow-2xl animate-in slide-in-from-bottom-full duration-300"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-center mb-6">
+                            <div className="w-12 h-1.5 bg-gray-700 rounded-full"></div>
+                        </div>
+
+                        <h3 className="text-xl font-bold text-white mb-4">Nova Tarefa</h3>
+
+                        <form onSubmit={addTask} className="flex flex-col gap-4">
+                            <input
+                                type="text"
+                                value={newTaskTitle}
+                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                placeholder="O que precisa ser feito?"
+                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                                autoFocus
+                            />
+                            <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 w-full justify-center py-3 text-lg">
+                                Adicionar Tarefa
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -108,16 +108,20 @@ Deno.serve(async (req: Request) => {
                 if (!failureReason) {
                     const message = `🔔 *Lembrete:* ${reminder.title}`;
 
-                    // Fetch user phone number manually
-                    const { data: userData } = await supabase
-                        .from('users')
-                        .select('phone_number')
-                        .eq('id', reminder.user_id)
+                    // Fetch user phone number and AI name from user_settings
+                    const { data: userSettings } = await supabase
+                        .from('user_settings')
+                        .select('phone_number, ai_name')
+                        .eq('user_id', reminder.user_id)
                         .single();
 
-                    const phoneNumber = userData?.phone_number;
+                    const phoneNumber = userSettings?.phone_number;
+                    const aiName = userSettings?.ai_name;
 
                     if (phoneNumber) {
+                        // Prefix message with AI Name if available
+                        const finalMessage = aiName ? `🔔 *${aiName}:* ${reminder.title}` : message;
+
                         console.log(`Sending to ${phoneNumber} via ${instanceName}...`);
                         const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
                             method: 'POST',
@@ -127,7 +131,7 @@ Deno.serve(async (req: Request) => {
                             },
                             body: JSON.stringify({
                                 number: phoneNumber.replace(/\D/g, ''),
-                                text: message,
+                                text: finalMessage,
                             }),
                         });
 
