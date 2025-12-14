@@ -82,6 +82,7 @@ Deno.serve(async (req: Request) => {
 
     try {
         const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number }: ProcessMessageRequest = await req.json();
+        console.log(`🚀 Process Message HIT: ${content?.substring(0, 50)}...`);
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -1999,7 +2000,7 @@ REGRAS ABSOLUTAS:
                             body: JSON.stringify({
                                 number: targetNumber,
                                 options: { delay: 1200, presence: 'composing' },
-                                textMessage: { text: args.message }
+                                text: args.message
                             })
                         });
 

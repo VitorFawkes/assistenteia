@@ -48,6 +48,8 @@ Deno.serve(async (req: Request) => {
         const body = await req.json();
         const { instance, data, event } = body;
 
+        console.log(`Webhook HIT: ${instance} - ${event}`);
+
         // 0. HANDLE CONNECTION UPDATES
         if (event === 'CONNECTION_UPDATE') {
             const { state } = data;
@@ -229,20 +231,25 @@ Deno.serve(async (req: Request) => {
             const targetPhone = remoteJid.split('@')[0].replace(/\D/g, '');
             const privacyReadScope = userSettings.privacy_read_scope || 'all';
 
+            // LOGIC MATRIX
+            const isNoteToSelf = fromMe && targetPhone === userPhone;
+
             // --- PRIVACY SCOPE CHECK ---
             const isGroup = remoteJid.includes('@g.us');
 
+            if (privacyReadScope === 'none' && !isNoteToSelf) {
+                console.log('🛑 Privacy Setting: Ignoring message (Scope: none / Note to Self Only)');
+                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
+            }
             if (privacyReadScope === 'private_only' && isGroup) {
                 console.log('🛑 Privacy Setting: Ignoring GROUP message (Scope: private_only)');
                 return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
             }
-            if (privacyReadScope === 'groups_only' && !isGroup) {
+            if (privacyReadScope === 'groups_only' && !isGroup && !isNoteToSelf) {
+                // Allow Note to Self even in groups_only mode? Usually yes, as it's a command interface.
                 console.log('🛑 Privacy Setting: Ignoring PRIVATE message (Scope: groups_only)');
                 return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
             }
-
-            // LOGIC MATRIX
-            const isNoteToSelf = fromMe && targetPhone === userPhone;
 
             if (isNoteToSelf) {
                 console.log('🧠 Note to Self detected. AI WILL reply.');
@@ -329,12 +336,24 @@ Deno.serve(async (req: Request) => {
         // Media Handling Strategy
         const mediaMessage = msgContent.imageMessage || msgContent.videoMessage || msgContent.documentMessage || msgContent.audioMessage || msgContent.stickerMessage;
 
-        // Check User Preferences
+        // Extract critical metadata early for decision making
+        const { fromMe } = message.key;
+
+        // Check User Preferences & Logic
         let shouldDownload = true;
+
+        // 1. User Settings Overrides (Global Disable)
         if (msgContent.imageMessage && userSettings?.storage_download_images === false) shouldDownload = false;
         if (msgContent.videoMessage && userSettings?.storage_download_videos === false) shouldDownload = false;
         if (msgContent.audioMessage && userSettings?.storage_download_audio === false) shouldDownload = false;
         if (msgContent.documentMessage && userSettings?.storage_download_documents === false) shouldDownload = false;
+
+        // 2. NEW RULE: Restrict External Media (except Audio)
+        // If message is NOT from me (External/Group) AND it is NOT an audio, DO NOT DOWNLOAD.
+        if (!fromMe && !msgContent.audioMessage) {
+            shouldDownload = false;
+            console.log('🚫 External media (non-audio) skipped to save storage/bandwidth.');
+        }
 
         if (mediaMessage) {
             if (msgContent.imageMessage) { mediaType = 'image'; mimeType = msgContent.imageMessage.mimetype; content = msgContent.imageMessage.caption || ''; }
@@ -343,7 +362,7 @@ Deno.serve(async (req: Request) => {
             else if (msgContent.audioMessage) { mediaType = 'audio'; mimeType = msgContent.audioMessage.mimetype; }
             else if (msgContent.stickerMessage) { mediaType = 'sticker'; mimeType = msgContent.stickerMessage.mimetype; }
 
-            console.log(`📎 Media detected: ${mediaType} (${mimeType}). Download allowed: ${shouldDownload}`);
+            console.log(`📎 Media detected: ${mediaType} (${mimeType}). Download allowed: ${shouldDownload}. FromMe: ${fromMe}`);
 
             // 1. Get Base64 (Only if allowed)
             if (shouldDownload) {
@@ -411,7 +430,7 @@ Deno.serve(async (req: Request) => {
 
         // 4.5 INSERT MESSAGE INTO DATABASE
         // Extract Metadata
-        const { fromMe, id: waMessageId, participant } = message.key;
+        const { id: waMessageId, participant } = message.key;
         const pushName = message.pushName || (fromMe ? 'Me' : 'Unknown');
         const isGroup = remoteJid.includes('@g.us');
         const senderNumber = isGroup ? (participant ? participant.split('@')[0] : 'Unknown') : remoteJid.split('@')[0];
@@ -459,13 +478,6 @@ Deno.serve(async (req: Request) => {
             console.log('✅ User message saved to DB:', insertedMessage?.id);
         }
 
-        await supabase.from('debug_logs').insert({
-            function_name: 'whatsapp-webhook',
-            level: 'info',
-            message: 'Forwarding to process-message',
-            meta: { content, mediaType, userId: userData.user_id, messageId: insertedMessage?.id }
-        });
-
         // Call Edge Function
         const { data: processData, error: invokeError } = await supabase.functions.invoke('process-message', {
             body: {
@@ -483,8 +495,23 @@ Deno.serve(async (req: Request) => {
 
         if (invokeError) {
             console.error('❌ Error invoking process-message:', invokeError);
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'error',
+                message: 'Error invoking process-message',
+                meta: { error: invokeError }
+            });
+        } else {
+            console.log('✅ process-message invoked successfully:', processData);
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'info',
+                message: 'process-message invoked successfully',
+                meta: { response: processData }
+            });
         }
 
+        // Handle AI Response (if any)
         if (processData && processData.response) {
             console.log('🤖 AI Response:', processData.response);
 
@@ -498,14 +525,28 @@ Deno.serve(async (req: Request) => {
                 body: JSON.stringify({
                     number: remoteJid,
                     options: { delay: 1200, presence: 'composing' },
-                    textMessage: { text: processData.response }
+                    text: processData.response
                 })
             });
 
+            const responseText = await sendResponse.text();
+
             if (!sendResponse.ok) {
-                console.error('❌ Failed to send WhatsApp response:', await sendResponse.text());
+                console.error('❌ Failed to send WhatsApp response:', responseText);
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'error',
+                    message: 'Failed to send WhatsApp response',
+                    meta: { error: responseText, statusCode: sendResponse.status }
+                });
             } else {
                 console.log('✅ Response sent to WhatsApp!');
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'info',
+                    message: 'Response sent to WhatsApp',
+                    meta: { response: responseText, statusCode: sendResponse.status }
+                });
             }
         }
 

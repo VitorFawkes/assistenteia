@@ -9,7 +9,7 @@ export default function SettingsPage() {
     const [preferredName, setPreferredName] = useState('');
     const [phone, setPhone] = useState('');
 
-    const [privacyReadScope, setPrivacyReadScope] = useState<'all' | 'private_only' | 'groups_only'>('all');
+    const [privacyReadScope, setPrivacyReadScope] = useState<'all' | 'private_only' | 'groups_only' | 'none'>('all');
     const [privacyAllowOutgoing, setPrivacyAllowOutgoing] = useState(true);
     const [customPrompt, setCustomPrompt] = useState('');
     const [aiModel, setAiModel] = useState('gpt-4o');
@@ -229,7 +229,7 @@ export default function SettingsPage() {
                             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                                 1. O que a IA pode ler?
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <button
                                     onClick={() => setPrivacyReadScope('all')}
                                     className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'all'
@@ -264,6 +264,18 @@ export default function SettingsPage() {
                                     <div className="font-bold mb-1">Apenas Grupos</div>
                                     <div className="text-xs opacity-80 leading-relaxed">
                                         Ignora mensagens privadas. Foca apenas em grupos.
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setPrivacyReadScope('none')}
+                                    className={`p-4 rounded-xl border text-left transition-all ${privacyReadScope === 'none'
+                                        ? 'bg-indigo-500/10 border-indigo-500/50 text-white ring-1 ring-indigo-500/50'
+                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:bg-gray-800'
+                                        }`}
+                                >
+                                    <div className="font-bold mb-1">Nenhuma</div>
+                                    <div className="text-xs opacity-80 leading-relaxed">
+                                        Ignora tudo. Lê apenas "Note to Self".
                                     </div>
                                 </button>
                             </div>
