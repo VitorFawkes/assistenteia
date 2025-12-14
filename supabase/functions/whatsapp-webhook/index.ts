@@ -515,6 +515,20 @@ Deno.serve(async (req: Request) => {
         if (!skipAIResponse && processData && processData.response) {
             console.log('🤖 AI Response:', processData.response);
 
+            // RE-FETCH SETTINGS: The AI might have updated its name during process-message.
+            // We need the latest name for the prefix.
+            if (userData?.user_id) {
+                const { data: latestSettings } = await supabase
+                    .from('user_settings')
+                    .select('ai_name')
+                    .eq('user_id', userData.user_id)
+                    .single();
+
+                if (latestSettings?.ai_name) {
+                    userData.ai_name = latestSettings.ai_name;
+                }
+            }
+
             // Send response back via Evolution API
             const sendResponse = await fetch(`${evolutionApiUrl}/message/sendText/${instance}`, {
                 method: 'POST',
