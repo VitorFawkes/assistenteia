@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Phone, Mail, Loader2, Check, AlertCircle, Bot } from 'lucide-react';
+import { Save, User, Loader2, Check, AlertCircle, Bot } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 import WhatsAppConnection from '../components/WhatsAppConnection';
 
 export default function SettingsPage() {
-    // Force redeploy - Settings Page Refactor
+    const [userId, setUserId] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    // Form State
     const [preferredName, setPreferredName] = useState('');
     const [phone, setPhone] = useState('');
-
     const [privacyReadScope, setPrivacyReadScope] = useState<'all' | 'private_only' | 'groups_only' | 'none'>('all');
     const [privacyAllowOutgoing, setPrivacyAllowOutgoing] = useState(true);
     const [customPrompt, setCustomPrompt] = useState('');
@@ -21,12 +25,6 @@ export default function SettingsPage() {
     const [storageDownloadDocuments, setStorageDownloadDocuments] = useState(true);
     const [storageTrackStatus, setStorageTrackStatus] = useState(true);
 
-    const [email, setEmail] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [userId, setUserId] = useState<string>('');
-
     useEffect(() => {
         loadSettings();
     }, []);
@@ -37,7 +35,6 @@ export default function SettingsPage() {
             if (!user) return;
 
             setUserId(user.id);
-            setEmail(user.email || '');
 
             const { data, error } = await supabase
                 .from('user_settings')
@@ -84,7 +81,7 @@ export default function SettingsPage() {
             const { error } = await supabase
                 .from('user_settings')
                 .upsert({
-                    user_id: userId,
+                    user_id: user.id,
                     preferred_name: preferredName,
                     // Ensure +55 is added
                     phone_number: phone.startsWith('+55') ? phone : `+55${phone.replace(/\D/g, '')}`,
