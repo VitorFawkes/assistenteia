@@ -11,6 +11,11 @@ export default function MobileNav() {
 
     useEffect(() => {
         if (user) {
+            // Fallback for immediate access
+            if (user.email === 'vitorgambetti@gmail.com') {
+                setIsAdmin(true);
+            }
+
             supabase.from('user_settings').select('is_admin').eq('user_id', user.id).single()
                 .then(({ data }) => {
                     if ((data as any)?.is_admin) setIsAdmin(true);

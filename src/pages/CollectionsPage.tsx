@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown, Square, CheckSquare as CheckSquareIcon, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown, Square, CheckSquare as CheckSquareIcon, ArrowLeft, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,6 +62,7 @@ export default function CollectionsPage() {
 
     // Selection & Deletion
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [initialLoadDone, setInitialLoadDone] = useState(false);
     const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -122,7 +123,9 @@ export default function CollectionsPage() {
 
             if (error) throw error;
             setItems(data || []);
+            setItems(data || []);
             setSelectedItems(new Set()); // Clear selection when changing collection
+            setIsSelectionMode(false);
         } catch (error) {
             console.error('Error fetching items:', error);
         } finally {
@@ -374,6 +377,35 @@ export default function CollectionsPage() {
             }
         } catch (error) {
             console.error('Error deleting item:', error);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedItems.size === 0) return;
+
+        if (!confirm(`Tem certeza que deseja apagar ${selectedItems.size} itens?`)) return;
+
+        try {
+            const ids = Array.from(selectedItems);
+            const { error } = await supabase.from('collection_items').delete().in('id', ids);
+
+            if (error) throw error;
+
+            setItems(items.filter(i => !selectedItems.has(i.id)));
+
+            // Update count
+            if (selectedCollection) {
+                const updatedCollections = collections.map(c =>
+                    c.id === selectedCollection.id ? { ...c, item_count: (c.item_count || 0) - selectedItems.size } : c
+                );
+                setCollections(updatedCollections);
+            }
+
+            setSelectedItems(new Set());
+            setIsSelectionMode(false);
+        } catch (error) {
+            console.error('Error bulk deleting:', error);
+            alert('Erro ao apagar itens selecionados.');
         }
     };
 
@@ -682,6 +714,33 @@ export default function CollectionsPage() {
                                     >
                                         Excluir
                                     </Button>
+
+                                    <div className="w-px bg-gray-700 mx-1 hidden md:block"></div>
+
+                                    <button
+                                        onClick={() => {
+                                            setIsSelectionMode(!isSelectionMode);
+                                            setSelectedItems(new Set());
+                                        }}
+                                        className={`h-full px-4 rounded-xl border transition-all flex items-center gap-2 ${isSelectionMode
+                                            ? 'bg-blue-600 text-white border-blue-500'
+                                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        <CheckSquareIcon size={18} />
+                                        <span className="text-sm hidden md:inline">{isSelectionMode ? 'Cancelar Seleção' : 'Selecionar'}</span>
+                                    </button>
+
+                                    {selectedItems.size > 0 && (
+                                        <Button
+                                            variant="danger"
+                                            onClick={handleBulkDelete}
+                                            className="h-full px-4 bg-red-600 text-white border-red-500 hover:bg-red-500 animate-in fade-in slide-in-from-right-4"
+                                            icon={Trash2}
+                                        >
+                                            Apagar ({selectedItems.size})
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -758,11 +817,31 @@ export default function CollectionsPage() {
                                                             <div
                                                                 className="flex flex-col gap-2 p-4 cursor-pointer group"
                                                                 onClick={() => {
-                                                                    setItemToEdit(item);
-                                                                    setIsEditItemModalOpen(true);
+                                                                    if (isSelectionMode) {
+                                                                        const newSelection = new Set(selectedItems);
+                                                                        if (newSelection.has(item.id)) {
+                                                                            newSelection.delete(item.id);
+                                                                        } else {
+                                                                            newSelection.add(item.id);
+                                                                        }
+                                                                        setSelectedItems(newSelection);
+                                                                    } else {
+                                                                        setItemToEdit(item);
+                                                                        setIsEditItemModalOpen(true);
+                                                                    }
                                                                 }}
                                                             >
                                                                 <div className="flex items-start gap-4">
+                                                                    {/* Selection Checkbox */}
+                                                                    {isSelectionMode && (
+                                                                        <div className={`mt-1.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedItems.has(item.id)
+                                                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                                                            : 'border-gray-600 bg-gray-800'
+                                                                            }`}>
+                                                                            {selectedItems.has(item.id) && <Check size={14} />}
+                                                                        </div>
+                                                                    )}
+
                                                                     {/* Icon */}
                                                                     {item.metadata?.type === 'expense' || hasAmount ? (
                                                                         <div className="bg-green-500/10 text-green-400 p-2 rounded-lg mt-1">

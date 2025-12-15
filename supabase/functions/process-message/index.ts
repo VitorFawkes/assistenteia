@@ -1267,11 +1267,24 @@ REGRAS ABSOLUTAS:
                                 }
                             }
                         } else if (args.action === 'delete') {
-                            const { error } = await supabase.from('collections').delete().eq('user_id', userId).eq('name', args.name);
-                            if (error) {
-                                toolOutput = `Erro ao apagar pasta: ${error.message}`;
+                            // Safety check: Check if collection has items
+                            const { data: collToDelete } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.name).maybeSingle();
+
+                            if (collToDelete) {
+                                const { count } = await supabase.from('collection_items').select('*', { count: 'exact', head: true }).eq('collection_id', collToDelete.id);
+
+                                if (count && count > 0 && !args.force) {
+                                    toolOutput = `⚠️ A pasta "${args.name}" não está vazia (${count} itens). Se você realmente quer apagar TUDO (pasta + itens), use action: 'delete' com force: true. Se quer apagar apenas os itens, use manage_items com action: 'delete'.`;
+                                } else {
+                                    const { error } = await supabase.from('collections').delete().eq('user_id', userId).eq('name', args.name);
+                                    if (error) {
+                                        toolOutput = `Erro ao apagar pasta: ${error.message}`;
+                                    } else {
+                                        toolOutput = `Pasta "${args.name}" apagada com sucesso.`;
+                                    }
+                                }
                             } else {
-                                toolOutput = `Pasta "${args.name}" apagada com sucesso.`;
+                                toolOutput = `Pasta "${args.name}" não encontrada.`;
                             }
                         }
                     }
