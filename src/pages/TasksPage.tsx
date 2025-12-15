@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { CheckSquare, Plus, Search, Filter, Trash2, CheckCircle2, Circle, Check } from 'lucide-react';
+import { CheckSquare, Plus, Search, Filter, Trash2, CheckCircle2, Circle, Check, Calendar, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { format } from 'date-fns';
+import { format, isToday, isPast, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import SwipeableItem from '../components/ui/SwipeableItem';
 
@@ -23,6 +23,7 @@ interface Task {
     tags?: string[];
     created_at: string;
     completed_at?: string;
+    due_date?: string; // New field
 }
 
 export default function TasksPage() {
@@ -72,7 +73,8 @@ export default function TasksPage() {
                     user_id: user?.id,
                     title: newTaskTitle,
                     priority: 'medium', // Default priority
-                    status: 'todo'
+                    status: 'todo',
+                    due_date: new Date().toISOString() // Default to today for quick add
                 }])
                 .select()
                 .single();
@@ -182,7 +184,20 @@ export default function TasksPage() {
         }
     };
 
-    const filteredTasks = tasks.filter(task => {
+    // --- FILTERING LOGIC ---
+    // 1. Separate "Today's Focus" (Due Today or Overdue AND Not Done)
+    const todayTasks = tasks.filter(t => {
+        if (t.status === 'done' || t.status === 'archived') return false;
+        if (!t.due_date) return false;
+        const date = parseISO(t.due_date);
+        return isToday(date) || isPast(date); // Today or Overdue
+    });
+
+    // 2. Filter the rest for the main list
+    const otherTasks = tasks.filter(task => {
+        // Exclude tasks already in "Today's Focus"
+        if (todayTasks.find(t => t.id === task.id)) return false;
+
         const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase());
         if (!matchesSearch) return false;
 
@@ -200,6 +215,104 @@ export default function TasksPage() {
         }
         return 0;
     });
+
+    const renderTaskItem = (task: Task) => (
+        <SwipeableItem
+            key={task.id}
+            onSwipeRight={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+            onSwipeLeft={() => deleteTask(task.id)}
+            leftActionIcon={task.status === 'done' ? <Circle size={24} /> : <CheckCircle2 size={24} />}
+            leftActionColor={task.status === 'done' ? 'bg-gray-600' : 'bg-green-600'}
+            rightActionColor="bg-red-600"
+        >
+            <Card className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
+                <div className="flex items-start gap-3">
+                    {/* Selection Checkbox */}
+                    <div className="pt-1">
+                        <input
+                            type="checkbox"
+                            checked={selectedTasks.has(task.id)}
+                            onChange={() => toggleSelectTask(task.id)}
+                            className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
+                        />
+                    </div>
+
+                    <button
+                        onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+                        className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
+                    >
+                        {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                        <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
+                            {task.title}
+                        </p>
+
+                        {/* Description / Checklist Rendering */}
+                        {task.description && (
+                            <div className="mt-3 space-y-1 text-sm text-gray-300">
+                                {task.description.split('\n').map((line, index) => {
+                                    const isChecklist = line.includes('[ ]') || line.includes('[x]');
+                                    if (!isChecklist) {
+                                        return <p key={index} className="pl-1 whitespace-pre-wrap">{line}</p>;
+                                    }
+
+                                    const isChecked = line.includes('[x]');
+                                    const text = line.replace(/\[.\]/, '').replace(/^-/, '').trim();
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="flex items-start gap-3 group/item cursor-pointer py-0.5"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleChecklistItem(task.id, task.description!, index);
+                                            }}
+                                        >
+                                            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
+                                                ? 'bg-blue-500 border-blue-500 text-white'
+                                                : 'border-gray-500 group-hover/item:border-blue-400'
+                                                }`}>
+                                                {isChecked && <Check size={10} strokeWidth={3} />}
+                                            </div>
+                                            <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                                                {text}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {task.due_date && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${task.status !== 'done' && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date))
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : isToday(parseISO(task.due_date))
+                                        ? 'bg-amber-500/20 text-amber-400'
+                                        : 'bg-gray-700 text-gray-400'
+                                    }`}>
+                                    <Calendar size={12} />
+                                    {isToday(parseISO(task.due_date)) ? 'Hoje' : format(parseISO(task.due_date), "dd/MM", { locale: ptBR })}
+                                </span>
+                            )}
+                            <span className="text-xs text-gray-600">
+                                Criado em {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => deleteTask(task.id)}
+                        className="text-gray-500 hover:text-red-400 p-1 shrink-0"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                </div>
+            </Card>
+        </SwipeableItem>
+    );
 
     if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
 
@@ -219,7 +332,7 @@ export default function TasksPage() {
                         type="text"
                         value={newTaskTitle}
                         onChange={(e) => setNewTaskTitle(e.target.value)}
-                        placeholder="Nova tarefa..."
+                        placeholder="Nova tarefa para hoje..."
                         className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
                     <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 shrink-0">
@@ -227,6 +340,23 @@ export default function TasksPage() {
                     </Button>
                 </form>
             </Card>
+
+            {/* TODAY'S FOCUS SECTION */}
+            {todayTasks.length > 0 && (
+                <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sun className="text-amber-400" size={24} />
+                        <h2 className="text-xl font-bold text-white">Foco de Hoje</h2>
+                        <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-full font-medium">
+                            {todayTasks.length}
+                        </span>
+                    </div>
+                    <div className="space-y-3">
+                        {todayTasks.map(renderTaskItem)}
+                    </div>
+                    <div className="my-6 border-t border-gray-800"></div>
+                </div>
+            )}
 
             {/* Filters & Actions */}
             <div className="mb-6 space-y-4">
@@ -287,101 +417,15 @@ export default function TasksPage() {
                 </div>
             </div>
 
-            {/* Task List */}
+            {/* Main Task List */}
             <div className="space-y-3">
-                {filteredTasks.length === 0 ? (
+                {otherTasks.length === 0 ? (
                     <div className="text-center py-16 bg-gray-800/30 rounded-2xl border border-dashed border-gray-700">
                         <Filter className="mx-auto text-gray-600 mb-3" size={48} />
                         <p className="text-gray-500 font-medium">Nenhuma tarefa encontrada</p>
                     </div>
                 ) : (
-                    filteredTasks.map(task => (
-                        <SwipeableItem
-                            key={task.id}
-                            onSwipeRight={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                            onSwipeLeft={() => deleteTask(task.id)}
-                            leftActionIcon={task.status === 'done' ? <Circle size={24} /> : <CheckCircle2 size={24} />}
-                            leftActionColor={task.status === 'done' ? 'bg-gray-600' : 'bg-green-600'}
-                            rightActionColor="bg-red-600"
-                        >
-                            <Card className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
-                                <div className="flex items-start gap-3">
-                                    {/* Selection Checkbox */}
-                                    <div className="pt-1">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedTasks.has(task.id)}
-                                            onChange={() => toggleSelectTask(task.id)}
-                                            className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
-                                        />
-                                    </div>
-
-                                    <button
-                                        onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                                        className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
-                                    >
-                                        {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
-                                    </button>
-
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
-                                            {task.title}
-                                        </p>
-
-                                        {/* Description / Checklist Rendering */}
-                                        {task.description && (
-                                            <div className="mt-3 space-y-1 text-sm text-gray-300">
-                                                {task.description.split('\n').map((line, index) => {
-                                                    const isChecklist = line.includes('[ ]') || line.includes('[x]');
-                                                    if (!isChecklist) {
-                                                        return <p key={index} className="pl-1 whitespace-pre-wrap">{line}</p>;
-                                                    }
-
-                                                    const isChecked = line.includes('[x]');
-                                                    // Remove [x], [ ], and leading dashes/spaces
-                                                    const text = line.replace(/\[.\]/, '').replace(/^-/, '').trim();
-
-                                                    return (
-                                                        <div
-                                                            key={index}
-                                                            className="flex items-start gap-3 group/item cursor-pointer py-0.5"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleChecklistItem(task.id, task.description!, index);
-                                                            }}
-                                                        >
-                                                            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
-                                                                ? 'bg-blue-500 border-blue-500 text-white'
-                                                                : 'border-gray-500 group-hover/item:border-blue-400'
-                                                                }`}>
-                                                                {isChecked && <Check size={10} strokeWidth={3} />}
-                                                            </div>
-                                                            <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                                                                {text}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        <div className="flex flex-wrap items-center gap-2 mt-2">
-                                            <span className="text-xs text-gray-600">
-                                                {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={() => deleteTask(task.id)}
-                                        className="text-gray-500 hover:text-red-400 p-1 shrink-0"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </Card>
-                        </SwipeableItem>
-                    ))
+                    otherTasks.map(renderTaskItem)
                 )}
             </div>
 
@@ -411,7 +455,7 @@ export default function TasksPage() {
                                 type="text"
                                 value={newTaskTitle}
                                 onChange={(e) => setNewTaskTitle(e.target.value)}
-                                placeholder="O que precisa ser feito?"
+                                placeholder="O que precisa ser feito hoje?"
                                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                                 autoFocus
                             />

@@ -212,7 +212,7 @@ CONTEXTO ATUAL:
                                     password: { type: 'string', description: 'Para credenciais: senha/código' },
                                     url: { type: 'string', description: 'Para credenciais: link de acesso' },
                                     status: { type: 'string', enum: ['todo', 'done'], description: 'Para tarefas: estado atual' },
-                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO)' },
+                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO). Use para "tarefa para hoje", "para amanhã", etc.' },
                                     date: { type: 'string', description: 'Para GASTOS ou EVENTOS: data de ocorrência (ISO). Se não informado, usar data atual.' },
                                     // Novos campos para Shopping List
                                     quantity: { type: 'string', description: 'Para compras: quantidade (ex: "2kg", "3 un")' },
@@ -531,7 +531,7 @@ Ferramentas:
 - manage_items: adicionar/atualizar/apagar itens em pastas
 - query_data: buscar/somar/contar dados com filtros (data, categoria, etc)
 - manage_reminders: criar/listar/completar lembretes (simples ou recorrentes)
-- manage_tasks: gerenciar lista de tarefas (To-Do) sem hora marcada obrigatória
+- manage_tasks: gerenciar lista de tarefas (To-Do). Use 'due_date' para tarefas do dia (Caixa do Dia).
 - save_memory: salvar fatos importantes na memória permanente (vetorial)
 - recall_memory: buscar memórias passadas por significado (RAG)
 - manage_rules: criar/listar/deletar regras de comportamento e preferências (Brain)
@@ -547,6 +547,8 @@ Exemplos:
 "O código do alarme é 9988" -> manage_items {action: "add", collection_name: "Casa", content: "Código do Alarme", metadata: {code: "9988"}}
 "Já fiz a reunião" -> manage_reminders {action: "complete", search_title: "reunião"}
 "Coloca na lista comprar pão" -> manage_tasks {action: "create", title: "Comprar pão", priority: "medium", tags: ["mercado"]}
+"Tarefa para hoje: Pagar conta" -> manage_tasks {action: "create", title: "Pagar conta", due_date: "2025-12-04T..."} (Use calculateDueAt logic)
+"O que tenho pra hoje?" -> manage_tasks {action: "list", filter_date: "today"}
 "O que tenho pra fazer?" -> manage_tasks {action: "list", filter_status: "todo"}
 "Lembre que eu não gosto de cebola" -> save_memory {content: "O usuário não gosta de cebola", category: "preferência"}
 "Sempre me chame de Chefe" -> manage_rules {action: "create", key: "Apelido", value: "Sempre chamar o usuário de Chefe"}
@@ -1285,12 +1287,21 @@ REGRAS ABSOLUTAS:
                                     query = query.eq(`metadata ->> ${args.search_metadata_key} `, args.search_metadata_value);
                                 }
 
-                                const { data: items } = await query.limit(1);
-                                const targetItem = items?.[0];
+                                // SMART LOGIC: Fetch candidates to handle ambiguity
+                                const { data: items } = await query.limit(5);
 
-                                if (!targetItem) {
-                                    toolOutput = `Erro: Não encontrei o item para ${args.action === 'delete' ? 'apagar' : 'alterar'}.`;
+                                let targetItem = null;
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = `Erro: Não encontrei nenhum item correspondente na pasta "${args.collection_name}".`;
+                                } else if (items.length > 1) {
+                                    // Ambiguity detected
+                                    const options = items.map((i: any) => `- ${i.content} (ID: ${i.id})`).join('\n');
+                                    toolOutput = `Encontrei múltiplos itens parecidos. Qual deles você quer ${args.action === 'delete' ? 'apagar' : 'alterar'}?\n${options}\n\nPor favor, seja mais específico.`;
                                 } else {
+                                    // Single match found
+                                    targetItem = items[0];
+
                                     if (args.action === 'delete') {
                                         await supabase.from('collection_items').delete().eq('id', targetItem.id);
                                         toolOutput = `Item apagado da pasta "${args.collection_name}".`;
@@ -1712,17 +1723,52 @@ REGRAS ABSOLUTAS:
                                         }
                                     }
                                     else if (args.action === 'delete_event') {
-                                        if (!args.event_id) {
-                                            results.push("Erro: ID do evento necessário para deletar.");
-                                        } else {
+                                        let eventIdToDelete = args.event_id;
+
+                                        // SMART LOGIC: If no ID, try to find by title
+                                        if (!eventIdToDelete && args.title) {
                                             if (isGoogle) {
-                                                const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${args.event_id}`, { method: 'DELETE', headers });
-                                                if (res.ok) results.push(`[GOOGLE] Evento ${args.event_id} deletado.`);
-                                                // Google returns 204 on success, 404 if not found.
-                                                // If 404, maybe it's an Outlook ID? We'll try next loop.
+                                                const searchUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${encodeURIComponent(args.title)}&timeMin=${new Date().toISOString()}&maxResults=5`;
+                                                const searchRes = await fetch(searchUrl, { headers });
+                                                const searchData = await searchRes.json();
+                                                const candidates = searchData.items || [];
+
+                                                if (candidates.length === 0) {
+                                                    results.push(`[GOOGLE] Não encontrei nenhum evento futuro com o título "${args.title}".`);
+                                                } else if (candidates.length > 1) {
+                                                    const options = candidates.map((e: any) => `- ${e.summary} (${new Date(e.start.dateTime || e.start.date).toLocaleString('pt-BR')}) [ID: ${e.id}]`).join('\n');
+                                                    results.push(`[GOOGLE] Encontrei múltiplos eventos. Qual deles apagar?\n${options}`);
+                                                } else {
+                                                    eventIdToDelete = candidates[0].id;
+                                                }
                                             } else if (isMicrosoft) {
-                                                const res = await fetch(`https://graph.microsoft.com/v1.0/me/events/${args.event_id}`, { method: 'DELETE', headers });
-                                                if (res.ok) results.push(`[OUTLOOK] Evento ${args.event_id} deletado.`);
+                                                const searchUrl = `https://graph.microsoft.com/v1.0/me/events?$filter=contains(subject,'${args.title}') and start/dateTime ge '${new Date().toISOString()}'&$top=5`;
+                                                const searchRes = await fetch(searchUrl, { headers });
+                                                const searchData = await searchRes.json();
+                                                const candidates = searchData.value || [];
+
+                                                if (candidates.length === 0) {
+                                                    results.push(`[OUTLOOK] Não encontrei nenhum evento futuro com o título "${args.title}".`);
+                                                } else if (candidates.length > 1) {
+                                                    const options = candidates.map((e: any) => `- ${e.subject} (${new Date(e.start.dateTime).toLocaleString('pt-BR')}) [ID: ${e.id}]`).join('\n');
+                                                    results.push(`[OUTLOOK] Encontrei múltiplos eventos. Qual deles apagar?\n${options}`);
+                                                } else {
+                                                    eventIdToDelete = candidates[0].id;
+                                                }
+                                            }
+                                        }
+
+                                        if (!eventIdToDelete && !args.title) {
+                                            results.push("Erro: ID do evento ou Título necessário para deletar.");
+                                        } else if (eventIdToDelete) {
+                                            if (isGoogle) {
+                                                const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventIdToDelete}`, { method: 'DELETE', headers });
+                                                if (res.ok) results.push(`[GOOGLE] Evento apagado com sucesso.`);
+                                                else results.push(`[GOOGLE] Erro ao apagar: ${(await res.json()).error?.message}`);
+                                            } else if (isMicrosoft) {
+                                                const res = await fetch(`https://graph.microsoft.com/v1.0/me/events/${eventIdToDelete}`, { method: 'DELETE', headers });
+                                                if (res.ok) results.push(`[OUTLOOK] Evento apagado com sucesso.`);
+                                                else results.push(`[OUTLOOK] Erro ao apagar: ${await res.text()}`);
                                             }
                                         }
                                     }
@@ -1914,21 +1960,67 @@ REGRAS ABSOLUTAS:
                                 await supabase.from('reminders').update({ is_completed: true }).eq('id', args.id).eq('user_id', userId);
                                 toolOutput = `Lembrete marcado como concluído (ID: ${args.id}).`;
                             } else {
-                                await supabase.from('reminders').update({ is_completed: true }).ilike('title', `%${args.search_title || args.title}%`).eq('user_id', userId);
-                                toolOutput = `Lembrete "${args.search_title || args.title}" marcado como concluído.`;
+                                const search = args.search_title || args.title;
+                                // 1. Try to find PENDING reminders first
+                                const { data: pending } = await supabase
+                                    .from('reminders')
+                                    .select('id, title, due_at')
+                                    .eq('user_id', userId)
+                                    .eq('is_completed', false)
+                                    .ilike('title', `%${search}%`);
+
+                                if (pending && pending.length === 1) {
+                                    // Perfect match
+                                    await supabase.from('reminders').update({ is_completed: true }).eq('id', pending[0].id);
+                                    toolOutput = `Lembrete "${pending[0].title}" marcado como concluído.`;
+                                } else if (pending && pending.length > 1) {
+                                    // Ambiguous
+                                    const options = pending.map((r: any) => `- ${r.title} (${new Date(r.due_at).toLocaleString('pt-BR')}) [ID: ${r.id}]`).join('\n');
+                                    toolOutput = `Encontrei múltiplos lembretes pendentes com esse nome. Qual deles você quer concluir?\n${options}\n\nPor favor, repita o comando usando o ID ou o nome mais específico.`;
+                                } else {
+                                    // No pending found, check completed?
+                                    const { data: completed } = await supabase
+                                        .from('reminders')
+                                        .select('id, title')
+                                        .eq('user_id', userId)
+                                        .eq('is_completed', true)
+                                        .ilike('title', `%${search}%`)
+                                        .limit(1);
+
+                                    if (completed && completed.length > 0) {
+                                        toolOutput = `O lembrete "${completed[0].title}" já estava concluído.`;
+                                    } else {
+                                        toolOutput = `Não encontrei nenhum lembrete chamado "${search}".`;
+                                    }
+                                }
                             }
                         } else if (args.action === 'update') {
-                            // First find the reminder
-                            let query = supabase.from('reminders').select('*').eq('user_id', userId);
-                            if (args.id) query = query.eq('id', args.id);
-                            else if (args.title) query = query.ilike('title', `%${args.title}%`);
+                            // SMART LOGIC: Find reminder to update
+                            let reminder = null;
 
-                            const { data: reminders } = await query.limit(1);
-                            const reminder = reminders?.[0];
-
-                            if (!reminder) {
-                                toolOutput = `Erro: Lembrete não encontrado para atualização.`;
+                            if (args.id) {
+                                const { data } = await supabase.from('reminders').select('*').eq('id', args.id).eq('user_id', userId).single();
+                                reminder = data;
                             } else {
+                                const search = args.title;
+                                // Prioritize PENDING
+                                const { data: pending } = await supabase.from('reminders').select('*').eq('user_id', userId).eq('is_completed', false).ilike('title', `%${search}%`).limit(5);
+
+                                if (pending && pending.length === 1) {
+                                    reminder = pending[0];
+                                } else if (pending && pending.length > 1) {
+                                    const options = pending.map((r: any) => `- ${r.title} (${new Date(r.due_at).toLocaleString('pt-BR')}) [ID: ${r.id}]`).join('\n');
+                                    toolOutput = `Encontrei múltiplos lembretes pendentes. Qual deles alterar?\n${options}`;
+                                } else {
+                                    // Try completed
+                                    const { data: anyRem } = await supabase.from('reminders').select('*').eq('user_id', userId).ilike('title', `%${search}%`).limit(1);
+                                    reminder = anyRem?.[0];
+                                }
+                            }
+
+                            if (!reminder && !toolOutput) {
+                                toolOutput = `Erro: Lembrete não encontrado para atualização.`;
+                            } else if (reminder) {
                                 const updateData: any = {};
                                 if (args.title) updateData.title = args.title;
 
@@ -1949,12 +2041,33 @@ REGRAS ABSOLUTAS:
                                 toolOutput = `Lembrete atualizado com sucesso.`;
                             }
                         } else if (args.action === 'delete') {
+                            // SMART LOGIC: Find reminder to delete
+                            let reminderToDelete = null;
+
                             if (args.id) {
-                                await supabase.from('reminders').delete().eq('id', args.id).eq('user_id', userId);
-                                toolOutput = `Lembrete apagado (ID: ${args.id}).`;
+                                reminderToDelete = { id: args.id };
                             } else {
-                                await supabase.from('reminders').delete().ilike('title', `%${args.search_title || args.title}%`).eq('user_id', userId);
-                                toolOutput = `Lembrete "${args.search_title || args.title}" apagado.`;
+                                const search = args.search_title || args.title;
+                                // Prioritize PENDING
+                                const { data: pending } = await supabase.from('reminders').select('id, title, due_at').eq('user_id', userId).eq('is_completed', false).ilike('title', `%${search}%`).limit(5);
+
+                                if (pending && pending.length === 1) {
+                                    reminderToDelete = pending[0];
+                                } else if (pending && pending.length > 1) {
+                                    const options = pending.map((r: any) => `- ${r.title} (${new Date(r.due_at).toLocaleString('pt-BR')}) [ID: ${r.id}]`).join('\n');
+                                    toolOutput = `Encontrei múltiplos lembretes pendentes. Qual deles apagar?\n${options}`;
+                                } else {
+                                    // Try completed
+                                    const { data: anyRem } = await supabase.from('reminders').select('id, title').eq('user_id', userId).ilike('title', `%${search}%`).limit(1);
+                                    reminderToDelete = anyRem?.[0];
+                                }
+                            }
+
+                            if (!reminderToDelete && !toolOutput) {
+                                toolOutput = `Erro: Lembrete não encontrado para apagar.`;
+                            } else if (reminderToDelete) {
+                                await supabase.from('reminders').delete().eq('id', reminderToDelete.id).eq('user_id', userId);
+                                toolOutput = `Lembrete apagado (ID: ${reminderToDelete.id}).`;
                             }
                         }
                     }
@@ -1963,6 +2076,8 @@ REGRAS ABSOLUTAS:
                     // --- MANAGE TASKS (TO-DO) ---
                     else if (functionName === 'manage_tasks') {
                         if (args.action === 'create') {
+                            const finalDueAt = calculateDueAt(args, brasiliaTime, null);
+
                             const { error } = await supabase.from('tasks').insert({
                                 user_id: userId,
                                 title: args.title,
@@ -1970,49 +2085,113 @@ REGRAS ABSOLUTAS:
                                 priority: args.priority || 'medium',
                                 status: args.status || 'todo',
                                 tags: args.tags || [],
-                                due_date: null // Tasks don't need a date
+                                due_date: finalDueAt // Now supports dates!
                             });
                             if (error) throw error;
-                            toolOutput = `Tarefa "${args.title}" adicionada à lista.`;
+
+                            const dateMsg = finalDueAt ? ` para ${new Date(finalDueAt).toLocaleDateString('pt-BR')}` : '';
+                            toolOutput = `Tarefa "${args.title}" adicionada à lista${dateMsg}.`;
                         } else if (args.action === 'list') {
                             let query = supabase.from('tasks').select('*').eq('user_id', userId);
-                            if (args.filter_status) query = query.eq('status', args.filter_status);
-                            else query = query.neq('status', 'done').neq('status', 'archived'); // Default: hide done
+
+                            if (args.filter_status) {
+                                query = query.eq('status', args.filter_status);
+                            } else {
+                                // Default: hide done/archived unless asking for them
+                                query = query.neq('status', 'done').neq('status', 'archived');
+                            }
 
                             const { data: tasks } = await query.order('created_at', { ascending: false });
 
                             if (!tasks || tasks.length === 0) {
                                 toolOutput = "Nenhuma tarefa encontrada.";
                             } else {
-                                toolOutput = `Suas Tarefas:\n${tasks.map((t: any) => `- [${t.status.toUpperCase()}] ${t.title} (${t.priority})`).join('\n')}`;
+                                let filteredTasks = tasks;
+
+                                // Date Filtering (In-memory for flexibility)
+                                if (args.filter_date === 'today') {
+                                    const todayStr = brasiliaTime.toISOString().split('T')[0];
+                                    filteredTasks = tasks.filter((t: any) => {
+                                        if (!t.due_date) return false;
+                                        const tDate = t.due_date.split('T')[0];
+                                        // Include today OR overdue (if not done)
+                                        return tDate === todayStr || (tDate < todayStr && t.status !== 'done');
+                                    });
+                                } else if (args.filter_date === 'tomorrow') {
+                                    const tomorrow = new Date(brasiliaTime);
+                                    tomorrow.setDate(tomorrow.getDate() + 1);
+                                    const tmrStr = tomorrow.toISOString().split('T')[0];
+                                    filteredTasks = tasks.filter((t: any) => t.due_date && t.due_date.startsWith(tmrStr));
+                                }
+
+                                if (filteredTasks.length === 0) {
+                                    toolOutput = `Nenhuma tarefa encontrada para "${args.filter_date || 'filtro atual'}".`;
+                                } else {
+                                    toolOutput = `Suas Tarefas:\n${filteredTasks.map((t: any) => {
+                                        const dateInfo = t.due_date ? ` [📅 ${new Date(t.due_date).toLocaleDateString('pt-BR')}]` : '';
+                                        return `- [${t.status.toUpperCase()}] ${t.title} (${t.priority})${dateInfo}`;
+                                    }).join('\n')}`;
+                                }
                             }
                         } else if (args.action === 'update' || args.action === 'complete' || args.action === 'delete') {
                             // First find the task
-                            let query = supabase.from('tasks').select('id, title').eq('user_id', userId);
+                            let query = supabase.from('tasks').select('id, title, status').eq('user_id', userId);
+
+                            // FILTER LOGIC:
+                            // If completing or deleting, prioritize NOT DONE tasks.
+                            if (args.action === 'complete' || args.action === 'delete') {
+                                // We can't easily do "order by status" to prioritize 'todo' over 'done' in one query without complex SQL.
+                                // So we'll fetch matches and filter in code, or try two queries.
+                                // Let's try fetching matches (limit 5) and picking the best one.
+                            }
+
                             if (args.search_title) query = query.ilike('title', `%${args.search_title}%`);
 
-                            const { data: tasks } = await query.limit(1);
-                            const task = tasks?.[0];
+                            // Fetch a few candidates to make a smart decision
+                            const { data: candidates } = await query.limit(5);
+
+                            let task = null;
+
+                            if (candidates && candidates.length > 0) {
+                                // 1. Try to find an exact match that is NOT done (for complete/delete)
+                                if (args.action === 'complete') {
+                                    task = candidates.find((t: any) => t.status !== 'done' && t.status !== 'archived');
+                                }
+                                // 2. If no pending task found, or action is update, just take the first one (or maybe the most recent?)
+                                // Ideally we should sort by created_at desc in the query to get most recent.
+                                if (!task) task = candidates[0];
+                            }
 
                             if (!task) {
                                 toolOutput = `Erro: Tarefa "${args.search_title}" não encontrada.`;
                             } else {
-                                if (args.action === 'delete') {
-                                    await supabase.from('tasks').delete().eq('id', task.id);
-                                    toolOutput = `Tarefa "${task.title}" apagada.`;
-                                } else if (args.action === 'complete') {
-                                    await supabase.from('tasks').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', task.id);
-                                    toolOutput = `Tarefa "${task.title}" marcada como concluída! 🎉`;
-                                } else { // update
-                                    const updateData: any = {};
-                                    if (args.title) updateData.title = args.title;
-                                    if (args.description) updateData.description = args.description;
-                                    if (args.priority) updateData.priority = args.priority;
-                                    if (args.status) updateData.status = args.status;
-                                    if (args.tags) updateData.tags = args.tags;
+                                // Check if we are completing an already completed task
+                                if (args.action === 'complete' && task.status === 'done') {
+                                    toolOutput = `A tarefa "${task.title}" já estava concluída!`;
+                                } else {
+                                    if (args.action === 'delete') {
+                                        await supabase.from('tasks').delete().eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" apagada.`;
+                                    } else if (args.action === 'complete') {
+                                        await supabase.from('tasks').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" marcada como concluída! 🎉`;
+                                    } else { // update
+                                        const updateData: any = {};
+                                        if (args.title) updateData.title = args.title;
+                                        if (args.description) updateData.description = args.description;
+                                        if (args.priority) updateData.priority = args.priority;
+                                        if (args.status) updateData.status = args.status;
+                                        if (args.tags) updateData.tags = args.tags;
 
-                                    await supabase.from('tasks').update(updateData).eq('id', task.id);
-                                    toolOutput = `Tarefa "${task.title}" atualizada.`;
+                                        // Update due_date if provided
+                                        if (args.due_date || args.time_config || args.relative_time) {
+                                            const newDueAt = calculateDueAt(args, brasiliaTime, null);
+                                            if (newDueAt) updateData.due_date = newDueAt;
+                                        }
+
+                                        await supabase.from('tasks').update(updateData).eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" atualizada.`;
+                                    }
                                 }
                             }
                         }
@@ -2217,11 +2396,11 @@ REGRAS ABSOLUTAS:
                                 const dir = m.is_from_me
                                     ? `Eu (Dono) -> ${m.sender_number}`
                                     : `${m.sender_name || 'Desconhecido'} (${m.sender_number})`;
-                                const context = m.is_group ? `(Grupo: ${m.group_name || 'Desconhecido'})` : '(Privado)';
+                                const context = m.is_group ? `[Grupo: ${m.group_name || 'Desconhecido'}]` : '[Privado]';
                                 const status = m.status ? `[Status: ${m.status}]` : '[Status: Pendente]';
                                 const time = new Date(m.message_timestamp).toLocaleString('pt-BR');
                                 const mediaInfo = m.media_url ? ` [Mídia: ${m.media_type} | URL: ${m.media_url}]` : '';
-                                return `[${time}] ${dir} ${context} ${status}: ${m.content}${mediaInfo}`;
+                                return `[${time}] ${context} ${dir} ${status}: ${m.content}${mediaInfo}`;
                             }).join('\n');
                         }
                     }
