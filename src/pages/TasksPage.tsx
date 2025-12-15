@@ -223,7 +223,7 @@ export default function TasksPage() {
                         className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
                     <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 shrink-0">
-                        Adicionar
+                        <span className="hidden md:inline">Adicionar</span>
                     </Button>
                 </form>
             </Card>

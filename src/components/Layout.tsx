@@ -4,6 +4,7 @@ import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Pl
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
+import OnboardingModal from './OnboardingModal';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -113,6 +114,7 @@ export default function Layout() {
 
             {/* Mobile Navigation */}
             <MobileNav />
+            <OnboardingModal />
         </div>
     );
 }

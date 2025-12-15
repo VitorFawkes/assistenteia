@@ -43,6 +43,23 @@ async function uploadMediaToStorage(base64: string, mimeType: string, folder: st
     }
 }
 
+// Helper to fetch group info
+async function fetchGroupInfo(instanceName: string, groupJid: string) {
+    try {
+        const res = await fetch(`${evolutionApiUrl}/group/findGroupInfos/${instanceName}?groupJid=${groupJid}`, {
+            method: 'GET',
+            headers: { 'apikey': evolutionApiKey }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            return data.subject || null; // 'subject' is usually the group name
+        }
+    } catch (e) {
+        console.error('Error fetching group info:', e);
+    }
+    return null;
+}
+
 Deno.serve(async (req: Request) => {
     try {
         const body = await req.json();
@@ -118,23 +135,54 @@ Deno.serve(async (req: Request) => {
 
             const updates = Array.isArray(data) ? data : [data];
             for (const update of updates) {
-                const { key, update: statusUpdate } = update;
-                if (!key || !statusUpdate || !statusUpdate.status) continue;
+                // Log to DB for inspection
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'info',
+                    message: 'Processing Status Update',
+                    meta: { update }
+                });
 
-                const statusMap: Record<number, string> = {
-                    2: 'sent',
-                    3: 'delivered',
-                    4: 'read',
-                    5: 'read' // Played
-                };
+                // Handle Evolution API flat format
+                let waMessageId = update.key?.id;
+                let statusRaw = update.update?.status;
 
-                const newStatus = statusMap[statusUpdate.status];
+                // Fallback for flat structure (seen in logs)
+                if (!waMessageId && update.keyId) {
+                    waMessageId = update.keyId;
+                    statusRaw = update.status;
+                }
+
+                if (!waMessageId || !statusRaw) {
+                    continue;
+                }
+
+                let newStatus = null;
+
+                // Map numeric statuses (Baileys)
+                if (typeof statusRaw === 'number') {
+                    const statusMap: Record<number, string> = {
+                        2: 'sent',
+                        3: 'delivered',
+                        4: 'read',
+                        5: 'read' // Played
+                    };
+                    newStatus = statusMap[statusRaw];
+                }
+                // Map string statuses (Evolution)
+                else if (typeof statusRaw === 'string') {
+                    const s = statusRaw.toUpperCase();
+                    if (s.includes('SENT') || s.includes('SERVER_ACK')) newStatus = 'sent';
+                    else if (s.includes('DELIVERY')) newStatus = 'delivered';
+                    else if (s.includes('READ') || s.includes('PLAYED')) newStatus = 'read';
+                }
+
                 if (newStatus) {
-                    console.log(`📨 Status Update: Msg ${key.id} -> ${newStatus}`);
+                    console.log(`📨 Status Update: Msg ${waMessageId} -> ${newStatus}`);
                     await supabase
                         .from('messages')
                         .update({ status: newStatus })
-                        .eq('wa_message_id', key.id);
+                        .eq('wa_message_id', waMessageId);
                 }
             }
             return new Response(JSON.stringify({ success: true, type: 'status_update' }), { headers: { 'Content-Type': 'application/json' } });
@@ -436,6 +484,13 @@ Deno.serve(async (req: Request) => {
         const senderNumber = isGroup ? (participant ? participant.split('@')[0] : 'Unknown') : remoteJid.split('@')[0];
         const messageTimestamp = message.messageTimestamp ? new Date(Number(message.messageTimestamp) * 1000).toISOString() : new Date().toISOString();
 
+        // Fetch Group Name if needed
+        let groupName = null;
+        if (isGroup) {
+            groupName = await fetchGroupInfo(instance, remoteJid);
+            console.log(`👥 Group Name Fetched: ${groupName}`);
+        }
+
         // Extract Quoted Context
         const contextInfo = message.message?.extendedTextMessage?.contextInfo || message.message?.imageMessage?.contextInfo || message.message?.audioMessage?.contextInfo || message.message?.videoMessage?.contextInfo;
         const quotedMessageId = contextInfo?.stanzaId || null;
@@ -452,6 +507,7 @@ Deno.serve(async (req: Request) => {
             // New Metadata
             sender_number: senderNumber,
             sender_name: pushName,
+            group_name: groupName,
             is_group: isGroup,
             is_from_me: fromMe,
             wa_message_id: waMessageId,
@@ -489,7 +545,8 @@ Deno.serve(async (req: Request) => {
                 // Context for Authority
                 is_owner: fromMe,
                 sender_name: pushName,
-                sender_number: senderNumber
+                sender_number: senderNumber,
+                is_group: isGroup
             }
         });
 

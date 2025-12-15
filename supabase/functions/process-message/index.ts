@@ -10,6 +10,7 @@ interface ProcessMessageRequest {
     is_owner?: boolean;
     sender_name?: string;
     sender_number?: string;
+    is_group?: boolean;
 }
 
 function calculateDueAt(args: any, brasiliaTime: Date, overrideDueAt: string | null): string | null {
@@ -81,7 +82,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number }: ProcessMessageRequest = await req.json();
+        const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number, is_group }: ProcessMessageRequest = await req.json();
         console.log(`🚀 Process Message HIT: ${content?.substring(0, 50)}...`);
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -102,7 +103,65 @@ Deno.serve(async (req: Request) => {
         const isOwner = is_owner !== false; // Default to true if undefined (backward compatibility)
         const senderName = sender_name || 'Desconhecido';
 
+        // --- CONTEXT INJECTION ---
+        const contextInfo = `
+CONTEXTO ATUAL:
+- Data/Hora: ${new Date().toISOString()}
+- Usuário: ${userId}
+- Canal: WhatsApp ${is_group ? '(GRUPO)' : '(PRIVADO)'}
+- Remetente da Mensagem: ${sender_name || 'Desconhecido'} (${sender_number || '?'})
+- Você é o Dono? ${isOwner ? 'SIM' : 'NÃO'}
+`;
+
         console.log(`👤 Sender: ${senderName} (${sender_number || '?'}) | Is Owner: ${isOwner}`);
+
+        // --- ECONOMY MODE: SKIP NON-OWNER MESSAGES ---
+        // Se a mensagem não for do dono, salvamos (já feito no webhook) mas NÃO processamos na AI.
+        // --- FETCH USER SETTINGS (Phone & AI Name) ---
+        // Moved up for early filtering
+        const { data: userSettingsData } = await supabase
+            .from('user_settings')
+            .select('phone_number, ai_name')
+            .eq('user_id', userId)
+            .single();
+
+        const userPhoneNumber = userSettingsData?.phone_number || '';
+        const aiName = userSettingsData?.ai_name || 'Assistente';
+
+        // 🛑 ECONOMY MODE & PRIVACY FILTER
+        if (!isOwner) {
+            console.log('🛑 Economy Mode: Message from non-owner. Skipping AI processing to save tokens.');
+            return new Response(JSON.stringify({
+                success: true,
+                message: 'Message saved but not processed (Economy Mode)',
+                skipped: true
+            }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } else {
+            // Message IS from Owner.
+            // Check if it is a "Note to Self" or a Direct Message to someone else.
+            // In 'whatsapp-webhook', sender_number is the remoteJid (Recipient) when fromMe is true.
+
+            // Normalize numbers for comparison
+            const targetNumber = sender_number?.replace(/\D/g, '') || '';
+            const myNumber = userPhoneNumber.replace(/\D/g, '');
+
+            const isNoteToSelf = targetNumber === myNumber;
+            const hasTrigger = content?.toLowerCase().match(/\b(bibi|ia|bot|assistente)\b/);
+
+            // If it's a message to someone else AND has no trigger, SKIP.
+            if (!isNoteToSelf && !hasTrigger) {
+                console.log(`🛑 Outgoing message to ${targetNumber} ignored (No trigger).`);
+                return new Response(JSON.stringify({
+                    success: true,
+                    message: 'Outgoing message ignored (No trigger)',
+                    skipped: true
+                }), {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+        }
 
         // ESTRATÉGIA: Usar transcrição da Evolution (se disponível), senão tentar Whisper como fallback
         console.log('📝 Initial content received:', processedText || 'EMPTY');
@@ -264,12 +323,13 @@ Deno.serve(async (req: Request) => {
                 type: 'function',
                 function: {
                     name: 'query_messages',
-                    description: 'Consulta o histórico de mensagens do WhatsApp. Use para resumir conversas ou lembrar o que foi dito.',
+                    description: 'Consulta o histórico de mensagens do WhatsApp. OBRIGATÓRIO usar se o usuário perguntar "o que fulano disse?", "veja a mensagem de X", ou pedir resumo de conversa.',
                     parameters: {
                         type: 'object',
                         properties: {
                             sender_number: { type: 'string', description: 'Filtrar por número do remetente' },
-                            sender_name: { type: 'string', description: 'Filtrar por nome do remetente' },
+                            sender_name: { type: 'string', description: 'Filtrar por nome do remetente (ex: "Bianca")' },
+                            group_name: { type: 'string', description: 'Filtrar por nome do grupo (ex: "Família", "Trabalho")' },
                             limit: { type: 'number', description: 'Número de mensagens (default: 20)' },
                             days_ago: { type: 'number', description: 'Quantos dias atrás buscar (default: 7)' }
                         }
@@ -523,11 +583,10 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
 
-**BUSCA DE CONTATOS (IMPORTANTE):**
-- Se o usuário pedir para enviar mensagem para alguém ("Mande msg para Bianca") e você NÃO tiver o número no contexto atual:
-- **NÃO DIGA QUE NÃO SABE.**
-- **USE A TOOL \`search_contacts\`** com o nome da pessoa.
-- Se encontrar o número, use \`send_whatsapp_message\` em seguida.
+- **BUSCA DE CONTATOS OBRIGATÓRIA**: Se o usuário pedir para enviar mensagem para alguém (ex: "Manda pra Bianca"), você **DEVE** usar a ferramenta \`search_contacts\` com o nome ("Bianca") ANTES de dizer que não tem o número. Se encontrar, use o número retornado.
+- **NUNCA** diga "não tenho acesso" ou "não consigo ver" sem antes tentar usar as ferramentas \`search_contacts\` ou \`query_messages\`.
+- **NUNCA** invente que tentou enviar se não tiver o número.
+- **NUNCA** peça o número se você conseguir encontrá-lo no histórico.
 - Se encontrar múltiplos, pergunte qual é o correto.
 
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
@@ -637,6 +696,15 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
   \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Louvre', metadata: { type: 'list_item', checked: false } })\`
   \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Montmartre', metadata: { type: 'list_item', checked: false } })\`
 
+### 6. MENSAGENS E CONTATOS (WHATSAPP) - NOVO:
+- **STATUS DE LEITURA**: Ao buscar mensagens (\`query_messages\`), você verá o status (Lido, Entregue, Pendente).
+  - Se o usuário perguntar "O que eu não li?", use \`query_messages({ only_unread: true })\`.
+- **IDENTIFICAÇÃO DE CONTATOS**:
+  - Mensagens enviadas pelo usuário aparecem como "Eu (Dono) -> [Número]".
+  - Para saber quem é esse número, use \`search_contacts({ query: "[Número]" })\`.
+  - A ferramenta \`search_contacts\` busca tanto por NOME quanto por NÚMERO.
+  - Se encontrar o nome, responda: "Você mandou para [Nome]...".
+
 ### 3. EXEMPLOS DE "TOTAL AUTONOMIA":
 
 **Usuário**: "Vou viajar para Londres em Dezembro. Já comprei a passagem por 3000 reais."
@@ -690,10 +758,15 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
       *"Quer que eu te cobre amanhã se deu certo?"*
     - Se ele aceitar, crie um novo lembrete para você mesmo cobrar ele.
 
-4.  **SENSO CRÍTICO E ORGANIZAÇÃO:**
     - Se o usuário mandar um item solto ("Comprar pão") e você vir que existe uma pasta "Mercado", SUGIRA ou FAÇA:
       *"Salvei em 'Mercado' para ficar organizado, ok?"*
-    - Não seja um robô cego. Ajude a organizar a vida dele.`;
+    - Não seja um robô cego. Ajude a organizar a vida dele.
+
+5.  **USO DE FERRAMENTAS (CRÍTICO - NÃO MINTA):**
+    - **NUNCA** diga "não tenho acesso" ou "não consigo ver" sem antes checar suas tools.
+    - Se perguntarem "Quem é X?" ou "Tenho o contato de Y?", USE 'search_contacts'.
+    - Se perguntarem "O que X me mandou?" ou "Veja a mensagem de Y", USE 'query_messages'.
+    - Você TEM acesso a contatos e mensagens via tools. USE-AS.`;
 
         let systemPrompt = DEFAULT_SYSTEM_PROMPT;
         let aiModel = 'gpt-4o'; // Default model
@@ -711,20 +784,18 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
 
             if (userSettings?.custom_system_prompt) {
                 systemPrompt = userSettings.custom_system_prompt;
-                // Inject dynamic variables into custom prompt
-                if (typeof systemPrompt === 'string') {
-                    systemPrompt = systemPrompt.replace('{{CURRENT_DATETIME}}', isoBrasilia);
-                }
             }
 
-            if (userSettings?.ai_model) {
-                aiModel = userSettings.ai_model;
-                // MAPPING: Handle "GPT 5.1 Preview" vanity model by mapping it to gpt-4o
-                if (aiModel === 'gpt-5.1-preview') {
-                    console.log('✨ Using GPT 5.1 Preview (Mapped to gpt-4o)');
-                    aiModel = 'gpt-4o';
-                }
+            // Inject dynamic variables (Works for both Default and Custom prompts)
+            if (typeof systemPrompt === 'string') {
+                const userName = userSettings?.preferred_name || 'Usuário';
+                systemPrompt = systemPrompt.replace('{{CURRENT_DATETIME}}', isoBrasilia);
+                systemPrompt = systemPrompt.replace('{{preferred_name}}', userName);
             }
+
+            // ENFORCED MODEL: Always use GPT 5.1 (mapped to gpt-4o)
+            console.log('✨ Enforcing GPT 5.1 (gpt-4o) for all users.');
+            aiModel = 'gpt-4o';
 
             // Inject AI Name
             const aiName = userSettings?.ai_name;
@@ -785,6 +856,9 @@ REGRAS ABSOLUTAS:
             systemPrompt += `\n\nREGRAS APRENDIDAS (PREFERÊNCIAS DO USUÁRIO):\n${rulesText}\n(Siga estas regras acima de tudo).`;
             console.log(`🧠 Injected ${userRules.length} user rules.`);
         }
+
+        // User settings fetched at the top
+
 
         // const messages: any[] = []; // REMOVIDO: Será declarado abaixo com histórico
 
@@ -1068,6 +1142,14 @@ REGRAS ABSOLUTAS:
                         console.warn(`🛑 BLOCKED TOOL EXECUTION: ${functionName} called by non-owner (${senderName})`);
                         throw new Error(`⛔ Ação Bloqueada: Apenas o dono (${userSettings?.preferred_name || 'Vitor'}) pode executar comandos.`);
                     }
+
+                    // LOG TOOL EXECUTION
+                    await supabase.from('debug_logs').insert({
+                        function_name: 'process-message',
+                        level: 'info',
+                        message: `Executing tool: ${functionName}`,
+                        meta: { args: args }
+                    });
 
                     // --- MANAGE COLLECTIONS ---
                     if (functionName === 'manage_collections') {
@@ -1660,12 +1742,13 @@ REGRAS ABSOLUTAS:
                         const { data: contacts } = await supabase
                             .from('messages')
                             .select('sender_name, sender_number, created_at')
-                            .ilike('sender_name', `%${args.query}%`)
+                            .eq('user_id', userId) // 🔒 SECURITY: Isolate by user
+                            .or(`sender_name.ilike.%${args.query}%,sender_number.ilike.%${args.query}%`) // Search Name OR Number
                             .order('created_at', { ascending: false })
-                            .limit(10);
+                            .limit(50); // Increased limit to find valid numbers among LIDs
 
                         if (!contacts || contacts.length === 0) {
-                            toolOutput = `Nenhum contato encontrado com o nome "${args.query}".`;
+                            toolOutput = `Nenhum contato encontrado com o nome "${args.query}". Tente buscar por parte do nome.`;
                         } else {
                             // Group by number to avoid duplicates
                             const uniqueContacts = new Map();
@@ -1679,11 +1762,22 @@ REGRAS ABSOLUTAS:
                                 }
                             });
 
-                            const list = Array.from(uniqueContacts.values()).map((c: any) =>
-                                `- ${c.name} (${c.number}) [Visto em: ${new Date(c.last_seen).toLocaleDateString('pt-BR')}]`
-                            ).join('\n');
+                            // Sort: Prioritize numbers starting with 55 and length 12-13 (BR Mobile)
+                            const sortedContacts = Array.from(uniqueContacts.values()).sort((a: any, b: any) => {
+                                const isAValid = a.number.startsWith('55') && a.number.length >= 12 && a.number.length <= 13;
+                                const isBValid = b.number.startsWith('55') && b.number.length >= 12 && b.number.length <= 13;
+                                if (isAValid && !isBValid) return -1;
+                                if (!isAValid && isBValid) return 1;
+                                return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime(); // Fallback to recency
+                            });
 
-                            toolOutput = `Contatos encontrados:\n${list}\n\nSe tiver certeza de qual é, use a ferramenta send_whatsapp_message com o número exato.`;
+                            const list = sortedContacts.map((c: any) => {
+                                const isValid = c.number.startsWith('55') && c.number.length >= 12 && c.number.length <= 13;
+                                const tag = isValid ? '[📱 CELULAR]' : '[❓ OUTRO/ID]';
+                                return `- ${c.name} (${c.number}) ${tag} [Visto em: ${new Date(c.last_seen).toLocaleDateString('pt-BR')}]`;
+                            }).join('\n');
+
+                            toolOutput = `Contatos encontrados para "${args.query}":\n${list}\n\nPREFIRA NÚMEROS MARCADOS COMO [📱 CELULAR]. Evite [❓ OUTRO/ID] se possível.`;
                         }
                     }
 
@@ -2015,32 +2109,74 @@ REGRAS ABSOLUTAS:
                         console.log(`📤 Sending WhatsApp message to ${args.number}`);
 
                         // Sanitize number (remove non-digits)
-                        const targetNumber = args.number.replace(/\D/g, '');
+                        const cleanNumber = args.number.replace(/\D/g, '');
+                        // FORMATTING FIX: Ensure @s.whatsapp.net suffix
+                        const targetNumber = cleanNumber.includes('@') ? cleanNumber : `${cleanNumber}@s.whatsapp.net`;
+
                         const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!;
                         const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
-                        // Assuming instance name is stored or passed. For now, defaulting to 'user_personal' or fetching from DB?
+
                         // Better: Fetch the active instance for this user.
                         const { data: instances } = await supabase.from('whatsapp_instances').select('instance_name').eq('user_id', userId).eq('status', 'connected').limit(1);
                         const instanceName = instances?.[0]?.instance_name || 'user_personal'; // Fallback
 
-                        const sendRes = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'apikey': evolutionApiKey
-                            },
-                            body: JSON.stringify({
-                                number: targetNumber,
-                                options: { delay: 1200, presence: 'composing' },
-                                text: args.message
-                            })
-                        });
+                        console.log(`📤 Sending WhatsApp message to ${targetNumber} via ${instanceName}`);
+
+                        let sendRes;
+                        if (args.media_url) {
+                            // SEND MEDIA
+                            console.log(`📎 Sending Media: ${args.media_url}`);
+                            sendRes = await fetch(`${evolutionApiUrl}/message/sendMedia/${instanceName}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'apikey': evolutionApiKey
+                                },
+                                body: JSON.stringify({
+                                    number: targetNumber,
+                                    options: { delay: 1200, presence: 'composing' },
+                                    mediaMessage: {
+                                        mediatype: args.media_type || 'image',
+                                        media: args.media_url,
+                                        caption: args.message || ''
+                                    }
+                                })
+                            });
+                        } else {
+                            // SEND TEXT
+                            sendRes = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'apikey': evolutionApiKey
+                                },
+                                body: JSON.stringify({
+                                    number: targetNumber,
+                                    options: { delay: 1200, presence: 'composing' },
+                                    text: args.message
+                                })
+                            });
+                        }
+
+                        const respText = await sendRes.text();
 
                         if (!sendRes.ok) {
-                            const errText = await sendRes.text();
-                            console.error('❌ Failed to send outgoing message:', errText);
-                            toolOutput = `Erro ao enviar mensagem: ${errText}`;
+                            console.error('❌ Failed to send outgoing message:', respText);
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'process-message',
+                                level: 'error',
+                                message: 'Failed to send WhatsApp message',
+                                meta: { error: respText, number: targetNumber, instance: instanceName }
+                            });
+                            toolOutput = `Erro ao enviar mensagem: ${respText}`;
                         } else {
+                            console.log('✅ Outgoing message sent!');
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'process-message',
+                                level: 'info',
+                                message: 'Outgoing WhatsApp message sent',
+                                meta: { number: targetNumber, instance: instanceName, hasMedia: !!args.media_url }
+                            });
                             toolOutput = `Mensagem enviada com sucesso para ${args.number}.`;
                         }
                     }
@@ -2049,15 +2185,22 @@ REGRAS ABSOLUTAS:
                     else if (functionName === 'query_messages') {
                         console.log(`🔎 Querying messages history...`);
                         let query = supabase.from('messages')
-                            .select('sender_name, sender_number, content, message_timestamp, is_from_me')
+                            .select('sender_name, sender_number, group_name, content, message_timestamp, is_from_me, is_group, status, media_url, media_type')
+                            .eq('user_id', userId) // 🔒 SECURITY: Isolate by user
                             .order('message_timestamp', { ascending: false })
                             .limit(args.limit || 20);
 
                         if (args.sender_number) query = query.eq('sender_number', args.sender_number);
                         if (args.sender_name) query = query.ilike('sender_name', `%${args.sender_name}%`);
+                        if (args.group_name) query = query.ilike('group_name', `%${args.group_name}%`);
 
-                        // Time filter
-                        const days = args.days_ago || 7;
+                        // Unread Filter
+                        if (args.only_unread) {
+                            query = query.eq('is_from_me', false).neq('status', 'read');
+                        }
+
+                        // Time filter (Default increased to 30 days to find older contacts)
+                        const days = args.days_ago || 30;
                         const dateLimit = new Date();
                         dateLimit.setDate(dateLimit.getDate() - days);
                         query = query.gte('message_timestamp', dateLimit.toISOString());
@@ -2071,9 +2214,14 @@ REGRAS ABSOLUTAS:
                         } else {
                             // Format for AI
                             toolOutput = msgs.reverse().map((m: any) => {
-                                const dir = m.is_from_me ? 'Eu (Dono)' : (m.sender_name || m.sender_number);
+                                const dir = m.is_from_me
+                                    ? `Eu (Dono) -> ${m.sender_number}`
+                                    : `${m.sender_name || 'Desconhecido'} (${m.sender_number})`;
+                                const context = m.is_group ? `(Grupo: ${m.group_name || 'Desconhecido'})` : '(Privado)';
+                                const status = m.status ? `[Status: ${m.status}]` : '[Status: Pendente]';
                                 const time = new Date(m.message_timestamp).toLocaleString('pt-BR');
-                                return `[${time}] ${dir}: ${m.content}`;
+                                const mediaInfo = m.media_url ? ` [Mídia: ${m.media_type} | URL: ${m.media_url}]` : '';
+                                return `[${time}] ${dir} ${context} ${status}: ${m.content}${mediaInfo}`;
                             }).join('\n');
                         }
                     }
@@ -2125,7 +2273,13 @@ REGRAS ABSOLUTAS:
             await supabase.from('messages').insert({
                 user_id: userId,
                 role: 'assistant',
-                content: finalResponse
+                content: finalResponse,
+                // Metadata for Context
+                is_from_me: true, // AI speaking on behalf of user/system
+                is_group: is_group, // Same context as the incoming message
+                sender_name: aiName,
+                sender_number: userPhoneNumber, // Use user's number as the "sender" identity for AI
+                message_timestamp: new Date().toISOString()
             });
             console.log('💾 AI Response saved to history.');
         }

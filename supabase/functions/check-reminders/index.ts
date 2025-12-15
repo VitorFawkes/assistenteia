@@ -122,7 +122,10 @@ Deno.serve(async (req: Request) => {
                         // Prefix message with AI Name if available
                         const finalMessage = aiName ? `🔔 *${aiName}:* ${reminder.title}` : message;
 
-                        console.log(`Sending to ${phoneNumber} via ${instanceName}...`);
+                        const cleanNumber = phoneNumber.replace(/\D/g, '');
+                        const formattedNumber = cleanNumber.includes('@') ? cleanNumber : `${cleanNumber}@s.whatsapp.net`;
+
+                        console.log(`Sending to ${formattedNumber} via ${instanceName}...`);
                         const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
                             method: 'POST',
                             headers: {
@@ -130,17 +133,24 @@ Deno.serve(async (req: Request) => {
                                 'apikey': evolutionApiKey,
                             },
                             body: JSON.stringify({
-                                number: phoneNumber.replace(/\D/g, ''),
+                                number: formattedNumber,
                                 text: finalMessage,
                             }),
                         });
 
+                        const respText = await response.text();
+
                         if (!response.ok) {
-                            const errText = await response.text();
-                            console.error(`❌ Failed to send WhatsApp: ${response.status} - ${errText}`);
-                            failureReason = `Erro API: ${response.status}`;
+                            console.error(`❌ Failed to send WhatsApp: ${response.status} - ${respText}`);
+                            failureReason = `Erro API: ${response.status} - ${respText}`;
                         } else {
-                            console.log(`✅ Sent reminder "${reminder.title}" to ${phoneNumber}`);
+                            console.log(`✅ Sent reminder "${reminder.title}" to ${formattedNumber}`);
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'check-reminders',
+                                level: 'info',
+                                message: `WhatsApp API Response: ${respText}`,
+                                meta: { reminder_id: reminder.id, status: response.status }
+                            });
                             notificationsSent++;
                             whatsappSent = true;
                         }
@@ -221,8 +231,14 @@ Deno.serve(async (req: Request) => {
 
                 remindersProcessed++;
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error(`Error processing reminder ${reminder.id}:`, error);
+                await supabase.from('debug_logs').insert({
+                    function_name: 'check-reminders',
+                    level: 'error',
+                    message: `Error processing reminder ${reminder.id}: ${error.message}`,
+                    meta: { stack: error.stack }
+                });
             }
         }
 
@@ -246,6 +262,22 @@ Deno.serve(async (req: Request) => {
 
     } catch (error: any) {
         console.error('CRITICAL Error in check-reminders:', error);
+
+        // Try to log to debug_logs if possible
+        try {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            await supabase.from('debug_logs').insert({
+                function_name: 'check-reminders',
+                level: 'error',
+                message: `CRITICAL FAILURE: ${error.message}`,
+                meta: { stack: error.stack }
+            });
+        } catch (logError) {
+            console.error('Failed to log critical error:', logError);
+        }
+
         return new Response(
             JSON.stringify({
                 success: false,

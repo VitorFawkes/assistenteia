@@ -6,9 +6,10 @@ import Button from './ui/Button';
 
 interface WhatsAppConnectionProps {
     userId: string;
+    onConnected?: () => void;
 }
 
-export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) {
+export default function WhatsAppConnection({ userId, onConnected }: WhatsAppConnectionProps) {
     const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +53,12 @@ export default function WhatsAppConnection({ userId }: WhatsAppConnectionProps) 
             console.error('Sync error:', e);
         }
     };
+
+    useEffect(() => {
+        if (status === 'connected' && onConnected) {
+            onConnected();
+        }
+    }, [status, onConnected]);
 
     useEffect(() => {
         // Initial check and sync

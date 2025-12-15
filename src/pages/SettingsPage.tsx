@@ -18,7 +18,7 @@ export default function SettingsPage() {
     const [privacyReadScope, setPrivacyReadScope] = useState<'all' | 'private_only' | 'groups_only' | 'none'>('all');
     const [privacyAllowOutgoing, setPrivacyAllowOutgoing] = useState(true);
     const [customPrompt, setCustomPrompt] = useState('');
-    const [aiModel, setAiModel] = useState('gpt-5.1-preview');
+    // const [aiModel, setAiModel] = useState('gpt-5.1-preview'); // Default & Enforced (Removed unused state)
 
     // Daily Briefing State
     const [dailyBriefingEnabled, setDailyBriefingEnabled] = useState(true);
@@ -61,7 +61,7 @@ export default function SettingsPage() {
                 setPrivacyReadScope(settings.privacy_read_scope || 'all');
                 setPrivacyAllowOutgoing(settings.privacy_allow_outgoing !== false);
                 setCustomPrompt(settings.custom_system_prompt || '');
-                setAiModel(settings.ai_model || 'gpt-5.1-preview');
+                // setAiModel('gpt-5.1-preview'); // State removed, enforced server-side
 
                 // Daily Briefing
                 setDailyBriefingEnabled(settings.daily_briefing_enabled !== false);
@@ -104,7 +104,7 @@ export default function SettingsPage() {
                     privacy_read_scope: privacyReadScope,
                     privacy_allow_outgoing: privacyAllowOutgoing,
                     custom_system_prompt: customPrompt,
-                    ai_model: aiModel,
+                    ai_model: 'gpt-5.1-preview', // Always enforce 5.1 on save
 
                     // Daily Briefing
                     daily_briefing_enabled: dailyBriefingEnabled,
@@ -316,6 +316,8 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
+
+
                 {/* SECTION 3: ARMAZENAMENTO (COFRE) */}
                 <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-6 backdrop-blur-sm">
                     <div className="flex items-center gap-3 mb-2">
@@ -382,51 +384,14 @@ export default function SettingsPage() {
                             </div>
 
                             <div className="p-6 space-y-8">
-                                {/* AI Model Selection */}
-                                <div>
+                                {/* AI Model - HIDDEN & ENFORCED */}
+                                <div className="hidden">
                                     <label className="block text-sm font-medium text-gray-300 mb-3">
                                         Modelo de Inteligência
                                     </label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <button
-                                            onClick={() => setAiModel('gpt-4o')}
-                                            className={`relative flex flex-col items-center p-5 border-2 rounded-xl transition-all group ${aiModel === 'gpt-4o'
-                                                ? 'border-purple-600 bg-purple-900/20 shadow-lg shadow-purple-900/20'
-                                                : 'border-gray-700/50 hover:border-purple-500/50 hover:bg-gray-800/50'
-                                                }`}
-                                        >
-                                            <span className="font-bold text-white text-lg">GPT-4o</span>
-                                            <span className="text-xs text-gray-400 mt-1 font-medium">Mais Inteligente</span>
-                                            {aiModel === 'gpt-4o' && (
-                                                <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => setAiModel('gpt-4o-mini')}
-                                            className={`relative flex flex-col items-center p-5 border-2 rounded-xl transition-all group ${aiModel === 'gpt-4o-mini'
-                                                ? 'border-purple-600 bg-purple-900/20 shadow-lg shadow-purple-900/20'
-                                                : 'border-gray-700/50 hover:border-purple-500/50 hover:bg-gray-800/50'
-                                                }`}
-                                        >
-                                            <span className="font-bold text-white text-lg">GPT-4o Mini</span>
-                                            <span className="text-xs text-gray-400 mt-1 font-medium">Mais Rápido</span>
-                                            {aiModel === 'gpt-4o-mini' && (
-                                                <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={() => setAiModel('gpt-5.1-preview')}
-                                            className={`relative flex flex-col items-center p-5 border-2 rounded-xl transition-all group ${aiModel === 'gpt-5.1-preview'
-                                                ? 'border-purple-600 bg-purple-900/20 shadow-lg shadow-purple-900/20'
-                                                : 'border-gray-700/50 hover:border-purple-500/50 hover:bg-gray-800/50'
-                                                }`}
-                                        >
-                                            <span className="font-bold text-white text-lg">GPT 5.1</span>
-                                            <span className="text-xs text-purple-400 mt-1 font-medium bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">Preview</span>
-                                            {aiModel === 'gpt-5.1-preview' && (
-                                                <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                                            )}
-                                        </button>
+                                    <div className="p-4 border border-gray-700/50 rounded-xl bg-gray-800/50 flex items-center gap-3">
+                                        <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                                        <span className="text-gray-300 font-medium">GPT 5.1 (Enforced)</span>
                                     </div>
                                 </div>
 
@@ -448,9 +413,11 @@ export default function SettingsPage() {
                                             {customPrompt.length} chars
                                         </div>
                                     </div>
-                                    <p className="mt-3 text-xs text-gray-500 flex items-center gap-1.5">
-                                        <Info className="w-3.5 h-3.5 text-purple-400" />
-                                        <span>Define a "alma" do seu assistente. Use <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">{'{{CURRENT_DATETIME}}'}</code> para injetar a hora atual.</span>
+                                    <p className="mt-3 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+                                        <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                        <span>
+                                            Use <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">{'{{preferred_name}}'}</code> para seu nome e <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">{'{{CURRENT_DATETIME}}'}</code> para a hora atual.
+                                        </span>
                                     </p>
                                 </div>
                             </div>
