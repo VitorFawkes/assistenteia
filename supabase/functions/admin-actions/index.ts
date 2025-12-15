@@ -71,6 +71,12 @@ serve(async (req) => {
             // Prevent self-deletion
             if (user_id === user.id) throw new Error('Cannot delete yourself');
 
+            // Manual cleanup of related tables (since cascading might not be set up)
+            await supabaseAdmin.from('user_settings').delete().eq('user_id', user_id);
+            await supabaseAdmin.from('user_preferences').delete().eq('user_id', user_id);
+            await supabaseAdmin.from('memories').delete().eq('user_id', user_id);
+            // Add other tables if necessary
+
             const { error } = await supabaseAdmin.auth.admin.deleteUser(user_id);
             if (error) throw error;
 

@@ -262,16 +262,16 @@ export function AdminPage() {
                     </div>
 
                     {/* Stats Pills */}
-                    <div className="hidden md:flex gap-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
+                    <div className="flex gap-4 overflow-x-auto pb-2 md:pb-0 no-scrollbar mask-fade-right">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700 whitespace-nowrap">
                             <User size={14} className="text-gray-400" />
                             <span className="text-sm font-medium">{totalUsers} Usuários</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700 whitespace-nowrap">
                             <Activity size={14} className="text-green-400" />
                             <span className="text-sm font-medium">{activeUsers} Ativos</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700 whitespace-nowrap">
                             <Shield size={14} className="text-purple-400" />
                             <span className="text-sm font-medium">{totalAdmins} Admins</span>
                         </div>
