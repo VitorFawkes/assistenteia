@@ -12,6 +12,7 @@ import IntegrationsPage from './pages/IntegrationsPage';
 import CalendarPage from './pages/CalendarPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import { AdminPage } from './pages/AdminPage';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="calendar" element={<CalendarPage />} />
+            <Route path="admin" element={<AdminPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

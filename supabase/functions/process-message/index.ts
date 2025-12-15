@@ -205,7 +205,6 @@ CONTEXTO ATUAL:
                                     amount: { type: 'number', description: 'Valor monetário. OBRIGATÓRIO se o item tiver custo. Ex: 182.90' },
                                     section: { type: 'string', description: 'Seção visual na lista (ex: Transporte, Alimentação)' },
                                     category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
-                                    date: { type: 'string', description: 'Data do evento (ISO)' },
                                     type: { type: 'string', enum: ['expense', 'note', 'task', 'credential', 'shopping_item', 'list_item'], description: 'Tipo do item' },
                                     // Novos campos para Credenciais/Tarefas/Gastos
                                     username: { type: 'string', description: 'Para credenciais: usuário/login' },
@@ -372,6 +371,24 @@ CONTEXTO ATUAL:
             {
                 type: 'function',
                 function: {
+                    name: 'manage_users',
+                    description: 'ADMIN ONLY: Manage users, models and rules. Use this to list users, change their AI model, or delete them.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['list', 'update_model', 'delete', 'update_rules'] },
+                            target_user_id: { type: 'string', description: 'The ID of the user to modify (required for update/delete)' },
+                            model: { type: 'string', enum: ['gpt-4o', 'gpt-5.1-preview'], description: 'New model to set' },
+                            rule_key: { type: 'string', description: 'Key of the rule to update' },
+                            rule_value: { type: 'string', description: 'Value of the rule to update' }
+                        },
+                        required: ['action']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'manage_emails',
                     description: 'Gerencia emails do Gmail (ler, enviar, responder, mover, apagar).',
                     parameters: {
@@ -530,8 +547,8 @@ Ferramentas:
 - manage_collections: criar/listar pastas
 - manage_items: adicionar/atualizar/apagar itens em pastas
 - query_data: buscar/somar/contar dados com filtros (data, categoria, etc)
-- manage_reminders: criar/listar/completar lembretes (simples ou recorrentes)
-- manage_tasks: gerenciar lista de tarefas (To-Do). Use 'due_date' para tarefas do dia (Caixa do Dia).
+- manage_tasks: gerenciar lista de tarefas (To-Do). Use 'due_date' para tarefas do dia (Caixa do Dia). PREFIRA ISSO para "coisas a fazer".
+- manage_reminders: APENAS para notificações/alertas em horário específico ("Me avise às 10h").
 - save_memory: salvar fatos importantes na memória permanente (vetorial)
 - recall_memory: buscar memórias passadas por significado (RAG)
 - manage_rules: criar/listar/deletar regras de comportamento e preferências (Brain)
@@ -560,7 +577,35 @@ Exemplos:
 "Me lembra a cada 30 minutos de beber água" -> manage_reminders {action: "create", title: "beber água", time_config: {mode: "relative", relative_amount: 30, relative_unit: "minutes"}, recurrence_type: "custom", recurrence_interval: 30, recurrence_unit: "minutes"}
 "Me lembra toda segunda, quarta e sexta às 9h" -> manage_reminders {action: "create", title: "...", time_config: {mode: "absolute", target_hour: 9}, recurrence_type: "weekly", weekdays: [1,3,5]}
 
-IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
+**PRIORIDADE DE BUSCA E CONCLUSÃO (CRÍTICO):**
+Se o usuário disser "Já fiz", "Tá pago", "Concluí", "Check":
+1. **PRIMEIRO:** Verifique \`manage_reminders\` e \`manage_tasks\`. É 99% de chance de ser um desses.
+2. **SEGUNDO:** Só verifique \`manage_items\` (Coleções) se o usuário mencionar explicitamente uma pasta ou se não encontrar NADA em lembretes/tarefas.
+3. **AMBIGUIDADE:** Se houver dúvida (ex: "Check no voo" e existir um Lembrete "Voo" e uma Pasta "Voo"), PERGUNTE: "Você quer concluir o lembrete ou atualizar a pasta?"
+**NUNCA PRESUMA** que é uma coleção se o contexto for de "fazer algo".
+
+**DIFERENÇA CRÍTICA: TAREFA vs LEMBRETE (E QUANDO USAR OS DOIS)**
+- **TAREFA (\`manage_tasks\`)**: Coisas que eu tenho que FAZER. Ex: "Pagar conta", "Comprar leite".
+  - Se tem data ("para hoje", "para amanhã"), use \`due_date\`.
+  - Vai para a "Caixa do Dia" ou lista de tarefas.
+- **LEMBRETE (\`manage_reminders\`)**: Alertas/Notificações. Ex: "Me avise para sair", "Me lembra de tomar remédio".
+  - Geralmente tem HORÁRIO específico.
+
+**REGRA DE DUPLA AÇÃO (IMPORTANTE):**
+Se o usuário pedir algo que é UMA TAREFA mas também precisa de UM AVISO, **FAÇA OS DOIS**.
+Ex: "Me lembra de pagar a conta amanhã às 10h"
+1. Crie a TAREFA "Pagar conta" para amanhã (\`manage_tasks\`).
+2. Crie o LEMBRETE "Pagar conta" para amanhã às 10h (\`manage_reminders\`).
+*Explique ao usuário que você criou ambos para garantir.*
+
+**Exemplos de TAREFAS (manage_tasks):**
+"Cria uma tarefa pagar luz vencimento hoje" -> manage_tasks {action: "create", title: "Pagar luz", due_date: "..."}
+"Coloca na minha lista de hoje: Ligar pro João" -> manage_tasks {action: "create", title: "Ligar pro João", due_date: "..."}
+"Tenho que entregar o projeto amanhã" -> manage_tasks {action: "create", title: "Entregar projeto", due_date: "..."}
+
+**Exemplos de LEMBRETES (manage_reminders):**
+"Me avise às 14h para a reunião" -> manage_reminders {action: "create", title: "Reunião", due_at: "..."}
+"Me lembra de tomar água a cada 1h" -> manage_reminders { ... }
 
 **EXECUTE IMEDIATAMENTE** quando tiver as informações essenciais:
 - Tempo específico ("daqui a 1 minuto", "às 15h", "amanhã") + assunto = CRIE o lembrete!
@@ -771,7 +816,7 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
     - Você TEM acesso a contatos e mensagens via tools. USE-AS.`;
 
         let systemPrompt = DEFAULT_SYSTEM_PROMPT;
-        let aiModel = 'gpt-4o'; // Default model
+        let aiModel = 'gpt-5.1-preview'; // Default model (User Enforced)
         let userSettings: any = null;
 
         // Try to load user's custom prompt and model
@@ -795,9 +840,9 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
                 systemPrompt = systemPrompt.replace('{{preferred_name}}', userName);
             }
 
-            // ENFORCED MODEL: Always use GPT 5.1 (mapped to gpt-4o)
-            console.log('✨ Enforcing GPT 5.1 (gpt-4o) for all users.');
-            aiModel = 'gpt-4o';
+            // ENFORCED MODEL: Always use GPT 5.1 (User Enforced)
+            console.log('✨ Enforcing GPT 5.1 for all users.');
+            aiModel = 'gpt-5.1-preview';
 
             // Inject AI Name
             const aiName = userSettings?.ai_name;
@@ -811,8 +856,15 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
             console.log(`👤 Preferred Name Injected: ${userName}`);
 
             // --- 🛡️ AUTHORITY RULES INJECTION ---
-            if (isOwner) {
-                systemPrompt += `\n\nSTATUS: Você está falando com o SEU DONO (${userName}). Você tem permissão total para executar comandos, criar tarefas, salvar memórias e gerenciar o sistema.`;
+            if (isOwner || userSettings?.is_admin) {
+                systemPrompt += `\n\nSTATUS: Você está falando com o SEU DONO/ADMIN (${userName}). Você tem permissão total para executar comandos, criar tarefas, salvar memórias e gerenciar o sistema.`;
+
+                if (userSettings?.is_admin) {
+                    systemPrompt += `\n\n🛡️ MODO ADMIN ATIVADO: Você tem acesso à ferramenta \`manage_users\`.
+Use-a para listar usuários, mudar modelos de IA (gpt-4o, gpt-5.1-preview) ou gerenciar regras.
+Se o admin pedir "Liste os usuários", use \`manage_users { action: 'list' }\`.
+Se o admin pedir "Mude o modelo do João para GPT-4o", use \`manage_users { action: 'update_model', ... }\`.`;
+                }
             } else {
                 systemPrompt += `\n\n⚠️ ALERTA DE SEGURANÇA - MODO RESTRITO ⚠️
 Você está falando com TERCEIROS (${senderName}), NÃO com o seu dono.
@@ -1080,17 +1132,16 @@ REGRAS ABSOLUTAS:
 
             // Call OpenAI with current history
             // --- MODEL SELECTION LOGIC ---
-            // Se o usuário escolheu "GPT 5.1 Preview" (que ainda não existe na API), usamos o GPT-4o
-            // mas mantemos a ilusão ou funcionalidade esperada de "melhor modelo possível".
+            // User requires GPT 5.1. We try to use it.
+            // If it fails (because it might not exist yet publicly), we fallback to GPT-4o.
             let modelToUse = aiModel;
-            if (aiModel === 'gpt-5.1-preview') {
-                modelToUse = 'gpt-4o';
-                console.log('🚀 GPT 5.1 Preview selected! Using gpt-4o as backend engine.');
-            }
+
+            // REMOVED: Forced mapping. We now trust the user and try the model.
+            // if (aiModel === 'gpt-5.1-preview') { ... }
 
             console.log(`🤖 Final Model for Inference: ${modelToUse} (Requested: ${aiModel})`);
 
-            const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            let gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${openaiKey}`,
@@ -1104,6 +1155,33 @@ REGRAS ABSOLUTAS:
                     temperature: 0.7, // Criatividade balanceada
                 }),
             });
+
+            // --- FALLBACK LOGIC ---
+            if (!gptResponse.ok && modelToUse === 'gpt-5.1-preview') {
+                console.warn('⚠️ GPT 5.1 failed (likely not available). Falling back to GPT-4o.');
+                await supabase.from('debug_logs').insert({
+                    function_name: 'process-message',
+                    level: 'warning',
+                    message: 'GPT 5.1 failed, falling back to GPT-4o',
+                    meta: { status: gptResponse.status }
+                });
+
+                modelToUse = 'gpt-4o';
+                gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openaiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: modelToUse,
+                        messages: messages,
+                        tools: tools,
+                        tool_choice: 'auto',
+                        temperature: 0.7,
+                    }),
+                });
+            }
 
             const gptData = await gptResponse.json();
 
@@ -1566,6 +1644,56 @@ REGRAS ABSOLUTAS:
                             }
 
                             toolOutput = results.length > 0 ? results.join('\n\n') : "Nenhum resultado encontrado.";
+                        }
+                    }
+
+                    // --- MANAGE USERS (ADMIN ONLY) ---
+                    else if (functionName === 'manage_users') {
+                        if (!userSettings?.is_admin) {
+                            throw new Error("⛔ ACESSO NEGADO: Apenas administradores podem usar esta ferramenta.");
+                        }
+
+                        console.log('🛡️ ADMIN ACTION:', args);
+
+                        if (args.action === 'list') {
+                            const { data: users, error } = await supabase
+                                .from('user_settings')
+                                .select('user_id, preferred_name, ai_model, is_admin');
+
+                            if (error) throw error;
+
+                            const userList = users.map((u: any) =>
+                                `- ${u.preferred_name || 'Sem Nome'} (ID: ${u.user_id}) [Model: ${u.ai_model}] ${u.is_admin ? '🛡️ ADMIN' : ''}`
+                            ).join('\n');
+
+                            toolOutput = `👥 Lista de Usuários:\n${userList}`;
+                        }
+                        else if (args.action === 'update_model') {
+                            if (!args.target_user_id || !args.model) throw new Error("target_user_id e model são obrigatórios.");
+
+                            const { error } = await supabase
+                                .from('user_settings')
+                                .update({ ai_model: args.model })
+                                .eq('user_id', args.target_user_id);
+
+                            if (error) throw error;
+                            toolOutput = `✅ Modelo do usuário ${args.target_user_id} atualizado para ${args.model}.`;
+                        }
+                        else if (args.action === 'delete') {
+                            if (!args.target_user_id) throw new Error("target_user_id é obrigatório.");
+
+                            // Delete from auth.users? No, we can't do that easily from here without service role key with special perms.
+                            // But we can delete from user_settings and data tables.
+                            // Actually, let's just delete user_settings for now as a soft delete/reset.
+                            // Or better: just warn that we can't fully delete auth user.
+
+                            const { error } = await supabase
+                                .from('user_settings')
+                                .delete()
+                                .eq('user_id', args.target_user_id);
+
+                            if (error) throw error;
+                            toolOutput = `⚠️ Configurações do usuário ${args.target_user_id} apagadas. (A conta Auth ainda existe).`;
                         }
                     }
 
