@@ -1,20 +1,29 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Trash2, BookOpen, User, Search, Save, X, Plus, Brain, Smartphone, ArrowLeft } from 'lucide-react';
+import { Shield, Trash2, BookOpen, User, Search, Save, X, Plus, Brain, Smartphone, ArrowLeft, Power, Activity, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { clsx } from 'clsx';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface UserSettings {
     user_id: string;
     preferred_name: string;
     ai_model: string;
     is_admin: boolean;
+    is_active: boolean;
     ai_name: string;
     phone_number: string;
     created_at: string;
+    // Feature Flags
+    daily_briefing_enabled: boolean;
+    storage_download_images: boolean;
+    storage_download_videos: boolean;
+    storage_download_audio: boolean;
+    storage_download_documents: boolean;
+    privacy_allow_outgoing: boolean;
+    // Prompts
+    custom_system_prompt: string;
+    daily_briefing_prompt: string;
 }
 
 interface UserRule {
@@ -32,7 +41,7 @@ export function AdminPage() {
     const [selectedUser, setSelectedUser] = useState<UserSettings | null>(null);
     const [userRules, setUserRules] = useState<UserRule[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'profile' | 'rules'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'features' | 'prompts' | 'rules'>('profile');
 
     // Edit States
     const [editForm, setEditForm] = useState<Partial<UserSettings>>({});
@@ -42,6 +51,12 @@ export function AdminPage() {
     const [newRuleKey, setNewRuleKey] = useState('');
     const [newRuleValue, setNewRuleValue] = useState('');
     const [isAddingRule, setIsAddingRule] = useState(false);
+
+    // Create User State
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [newUserEmail, setNewUserEmail] = useState('');
+    const [newUserPassword, setNewUserPassword] = useState('');
+    const [newUserName, setNewUserName] = useState('');
 
     useEffect(() => {
         checkAdmin();
@@ -62,7 +77,6 @@ export function AdminPage() {
 
     const checkAdmin = async () => {
         if (!user) return;
-        // Fallback for immediate access
         if (user.email === 'vitorgambetti@gmail.com') {
             fetchUsers();
             setLoading(false);
@@ -123,25 +137,63 @@ export function AdminPage() {
             setUsers(users.map(u => u.user_id === selectedUser.user_id ? { ...u, ...editForm } : u));
             setSelectedUser({ ...selectedUser, ...editForm });
             setIsEditing(false);
-            alert('Perfil atualizado com sucesso!');
+            alert('Configurações atualizadas com sucesso!');
         } else {
-            alert('Erro ao atualizar perfil.');
+            alert('Erro ao atualizar configurações.');
+        }
+    };
+
+    const handleCreateUser = async () => {
+        if (!newUserEmail || !newUserPassword || !newUserName) {
+            alert('Preencha todos os campos');
+            return;
+        }
+
+        try {
+            const { error } = await supabase.functions.invoke('admin-actions', {
+                body: {
+                    action: 'create_user',
+                    payload: {
+                        email: newUserEmail,
+                        password: newUserPassword,
+                        preferred_name: newUserName
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            alert('Usuário criado com sucesso!');
+            setIsCreatingUser(false);
+            setNewUserEmail('');
+            setNewUserPassword('');
+            setNewUserName('');
+            fetchUsers(); // Refresh list
+        } catch (error: any) {
+            console.error(error);
+            alert('Erro ao criar usuário: ' + error.message);
         }
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('ATENÇÃO: Isso apagará TODAS as configurações e memórias deste usuário. Continuar?')) return;
+        if (!confirm('ATENÇÃO: Isso apagará PERMANENTEMENTE o usuário do Auth e do Banco de Dados. Continuar?')) return;
 
-        const { error } = await supabase
-            .from('user_settings')
-            .delete()
-            .eq('user_id', userId);
+        try {
+            const { error } = await supabase.functions.invoke('admin-actions', {
+                body: {
+                    action: 'delete_user',
+                    payload: { user_id: userId }
+                }
+            });
 
-        if (!error) {
+            if (error) throw error;
+
             setUsers(users.filter(u => u.user_id !== userId));
             if (selectedUser?.user_id === userId) setSelectedUser(null);
-        } else {
-            alert('Erro ao deletar usuário.');
+            alert('Usuário deletado com sucesso.');
+        } catch (error: any) {
+            console.error(error);
+            alert('Erro ao deletar usuário: ' + error.message);
         }
     };
 
@@ -184,7 +236,7 @@ export function AdminPage() {
     // Stats
     const totalUsers = users.length;
     const totalAdmins = users.filter(u => u.is_admin).length;
-    const gpt5Users = users.filter(u => u.ai_model?.includes('5.1')).length;
+    const activeUsers = users.filter(u => u.is_active !== false).length;
 
     if (loading) return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
@@ -205,7 +257,7 @@ export function AdminPage() {
                             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                                 Admin Dashboard
                             </h1>
-                            <p className="text-xs text-gray-400">Gerenciamento do Sistema</p>
+                            <p className="text-xs text-gray-400">Gerenciamento Total</p>
                         </div>
                     </div>
 
@@ -216,12 +268,12 @@ export function AdminPage() {
                             <span className="text-sm font-medium">{totalUsers} Usuários</span>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
-                            <Shield size={14} className="text-purple-400" />
-                            <span className="text-sm font-medium">{totalAdmins} Admins</span>
+                            <Activity size={14} className="text-green-400" />
+                            <span className="text-sm font-medium">{activeUsers} Ativos</span>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
-                            <Brain size={14} className="text-green-400" />
-                            <span className="text-sm font-medium">{gpt5Users} GPT-5.1</span>
+                            <Shield size={14} className="text-purple-400" />
+                            <span className="text-sm font-medium">{totalAdmins} Admins</span>
                         </div>
                     </div>
                 </div>
@@ -232,21 +284,28 @@ export function AdminPage() {
                 {/* Left Column: User List */}
                 <div className={clsx(
                     "lg:col-span-4 flex flex-col bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden backdrop-blur-sm transition-all",
-                    // Mobile Logic: Hide if user selected
                     selectedUser ? "hidden lg:flex" : "flex",
-                    // Desktop Logic: Always flex
                     "lg:flex"
                 )}>
                     <div className="p-4 border-b border-gray-700 space-y-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Buscar usuários..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
-                            />
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={() => setIsCreatingUser(true)}
+                                className="p-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white transition-colors"
+                                title="Criar Usuário"
+                            >
+                                <Plus size={20} />
+                            </button>
                         </div>
                     </div>
 
@@ -256,7 +315,7 @@ export function AdminPage() {
                                 key={u.user_id}
                                 onClick={() => handleSelectUser(u)}
                                 className={clsx(
-                                    "w-full text-left p-3 rounded-xl transition-all border",
+                                    "w-full text-left p-3 rounded-xl transition-all border group",
                                     selectedUser?.user_id === u.user_id
                                         ? "bg-blue-600/10 border-blue-500/50 shadow-lg shadow-blue-900/20"
                                         : "bg-transparent border-transparent hover:bg-gray-700/50 text-gray-400 hover:text-white"
@@ -266,19 +325,12 @@ export function AdminPage() {
                                     <span className={clsx("font-semibold", selectedUser?.user_id === u.user_id ? "text-blue-400" : "text-gray-200")}>
                                         {u.preferred_name || 'Sem Nome'}
                                     </span>
-                                    {u.is_admin && <Shield size={14} className="text-purple-400" />}
+                                    <div className="flex gap-1">
+                                        {u.is_active === false && <Power size={14} className="text-red-400" />}
+                                        {u.is_admin && <Shield size={14} className="text-purple-400" />}
+                                    </div>
                                 </div>
                                 <div className="text-xs text-gray-500 truncate mb-2 font-mono opacity-60">{u.user_id}</div>
-                                <div className="flex items-center gap-2">
-                                    <span className={clsx(
-                                        "text-[10px] px-2 py-0.5 rounded-full border",
-                                        u.ai_model?.includes('5.1')
-                                            ? "bg-green-500/10 text-green-400 border-green-500/20"
-                                            : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                    )}>
-                                        {u.ai_model || 'gpt-4o'}
-                                    </span>
-                                </div>
                             </button>
                         ))}
                     </div>
@@ -287,7 +339,6 @@ export function AdminPage() {
                 {/* Right Column: Details */}
                 <div className={clsx(
                     "lg:col-span-8 flex flex-col bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden backdrop-blur-sm relative transition-all",
-                    // Mobile Logic: Show only if user selected
                     selectedUser ? "flex" : "hidden lg:flex"
                 )}>
                     {selectedUser ? (
@@ -295,7 +346,6 @@ export function AdminPage() {
                             {/* User Header */}
                             <div className="p-6 border-b border-gray-700 flex justify-between items-start bg-gray-800/80">
                                 <div className="flex items-start gap-3">
-                                    {/* Mobile Back Button */}
                                     <button
                                         onClick={() => setSelectedUser(null)}
                                         className="lg:hidden p-1 -ml-2 mr-1 text-gray-400 hover:text-white"
@@ -304,11 +354,16 @@ export function AdminPage() {
                                     </button>
 
                                     <div>
-                                        <h2 className="text-2xl font-bold text-white mb-1">{selectedUser.preferred_name}</h2>
+                                        <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+                                            {selectedUser.preferred_name}
+                                            {selectedUser.is_active === false && (
+                                                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30">
+                                                    INATIVO
+                                                </span>
+                                            )}
+                                        </h2>
                                         <div className="flex items-center gap-3 text-sm text-gray-400">
                                             <span className="font-mono bg-gray-900 px-2 py-0.5 rounded text-xs hidden sm:inline">{selectedUser.user_id}</span>
-                                            <span className="hidden sm:inline">•</span>
-                                            <span>Criado em {selectedUser.created_at ? format(new Date(selectedUser.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -334,7 +389,7 @@ export function AdminPage() {
                                             onClick={() => setIsEditing(true)}
                                             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                                         >
-                                            <span className="hidden sm:inline">Editar Perfil</span>
+                                            <span className="hidden sm:inline">Editar</span>
                                             <span className="sm:hidden">Editar</span>
                                         </button>
                                     )}
@@ -343,29 +398,26 @@ export function AdminPage() {
 
                             {/* Tabs */}
                             <div className="flex border-b border-gray-700 px-6 overflow-x-auto">
-                                <button
-                                    onClick={() => setActiveTab('profile')}
-                                    className={clsx(
-                                        "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                                        activeTab === 'profile'
-                                            ? "border-blue-500 text-blue-400"
-                                            : "border-transparent text-gray-400 hover:text-white"
-                                    )}
-                                >
-                                    Perfil & Configurações
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('rules')}
-                                    className={clsx(
-                                        "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap",
-                                        activeTab === 'rules'
-                                            ? "border-purple-500 text-purple-400"
-                                            : "border-transparent text-gray-400 hover:text-white"
-                                    )}
-                                >
-                                    Memórias & Regras
-                                    <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full text-xs">{userRules.length}</span>
-                                </button>
+                                {[
+                                    { id: 'profile', label: 'Perfil', icon: User },
+                                    { id: 'features', label: 'Funcionalidades', icon: Power },
+                                    { id: 'prompts', label: 'Cérebro & Prompts', icon: Brain },
+                                    { id: 'rules', label: 'Memórias', icon: BookOpen },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={clsx(
+                                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2",
+                                            activeTab === tab.id
+                                                ? "border-blue-500 text-blue-400"
+                                                : "border-transparent text-gray-400 hover:text-white"
+                                        )}
+                                    >
+                                        <tab.icon size={16} />
+                                        {tab.label}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* Content Area */}
@@ -380,7 +432,7 @@ export function AdminPage() {
                                                     disabled={!isEditing}
                                                     value={editForm.preferred_name || ''}
                                                     onChange={e => setEditForm({ ...editForm, preferred_name: e.target.value })}
-                                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none disabled:opacity-50"
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -390,7 +442,7 @@ export function AdminPage() {
                                                     disabled={!isEditing}
                                                     value={editForm.ai_name || ''}
                                                     onChange={e => setEditForm({ ...editForm, ai_name: e.target.value })}
-                                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none disabled:opacity-50"
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -402,7 +454,7 @@ export function AdminPage() {
                                                         disabled={!isEditing}
                                                         value={editForm.phone_number || ''}
                                                         onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
-                                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-3 py-3 focus:border-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-3 py-3 focus:border-blue-500 outline-none disabled:opacity-50"
                                                     />
                                                 </div>
                                             </div>
@@ -414,7 +466,7 @@ export function AdminPage() {
                                                         disabled={!isEditing}
                                                         value={editForm.ai_model || 'gpt-4o'}
                                                         onChange={e => setEditForm({ ...editForm, ai_model: e.target.value })}
-                                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-3 py-3 focus:border-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-10 pr-3 py-3 focus:border-blue-500 outline-none disabled:opacity-50 appearance-none"
                                                     >
                                                         <option value="gpt-4o">GPT-4o</option>
                                                         <option value="gpt-5.1-preview">GPT 5.1 Preview</option>
@@ -423,8 +475,33 @@ export function AdminPage() {
                                             </div>
                                         </div>
 
-                                        <div className="pt-6 border-t border-gray-700">
-                                            <label className="flex items-center gap-3 p-4 bg-gray-900/50 rounded-xl border border-gray-700 cursor-pointer hover:bg-gray-900 transition-colors">
+                                        <div className="pt-6 border-t border-gray-700 space-y-4">
+                                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Controle de Acesso</h3>
+
+                                            <label className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl border border-gray-700 cursor-pointer hover:bg-gray-900 transition-colors">
+                                                <div>
+                                                    <span className="font-medium text-white block">Status da Conta</span>
+                                                    <span className="text-sm text-gray-400">
+                                                        {editForm.is_active !== false ? 'Ativo - Usuário pode acessar' : 'Inativo - Acesso bloqueado'}
+                                                    </span>
+                                                </div>
+                                                <div className={clsx("w-12 h-6 rounded-full p-1 transition-colors", editForm.is_active !== false ? "bg-green-500" : "bg-gray-600")}>
+                                                    <div className={clsx("w-4 h-4 bg-white rounded-full shadow-sm transition-transform", editForm.is_active !== false ? "translate-x-6" : "translate-x-0")} />
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    className="hidden"
+                                                    disabled={!isEditing}
+                                                    checked={editForm.is_active !== false}
+                                                    onChange={e => setEditForm({ ...editForm, is_active: e.target.checked })}
+                                                />
+                                            </label>
+
+                                            <label className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl border border-gray-700 cursor-pointer hover:bg-gray-900 transition-colors">
+                                                <div>
+                                                    <span className="font-medium text-white block">Acesso de Administrador</span>
+                                                    <span className="text-sm text-gray-400">Permite acesso total a este painel.</span>
+                                                </div>
                                                 <input
                                                     type="checkbox"
                                                     disabled={!isEditing}
@@ -432,10 +509,6 @@ export function AdminPage() {
                                                     onChange={e => setEditForm({ ...editForm, is_admin: e.target.checked })}
                                                     className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-800"
                                                 />
-                                                <div>
-                                                    <span className="font-medium text-white block">Acesso de Administrador</span>
-                                                    <span className="text-sm text-gray-400">Permite acesso total a este painel e configurações globais.</span>
-                                                </div>
                                             </label>
                                         </div>
 
@@ -447,6 +520,70 @@ export function AdminPage() {
                                                 <Trash2 size={18} />
                                                 Deletar Usuário Permanentemente
                                             </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'features' && (
+                                    <div className="space-y-6 max-w-2xl">
+                                        <div className="space-y-4">
+                                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Privacidade & Armazenamento</h3>
+
+                                            {[
+                                                { key: 'privacy_allow_outgoing', label: 'Permitir Mensagens Ativas', desc: 'IA pode iniciar conversas no WhatsApp' },
+                                                { key: 'daily_briefing_enabled', label: 'Resumo Diário', desc: 'Envia briefing matinal automático' },
+                                                { key: 'storage_download_images', label: 'Download de Imagens', desc: 'Salva imagens recebidas no Storage' },
+                                                { key: 'storage_download_audio', label: 'Download de Áudio', desc: 'Salva áudios recebidos no Storage' },
+                                                { key: 'storage_download_documents', label: 'Download de Documentos', desc: 'Salva PDFs e docs no Storage' },
+                                            ].map(feature => (
+                                                <label key={feature.key} className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl border border-gray-700 cursor-pointer hover:bg-gray-900 transition-colors">
+                                                    <div>
+                                                        <span className="font-medium text-white block">{feature.label}</span>
+                                                        <span className="text-sm text-gray-400">{feature.desc}</span>
+                                                    </div>
+                                                    <div className={clsx("w-12 h-6 rounded-full p-1 transition-colors", (editForm as any)[feature.key] ? "bg-blue-600" : "bg-gray-600")}>
+                                                        <div className={clsx("w-4 h-4 bg-white rounded-full shadow-sm transition-transform", (editForm as any)[feature.key] ? "translate-x-6" : "translate-x-0")} />
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        disabled={!isEditing}
+                                                        checked={(editForm as any)[feature.key] || false}
+                                                        onChange={e => setEditForm({ ...editForm, [feature.key]: e.target.checked })}
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'prompts' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                                                <Brain size={16} />
+                                                Prompt do Sistema (Personalidade)
+                                            </label>
+                                            <textarea
+                                                disabled={!isEditing}
+                                                value={editForm.custom_system_prompt || ''}
+                                                onChange={e => setEditForm({ ...editForm, custom_system_prompt: e.target.value })}
+                                                className="w-full h-64 bg-gray-900 border border-gray-700 rounded-xl p-4 font-mono text-sm focus:border-blue-500 outline-none disabled:opacity-50 resize-none"
+                                                placeholder="Instruções base para a IA..."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                                                <FileText size={16} />
+                                                Prompt do Resumo Diário
+                                            </label>
+                                            <textarea
+                                                disabled={!isEditing}
+                                                value={editForm.daily_briefing_prompt || ''}
+                                                onChange={e => setEditForm({ ...editForm, daily_briefing_prompt: e.target.value })}
+                                                className="w-full h-32 bg-gray-900 border border-gray-700 rounded-xl p-4 font-mono text-sm focus:border-blue-500 outline-none disabled:opacity-50 resize-none"
+                                                placeholder="Como o resumo deve ser gerado..."
+                                            />
                                         </div>
                                     </div>
                                 )}
@@ -537,6 +674,61 @@ export function AdminPage() {
                     )}
                 </div>
             </div>
+
+            {/* Create User Modal */}
+            {isCreatingUser && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95">
+                        <h2 className="text-xl font-bold text-white mb-4">Criar Novo Usuário</h2>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Nome</label>
+                                <input
+                                    type="text"
+                                    value={newUserName}
+                                    onChange={e => setNewUserName(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none"
+                                    placeholder="Ex: João Silva"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Email</label>
+                                <input
+                                    type="email"
+                                    value={newUserEmail}
+                                    onChange={e => setNewUserEmail(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none"
+                                    placeholder="email@exemplo.com"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Senha</label>
+                                <input
+                                    type="password"
+                                    value={newUserPassword}
+                                    onChange={e => setNewUserPassword(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:border-blue-500 outline-none"
+                                    placeholder="Mínimo 6 caracteres"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    onClick={() => setIsCreatingUser(false)}
+                                    className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateUser}
+                                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors"
+                                >
+                                    Criar Conta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
