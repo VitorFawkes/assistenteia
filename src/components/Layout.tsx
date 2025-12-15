@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug, Calendar } from 'lucide-react';
+import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug, Calendar, Shield } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
@@ -30,6 +30,22 @@ export default function Layout() {
         }
     };
 
+    const [isAdmin, setIsAdmin] = React.useState(false);
+
+    useEffect(() => {
+        if (user) {
+            // Fallback for immediate access
+            if (user.email === 'vitorgambetti@gmail.com') {
+                setIsAdmin(true);
+            }
+
+            supabase.from('user_settings').select('is_admin').eq('user_id', user.id).single()
+                .then(({ data }) => {
+                    if ((data as any)?.is_admin) setIsAdmin(true);
+                });
+        }
+    }, [user]);
+
     const navItems = [
         { icon: CheckSquare, label: 'Tarefas', path: '/tasks' },
         { icon: Clock, label: 'Lembretes', path: '/reminders' },
@@ -38,6 +54,7 @@ export default function Layout() {
         { icon: Brain, label: 'Cérebro', path: '/brain' },
         { icon: FileText, label: 'Documentos', path: '/documents' },
         { icon: Plug, label: 'Integrações', path: '/integrations' },
+        ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: '/admin' }] : []),
     ];
 
     return (
