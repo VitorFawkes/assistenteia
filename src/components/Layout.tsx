@@ -1,14 +1,34 @@
-import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Clock, Brain, FileText, Settings, Menu, LogOut, Folder, CheckSquare, Plug, Calendar } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
-import OnboardingModal from './OnboardingModal';
+import { supabase } from '../lib/supabase';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
-    const { signOut } = useAuth();
+    const { user, signOut } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (user) {
+            checkOnboarding();
+        }
+    }, [user]);
+
+    const checkOnboarding = async () => {
+        const { data } = await supabase
+            .from('user_settings')
+            .select('onboarding_completed')
+            .eq('user_id', user!.id)
+            .single();
+
+        // Cast to any to avoid TS error until types are updated
+        if ((data as any)?.onboarding_completed === false) {
+            navigate('/onboarding');
+        }
+    };
 
     const navItems = [
         { icon: CheckSquare, label: 'Tarefas', path: '/tasks' },
@@ -114,7 +134,6 @@ export default function Layout() {
 
             {/* Mobile Navigation */}
             <MobileNav />
-            <OnboardingModal />
         </div>
     );
 }

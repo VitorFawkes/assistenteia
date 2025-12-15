@@ -13,6 +13,7 @@ import CalendarPage from './pages/CalendarPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import { AdminPage } from './pages/AdminPage';
+import OnboardingGuide from './pages/OnboardingGuide';
 
 function App() {
   return (
@@ -21,6 +22,12 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+
+          <Route path="/onboarding" element={
+            <ProtectedRoute>
+              <OnboardingGuide />
+            </ProtectedRoute>
+          } />
 
           <Route path="/" element={
             <ProtectedRoute>
