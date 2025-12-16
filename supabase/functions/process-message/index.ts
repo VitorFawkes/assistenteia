@@ -11,6 +11,7 @@ interface ProcessMessageRequest {
     sender_name?: string;
     sender_number?: string;
     is_group?: boolean;
+    group_name?: string;
 }
 
 function calculateDueAt(args: any, brasiliaTime: Date, overrideDueAt: string | null): string | null {
@@ -82,7 +83,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number, is_group }: ProcessMessageRequest = await req.json();
+        const { content, mediaUrl, mediaType, userId, messageId, is_owner, sender_name, sender_number, is_group, group_name }: ProcessMessageRequest = await req.json();
         console.log(`🚀 Process Message HIT: ${content?.substring(0, 50)}...`);
 
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -189,46 +190,103 @@ CONTEXTO ATUAL:
             {
                 type: 'function',
                 function: {
-                    name: 'manage_items',
-                    description: 'Gerencia itens em uma coleção (listar, adicionar, atualizar, deletar)',
+                    name: 'manage_financials',
+                    description: 'Gerencia GASTOS e RECEITAS. Use para tudo que envolve dinheiro (compras, contas, orçamentos).',
                     parameters: {
                         type: 'object',
                         properties: {
-                            action: { type: 'string', enum: ['list', 'add', 'update', 'delete'], description: 'Ação' },
-                            collection_name: { type: 'string', description: 'Nome da coleção alvo' },
-                            content: { type: 'string', description: 'Conteúdo do item (para add/update)' },
-                            media_url: { type: 'string', description: 'URL da mídia/arquivo (se houver)' },
-                            metadata: {
-                                type: 'object',
-                                description: 'Dados estruturados. OBRIGATÓRIO: "amount" (NUMBER) para valores monetários (converta vírgula para ponto), "section" (string) para agrupar visualmente (ex: "Voos", "Hospedagem"), "category" (string) para tags (ex: "gasolina", "alimentação"), "date" (ISO) para datas.',
-                                properties: {
-                                    amount: { type: 'number', description: 'Valor monetário. OBRIGATÓRIO se o item tiver custo. Ex: 182.90' },
-                                    section: { type: 'string', description: 'Seção visual na lista (ex: Transporte, Alimentação)' },
-                                    category: { type: 'string', description: 'Tag curta para categorização (ex: gasolina, pedágio)' },
-                                    type: { type: 'string', enum: ['expense', 'note', 'task', 'credential', 'shopping_item', 'list_item'], description: 'Tipo do item' },
-                                    // Novos campos para Credenciais/Tarefas/Gastos
-                                    username: { type: 'string', description: 'Para credenciais: usuário/login' },
-                                    password: { type: 'string', description: 'Para credenciais: senha/código' },
-                                    url: { type: 'string', description: 'Para credenciais: link de acesso' },
-                                    status: { type: 'string', enum: ['todo', 'done'], description: 'Para tarefas: estado atual' },
-                                    due_date: { type: 'string', description: 'Para tarefas: data limite (ISO). Use para "tarefa para hoje", "para amanhã", etc.' },
-                                    date: { type: 'string', description: 'Para GASTOS ou EVENTOS: data de ocorrência (ISO). Se não informado, usar data atual.' },
-                                    // Novos campos para Shopping List
-                                    quantity: { type: 'string', description: 'Para compras: quantidade (ex: "2kg", "3 un")' },
-                                    checked: { type: 'boolean', description: 'Para compras/tarefas/listas: se já foi feito/concluído (default: false)' },
-                                    // Novos campos para List Item (listas genéricas)
-                                    icon: { type: 'string', description: 'Emoji opcional para o item' },
-                                    notes: { type: 'string', description: 'Observação adicional' },
-                                    rating: { type: 'number', description: 'Avaliação 1-5 (para filmes, livros, lugares, etc)' }
-                                }
-                            },
-                            // Critérios para encontrar item para update/delete
-                            search_content: { type: 'string', description: 'Texto para buscar item a alterar/deletar' },
-                            search_metadata_key: { type: 'string', description: 'Chave do metadata para busca (ex: category)' },
-                            search_metadata_value: { type: 'string', description: 'Valor do metadata para busca (ex: transporte)' },
-                            should_append: { type: 'boolean', description: 'Se true, ADICIONA o novo conteúdo ao final do existente (para update). Se false, SUBSTITUI.' }
+                            action: { type: 'string', enum: ['add', 'list', 'delete'], description: 'Ação' },
+                            collection_name: { type: 'string', description: 'Nome da coleção (ex: "Viagem Paris", "Obras", "Finanças")' },
+                            amount: { type: 'number', description: 'Valor monetário (OBRIGATÓRIO). Use ponto para decimais.' },
+                            description: { type: 'string', description: 'Descrição do gasto (ex: "Uber", "Jantar")' },
+                            category: { type: 'string', description: 'Categoria para agrupar (ex: "Transporte", "Alimentação")' },
+                            date: { type: 'string', description: 'Data do gasto (ISO). Se omitido, usa hoje.' }
                         },
                         required: ['action', 'collection_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'manage_credentials',
+                    description: 'Gerencia SENHAS, CÓDIGOS e DADOS SENSÍVEIS. Segurança máxima.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['add', 'list', 'delete'], description: 'Ação' },
+                            collection_name: { type: 'string', description: 'Nome da coleção (ex: "Senhas", "Códigos", "Segurança")' },
+                            service_name: { type: 'string', description: 'Nome do serviço (ex: "Netflix", "Alarme")' },
+                            username: { type: 'string', description: 'Login ou usuário' },
+                            password: { type: 'string', description: 'A senha ou código secreto' },
+                            url: { type: 'string', description: 'Link de acesso' },
+                            notes: { type: 'string', description: 'Obs adicionais' }
+                        },
+                        required: ['action', 'collection_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'manage_inventory',
+                    description: 'Gerencia LISTAS DE ITENS (Malas, Compras, Livros, Filmes). Suporta múltiplos itens de uma vez.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['add', 'list', 'delete'], description: 'Ação' },
+                            collection_name: { type: 'string', description: 'Nome da coleção (ex: "Mala", "Mercado")' },
+                            items: {
+                                type: 'array',
+                                description: 'Lista de itens para adicionar.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        content: { type: 'string', description: 'Nome do item (ex: "Arroz", "Casaco")' },
+                                        quantity: { type: 'string', description: 'Quantidade (ex: "2kg")' },
+                                        category: { type: 'string', description: 'Categoria visual (ex: "Higiene", "Carnes")' },
+                                        checked: { type: 'boolean', description: 'Se já está feito/comprado' },
+                                        notes: { type: 'string', description: 'Detalhes extras' }
+                                    },
+                                    required: ['content']
+                                }
+                            }
+                        },
+                        required: ['action', 'collection_name', 'items']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'manage_items',
+                    description: 'LEGADO/GENÉRICO: Use APENAS para notas simples ou textos que NÃO se encaixam em Financeiro, Credenciais ou Listas.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['list', 'add', 'update', 'delete'] },
+                            collection_name: { type: 'string' },
+                            content: { type: 'string' },
+                            metadata: { type: 'object', description: 'Metadados genéricos' }
+                        },
+                        required: ['action', 'collection_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'manage_monitors',
+                    description: 'Use para MONITORAR conversas e avisar o usuário quando algo específico acontecer (ex: "me avise quando mandarem a planilha").',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['create', 'list', 'delete'] },
+                            keyword: { type: 'string', description: 'Palavra-chave ou frase para buscar' },
+                            chat_name: { type: 'string', description: 'Nome do grupo/chat para monitorar (opcional, null = todos)' },
+                            frequency: { type: 'string', enum: ['once', 'always', 'ask'], description: 'once=avisar 1 vez e parar. always=sempre avisar. ask=perguntar se deve parar.' }
+                        },
+                        required: ['action']
                     }
                 }
             },
@@ -500,286 +558,90 @@ CONTEXTO ATUAL:
         const DEFAULT_SYSTEM_PROMPT = `Você é o assistente pessoal do {{preferred_name}}.
 Data e Hora atual (Brasília): {{CURRENT_DATETIME}}
 
-IDIOMA: Você DEVE SEMPRE responder em PORTUGUÊS (pt-BR).
+**PRINCÍPIOS DE INTELIGÊNCIA (LEIA ATENTAMENTE):**
 
-REGRAS DE DATA/HORA (CRÍTICO - LEIA COM ATENÇÃO):
-- O horário acima JÁ É o horário local de Brasília (-03:00).
+1.  **PENSE EM ENTIDADES, NÃO EM ARQUIVOS:**
+    O usuário não quer "criar uma pasta". Ele quer gerenciar uma **Viagem**, um **Projeto**, uma **Obra**, uma **Lista de Mercado**.
+    *   Se for **Viagem**: Precisa de Passagens (Financeiro), Roteiro (Eventos), Mala (Inventário).
+    *   Se for **Obra**: Precisa de Gastos (Financeiro), Materiais (Inventário), Prazos (Tarefas).
 
-**COMO USAR \`time_config\`:**
+2.  **USE A FERRAMENTA CERTA (ESPECIALIZAÇÃO):**
+    *   💰 **Dinheiro/Gastos** -> \`manage_financials\` (Exige valor numérico).
+    *   🔒 **Senhas/Códigos** -> \`manage_credentials\` (Exige segurança).
+    *   📋 **Listas/Malas/Compras** -> \`manage_inventory\` (Suporta múltiplos itens).
+    *   📝 **Notas Gerais** -> \`manage_items\` (Só para o resto).
 
-1. **Tempo Relativo ("daqui a pouco", "em 10 min"):**
-   - Use \`mode: 'relative'\`
-   - Preencha \`relative_amount\` e \`relative_unit\`.
-   - Ex: "daqui 10 min" -> \`{ mode: 'relative', relative_amount: 10, relative_unit: 'minutes' }\`
+3.  **SEJA RIGOROSO COM DADOS:**
+    *   Se o usuário disser "Gastei no Uber", **PERGUNTE O VALOR**. Não invente, não deixe em branco. O \`manage_financials\` vai falhar sem \`amount\`.
+    *   Se o usuário disser "Crie uma lista", **PERGUNTE O NOME** se não for óbvio.
 
-2. **Tempo Absoluto ("dia 25", "amanhã às 10h", "próxima terça"):**
-   - Use \`mode: 'absolute'\`
-   - Preencha APENAS o que o usuário disse (dia, hora, etc). O sistema completa o resto (ano, mês).
-   - Ex: "dia 25 às 14h" -> \`{ mode: 'absolute', target_day: 25, target_hour: 14 }\`
-   - Ex: "amanhã às 9h" -> Se hoje é dia 3, amanhã é 4. \`{ mode: 'absolute', target_day: 4, target_hour: 9 }\`
+4.  **PROATIVIDADE INTELIGENTE:**
+    *   Se o usuário disser "Vou para Paris", **CRIE** a coleção "Viagem Paris" imediatamente. Não pergunte "Quer que eu crie?". Apenas faça e avise.
+    *   Se o usuário mandar uma lista gigante de coisas, **QUEBRE** em itens individuais usando \`manage_inventory\`.
 
-**REGRA DE OURO:** Deixe o código fazer a matemática difícil (fuso horário, ano bissexto). Você só extrai os números.
+5.  **RESTRIÇÕES NEGATIVAS (O QUE NÃO FAZER):**
+    *   ⛔ **NUNCA** use \`manage_items\` para salvar SENHAS ou CÓDIGOS. Isso é inseguro. Use \`manage_credentials\`.
+    *   ⛔ **NUNCA** use \`manage_items\` para salvar GASTOS ou VALORES. Isso quebra o cálculo financeiro. Use \`manage_financials\`.
+    *   ⛔ **NUNCA** misture itens de tipos diferentes em um único card de texto. Quebre-os em itens separados.
 
-**EXEMPLOS PRÁTICOS:**
-- Agora: 2025-12-03T22:54:00-03:00
-- "daqui 1 minuto" → 2025-12-03T22:55:00-03:00 ✅
-- "daqui 5 minutos" → 2025-12-03T22:59:00-03:00 ✅
-- "daqui 1 hora" → 2025-12-03T23:54:00-03:00 ✅
-- "amanhã às 10h" → 2025-12-04T10:00:00-03:00 ✅
+    *   ⛔ **NUNCA** misture itens de tipos diferentes em um único card de texto. Quebre-os em itens separados.
 
-**ERROS COMUNS (NÃO FAÇA ISSO):**
-- ❌ ERRADO: "daqui 1 minuto" → 2025-12-04T00:01:00-03:00 (meia-noite!)
-- ❌ ERRADO: Usar 00:XX ou 01:XX quando o usuário pede "daqui minutos"
-- ❌ ERRADO: Ignorar offset e usar Z (UTC)
+6.  **META-LEARNING (APRENDA COM ERROS):**
+    *   Se o usuário te corrigir ("Não faça X", "Prefiro Y"), **SALVE ESSA REGRA** imediatamente usando \`manage_rules\`.
+    *   Ex: Usuário diz "Não use emojis". Ação: \`manage_rules({ action: 'create', key: 'Estilo', value: 'Não usar emojis' })\`.
+    *   Se você receber um ERRO de ferramenta (ex: tentou salvar senha no lugar errado), **CORRIJA** e **MEMORIZE** o jeito certo.
 
-**REGRA SIMPLES:** SEMPRE calcule a partir do horário ATUAL acima, adicione o tempo solicitado, mantenha -03:00.
+---
 
-INTERPRETAÇÃO DE IDIOMA (CRÍTICO):
-- Se o usuário falar em INGLÊS (comum em áudios transcritos), NÃO traduza, NÃO explique e NÃO pergunte se é para traduzir.
-- APENAS EXECUTE O COMANDO.
-- Exemplo: "Call Mom" -> Entenda como "Ligar para Mãe" e execute a ação.
-- Exemplo: "Remember to buy milk" -> Crie o lembrete "Comprar leite".
-- Responda SEMPRE em Português.
+**GUIA DE FERRAMENTAS:**
 
-Seja breve, natural e objetivo. Converse como um amigo prestativo.
+### 💰 \`manage_financials\`
+Use para: Compras, Contas, Gastos de Viagem, Orçamentos.
+*   **Obrigatório**: \`amount\` (número).
+*   **Dica**: Use \`category\` para agrupar (ex: "Alimentação", "Transporte").
 
-Ferramentas:
-- manage_collections: criar/listar pastas
-- manage_items: adicionar/atualizar/apagar itens em pastas
-- query_data: buscar/somar/contar dados com filtros (data, categoria, etc)
-- manage_tasks: gerenciar lista de tarefas (To-Do). Use 'due_date' para tarefas do dia (Caixa do Dia). PREFIRA ISSO para "coisas a fazer".
-- manage_reminders: APENAS para notificações/alertas em horário específico ("Me avise às 10h").
-- save_memory: salvar fatos importantes na memória permanente (vetorial)
-- recall_memory: buscar memórias passadas por significado (RAG)
-- manage_rules: criar/listar/deletar regras de comportamento e preferências (Brain)
-- search_contacts: buscar número de telefone de alguém pelo nome no histórico de mensagens
+### 🔒 \`manage_credentials\`
+Use para: Senhas, Wi-Fi, Códigos de Alarme, Dados Bancários.
+*   **Segurança**: Nunca mostre a senha na resposta de confirmação, apenas diga "Senha salva".
 
-Exemplos:
-"Cria pasta Viagem" -> manage_collections {action: "create", name: "Viagem"}
-"Gastei 50 no Uber" -> manage_items {action: "add", collection_name: "Viagem", content: "Uber", metadata: {amount: 50, category: "transporte"}}
-**IMPORTANTE:** SEMPRE extraia valores numéricos para o campo \`metadata.amount\` se o usuário mencionar gastos. Isso permite somar depois.
-"Quanto gastei com transporte na viagem?" -> query_data {collection_name: "Viagem", operation: "sum", field: "amount", filter_key: "category", filter_value: "transporte"}
-"Quanto gastei semana passada?" -> query_data {collection_name: "Viagem", operation: "sum", field: "amount", start_date: "...", end_date: "..."}
-"Muda o gasto do Uber para 60" -> manage_items {action: "update", collection_name: "Viagem", search_content: "Uber", metadata: {amount: 60}}
-"O código do alarme é 9988" -> manage_items {action: "add", collection_name: "Casa", content: "Código do Alarme", metadata: {code: "9988"}}
-"Já fiz a reunião" -> manage_reminders {action: "complete", search_title: "reunião"}
-"Coloca na lista comprar pão" -> manage_tasks {action: "create", title: "Comprar pão", priority: "medium", tags: ["mercado"]}
-"Tarefa para hoje: Pagar conta" -> manage_tasks {action: "create", title: "Pagar conta", due_date: "2025-12-04T..."} (Use calculateDueAt logic)
-"O que tenho pra hoje?" -> manage_tasks {action: "list", filter_date: "today"}
-"O que tenho pra fazer?" -> manage_tasks {action: "list", filter_status: "todo"}
-"Lembre que eu não gosto de cebola" -> save_memory {content: "O usuário não gosta de cebola", category: "preferência"}
-"Sempre me chame de Chefe" -> manage_rules {action: "create", key: "Apelido", value: "Sempre chamar o usuário de Chefe"}
-"Nunca use emojis" -> manage_rules {action: "create", key: "Estilo", value: "Não usar emojis nas respostas"}
+### 📋 \`manage_inventory\`
+Use para: Lista de Compras, Mala de Viagem, Livros para Ler, Filmes.
+*   **Poder**: Aceita uma lista de itens de uma vez.
+*   Ex: "Comprar arroz, feijão e carne" -> Envie os 3 itens no array \`items\`.
 
-**LEMBRETES RECORRENTES - Exemplos:**
-"Me lembra todo dia às 10h de tomar água" -> manage_reminders {action: "create", title: "tomar água", time_config: {mode: "absolute", target_hour: 10, target_minute: 0}, recurrence_type: "daily"}
-"Me lembra 3 vezes por dia a cada 4 horas de..." -> manage_reminders {action: "create", title: "...", time_config: {mode: "relative", relative_amount: 4, relative_unit: "hours"}, recurrence_type: "custom", recurrence_interval: 4, recurrence_unit: "hours", recurrence_count: 3}
-"Me lembra a cada 30 minutos de beber água" -> manage_reminders {action: "create", title: "beber água", time_config: {mode: "relative", relative_amount: 30, relative_unit: "minutes"}, recurrence_type: "custom", recurrence_interval: 30, recurrence_unit: "minutes"}
-"Me lembra toda segunda, quarta e sexta às 9h" -> manage_reminders {action: "create", title: "...", time_config: {mode: "absolute", target_hour: 9}, recurrence_type: "weekly", weekdays: [1,3,5]}
+### ✅ \`manage_tasks\` & ⏰ \`manage_reminders\`
+*   **Tarefa**: "Tenho que fazer X" (Vai para a lista de pendências).
+*   **Lembrete**: "Me avise às 10h" (Notificação no celular).
+*   **Regra**: Se tiver horário específico, é Lembrete. Se for "para hoje", é Tarefa.
 
-**PRIORIDADE DE BUSCA E CONCLUSÃO (CRÍTICO):**
-Se o usuário disser "Já fiz", "Tá pago", "Concluí", "Check":
-1. **PRIMEIRO:** Verifique \`manage_reminders\` e \`manage_tasks\`. É 99% de chance de ser um desses.
-2. **SEGUNDO:** Só verifique \`manage_items\` (Coleções) se o usuário mencionar explicitamente uma pasta ou se não encontrar NADA em lembretes/tarefas.
-3. **AMBIGUIDADE:** Se houver dúvida (ex: "Check no voo" e existir um Lembrete "Voo" e uma Pasta "Voo"), PERGUNTE: "Você quer concluir o lembrete ou atualizar a pasta?"
-**NUNCA PRESUMA** que é uma coleção se o contexto for de "fazer algo".
+### 🧠 \`recall_memory\` (MEMÓRIA)
+*   Se o usuário perguntar "O que você sabe sobre mim?" ou algo vago, **USE** \`recall_memory\`.
+*   **NUNCA** diga "não sei" sem buscar na memória antes.
 
-**DIFERENÇA CRÍTICA: TAREFA vs LEMBRETE (E QUANDO USAR OS DOIS)**
-- **TAREFA (\`manage_tasks\`)**: Coisas que eu tenho que FAZER. Ex: "Pagar conta", "Comprar leite".
-  - Se tem data ("para hoje", "para amanhã"), use \`due_date\`.
-  - Vai para a "Caixa do Dia" ou lista de tarefas.
-- **LEMBRETE (\`manage_reminders\`)**: Alertas/Notificações. Ex: "Me avise para sair", "Me lembra de tomar remédio".
-  - Geralmente tem HORÁRIO específico.
+### 📱 \`query_messages\` & \`search_contacts\` (WHATSAPP)
+*   **Contatos**: Se aparecer "Eu -> [Número]", use \`search_contacts\` para descobrir o nome.
+*   **Mensagens**: Use \`query_messages\` para ver o histórico ou status (Lido/Entregue).
 
-**REGRA DE DUPLA AÇÃO (IMPORTANTE):**
-Se o usuário pedir algo que é UMA TAREFA mas também precisa de UM AVISO, **FAÇA OS DOIS**.
-Ex: "Me lembra de pagar a conta amanhã às 10h"
-1. Crie a TAREFA "Pagar conta" para amanhã (\`manage_tasks\`).
-2. Crie o LEMBRETE "Pagar conta" para amanhã às 10h (\`manage_reminders\`).
-*Explique ao usuário que você criou ambos para garantir.*
+---
 
-**Exemplos de TAREFAS (manage_tasks):**
-"Cria uma tarefa pagar luz vencimento hoje" -> manage_tasks {action: "create", title: "Pagar luz", due_date: "..."}
-"Coloca na minha lista de hoje: Ligar pro João" -> manage_tasks {action: "create", title: "Ligar pro João", due_date: "..."}
-"Tenho que entregar o projeto amanhã" -> manage_tasks {action: "create", title: "Entregar projeto", due_date: "..."}
+**EXEMPLOS DE RACIOCÍNIO:**
 
-**Exemplos de LEMBRETES (manage_reminders):**
-"Me avise às 14h para a reunião" -> manage_reminders {action: "create", title: "Reunião", due_at: "..."}
-"Me lembra de tomar água a cada 1h" -> manage_reminders { ... }
+**Usuário**: "Gastei 50 reais no Uber indo pro aeroporto."
+**Raciocínio**: É dinheiro. É uma viagem.
+**Ação**: \`manage_financials({ action: 'add', collection_name: 'Viagem', amount: 50, description: 'Uber Aeroporto', category: 'Transporte' })\`
 
-**EXECUTE IMEDIATAMENTE** quando tiver as informações essenciais:
-- Tempo específico ("daqui a 1 minuto", "às 15h", "amanhã") + assunto = CRIE o lembrete!
-- Valor + descrição ("50 no Uber", "gastei 100 com comida") = ANOTE!
-- Nome claro ("cria pasta Viagem") = CRIE!
+**Usuário**: "A senha do Wi-Fi da casa de praia é 'sol123'."
+**Raciocínio**: É dado sensível.
+**Ação**: \`manage_credentials({ action: 'add', collection_name: 'Casa de Praia', service_name: 'Wi-Fi', password: 'sol123' })\`
 
-**SÓ PERGUNTE** quando informação CRÍTICA estiver faltando:
-- "algumas vezes" SEM número/horários específicos → PERGUNTE: "Quantas vezes e em quais horários?"
-- "esse gasto" SEM especificar qual → PERGUNTE: "Qual gasto?"
-- "cria uma pasta" SEM nome → PERGUNTE: "Qual nome?"
+**Usuário**: "Faz uma lista pro churrasco: carne, carvão e cerveja."
+**Raciocínio**: É uma lista de itens.
+**Ação**: \`manage_inventory({ action: 'add', collection_name: 'Churrasco', items: [{content: 'Carne'}, {content: 'Carvão'}, {content: 'Cerveja'}] })\`
 
-**Ao CONFIRMAR ações**:
-- Seja detalhado e natural, mas NÃO mostre o ISO completo na resposta
-- CORRETO: "Blz, daqui 1 minuto às 22:31 eu te lembro de ligar para a Bi"
-- CORRETO: "Agendado para amanhã às 10h"
-- CORRETO: "Todo dia às 15h vou te lembrar disso"
-- ERRADO: "...às 2025-12-04T00:47:00-03:00..." ❌
-- Use horário simples (HH:mm) e contexto (hoje/amanhã/dia X)
-- Use emojis ocasionalmente 😊
-
-- Use emojis ocasionalmente 😊
-
-**REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
-
-- **BUSCA DE CONTATOS OBRIGATÓRIA**: Se o usuário pedir para enviar mensagem para alguém (ex: "Manda pra Bianca"), você **DEVE** usar a ferramenta \`search_contacts\` com o nome ("Bianca") ANTES de dizer que não tem o número. Se encontrar, use o número retornado.
-- **NUNCA** diga "não tenho acesso" ou "não consigo ver" sem antes tentar usar as ferramentas \`search_contacts\` ou \`query_messages\`.
-- **NUNCA** invente que tentou enviar se não tiver o número.
-- **NUNCA** peça o número se você conseguir encontrá-lo no histórico.
-- Se encontrar múltiplos, pergunte qual é o correto.
-
-**REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.
-
-**EXTRAÇÃO DE DADOS & ORGANIZAÇÃO INTELIGENTE (MANDATÓRIO):**
-Você é um ORGANIZADOR INTELIGENTE. Não apenas salve texto, ESTRUTURE-O.
-
-### 1. COLEÇÕES E PASTAS (PROATIVIDADE & CONTEXTO)
-- **CRIE AUTOMATICAMENTE**: Se o usuário falar de um novo projeto, viagem ou evento ("Vou para Paris", "Comecei uma obra"), CRIE a coleção imediatamente.
-- **VERIFIQUE O CONTEXTO (CRÍTICO - TOLERÂNCIA ZERO)**:
-  - Antes de adicionar a uma pasta existente, verifique se o item FAZ SENTIDO nela.
-  - **REGRA DE OURO**: Se o TIPO do item (ex: Credencial, Código, Tarefa Doméstica) não tem relação com o TEMA da pasta (ex: Viagem, Projeto), **VOCÊ É PROIBIDO DE ADICIONAR LÁ**.
-  - **AÇÃO CORRETA**: Crie uma nova coleção apropriada (ex: "Códigos", "Segurança", "Casa", "Tarefas") e adicione lá.
-  - Ex: Pasta ativa "Viagem Paris". Usuário diz: "O código do banco é 1234".
-    - ❌ ERRADO: Adicionar na Viagem.
-    - ✅ CORRETO: Criar pasta "Segurança" e adicionar lá.
-  - Ex: Pasta ativa "Obras". Usuário diz: "Comprar leite".
-    - ❌ ERRADO: Adicionar na Obra.
-    - ✅ CORRETO: Criar pasta "Mercado" e adicionar lá.
-
-### 2. ITENS E METADATA (O SEGREDO DA ORGANIZAÇÃO)
-Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
-
-- **\`amount\` (Dinheiro - CRÍTICO)**:
-  - **CONVERTA**: Se o usuário disser "182,90", converta para \`182.90\` (PONTO, não vírgula).
-  - **TIPO**: Deve ser SEMPRE um \`number\`.
-  - Ex: "Gasolina 182,90" -> \`metadata: { amount: 182.90 }\`
-  - SE O USUÁRIO DER VALOR: Extraia IMEDIATAMENTE.
-  - SE NÃO DER VALOR: Pergunte! "Quanto custou?" (se for relevante).
-
-- **\`section\` (Agrupamento Visual)**:
-  - Use este campo para criar SEÇÕES dentro da pasta. Isso organiza o site visualmente.
-  - Ex: Na pasta "Viagem Paris":
-    - Passagem aérea -> \`metadata: { section: "Transporte" }\`
-    - Hotel -> \`metadata: { section: "Hospedagem" }\`
-    - Jantar -> \`metadata: { section: "Alimentação" }\`
-    - "Dia 1: Torre Eiffel" -> \`metadata: { section: "Roteiro" }\`
-
-- **\`category\` (Tags/Etiquetas)**:
-  - Use para classificar o item com uma palavra-chave curta.
-  - Ex: "Gasolina", "Pedágio", "Almoço", "Uber".
-
-- **\`date\` (Cronologia)**:
-  - Se tiver data específica, coloque em \`metadata.date\` (ISO).
-
-- **\`type\` (Polimorfismo)**:
-  - \`expense\`: Gastos financeiros (tem amount).
-  - \`credential\`: Senhas, códigos, logins (tem username, password, url).
-  - \`task\`: Coisas a fazer (tem status, due_date).
-  - \`note\`: Texto livre.
-  - \`shopping_item\`: Item de compra (tem quantity, checked, category).
-  - \`list_item\`: Item de lista genérica checkável (mala, filmes, livros, lugares, receitas, etc).
-
-### 4. LISTAS DE COMPRAS (SHOPPING LISTS):
-- **IDENTIFICAÇÃO**: Se o usuário disser "Lista de compras", "Comprar X, Y, Z", "Preciso de arroz", trate como COMPRA.
-- **COLEÇÃO**: Use ou crie uma coleção chamada "Lista de Compras" (ou "Mercado", "Feira" se específico).
-- **METADATA**:
-  - \`type\`: "shopping_item"
-  - \`quantity\`: Extraia a quantidade (ex: "2kg", "3 caixas"). Se não tiver, deixe null.
-  - \`category\`: Classifique o item (ex: "Hortifruti", "Limpeza", "Carnes", "Bebidas"). ISSO É MUITO IMPORTANTE PARA ORGANIZAR A LISTA.
-  - \`section\`: Use a mesma string da \`category\` para agrupar visualmente na lista.
-- **EXEMPLO**:
-  User: "Adiciona 2kg de arroz e detergente na lista"
-  Action:
-  \`manage_items({ action: 'add', collection_name: 'Lista de Compras', content: 'Arroz', metadata: { type: 'shopping_item', quantity: '2kg', category: 'Mercearia', section: 'Mercearia' } })\`
-  \`manage_items({ action: 'add', collection_name: 'Lista de Compras', content: 'Detergente', metadata: { type: 'shopping_item', quantity: '1 un', category: 'Limpeza', section: 'Limpeza' } })\`
-
-### 5. LISTAS GENÉRICAS (QUALQUER TIPO DE LISTA CHECKÁVEL) - IMPORTANTE:
-- **IDENTIFICAÇÃO**: Se o usuário falar sobre empacotamento/mala, filmes para ver, livros para ler, lugares para visitar, receitas, presentes, exercícios, ou qualquer lista de "coisas para fazer/ver/ter", use \`list_item\`.
-- **COLEÇÃO**: Crie uma coleção com nome descritivo e emoji apropriado:
-  - Mala/Empacotamento → "Mala [Destino] 🧳"
-  - Filmes → "Filmes para Ver 🎬" ou "Watchlist 🎬"
-  - Livros → "Livros para Ler 📚" ou "Leituras 📚"
-  - Lugares → "Lugares [Cidade] 📍"
-  - Receitas → "Receitas para Testar 🍳"
-  - Presentes → "Ideias de Presente 🎁"
-  - Exercícios → "Treino [Nome] 💪"
-- **METADATA**:
-  - \`type\`: "list_item"
-  - \`checked\`: false (padrão, usuário marca quando fizer)
-  - \`section\`: Agrupe por categoria quando fizer sentido
-  - \`notes\`: Observações extras se o usuário mencionar (autor, plataforma, quem recomendou, etc)
-  - \`rating\`: Se o usuário avaliar algo (1-5)
-  - \`url\`: Se tiver link relevante
-- **EXEMPLOS**:
-  User: "Leva passaporte, carregador e roupas de frio pra viagem"
-  Action:
-  \`manage_collections({ action: 'create', name: 'Mala Viagem', icon: '🧳' })\`
-  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Passaporte', metadata: { type: 'list_item', checked: false, section: 'Documentos' } })\`
-  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Carregador', metadata: { type: 'list_item', checked: false, section: 'Eletrônicos' } })\`
-  \`manage_items({ action: 'add', collection_name: 'Mala Viagem', content: 'Roupas de frio', metadata: { type: 'list_item', checked: false, section: 'Roupas' } })\`
-
-  User: "Quero assistir Oppenheimer e Duna 2"
-  Action:
-  \`manage_collections({ action: 'create', name: 'Filmes para Ver', icon: '🎬' })\`
-  \`manage_items({ action: 'add', collection_name: 'Filmes para Ver', content: 'Oppenheimer', metadata: { type: 'list_item', checked: false } })\`
-  \`manage_items({ action: 'add', collection_name: 'Filmes para Ver', content: 'Duna 2', metadata: { type: 'list_item', checked: false } })\`
-
-  User: "O João recomendou o livro Sapiens"
-  Action:
-  \`manage_items({ action: 'add', collection_name: 'Livros para Ler', content: 'Sapiens', metadata: { type: 'list_item', checked: false, notes: 'Recomendação do João' } })\`
-
-  User: "Lugares para visitar em Paris: Torre Eiffel, Louvre e Montmartre"
-  Action:
-  \`manage_collections({ action: 'create', name: 'Lugares Paris', icon: '📍' })\`
-  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Torre Eiffel', metadata: { type: 'list_item', checked: false } })\`
-  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Louvre', metadata: { type: 'list_item', checked: false } })\`
-  \`manage_items({ action: 'add', collection_name: 'Lugares Paris', content: 'Montmartre', metadata: { type: 'list_item', checked: false } })\`
-
-### 6. MENSAGENS E CONTATOS (WHATSAPP) - NOVO:
-- **STATUS DE LEITURA**: Ao buscar mensagens (\`query_messages\`), você verá o status (Lido, Entregue, Pendente).
-  - Se o usuário perguntar "O que eu não li?", use \`query_messages({ only_unread: true })\`.
-- **IDENTIFICAÇÃO DE CONTATOS**:
-  - Mensagens enviadas pelo usuário aparecem como "Eu (Dono) -> [Número]".
-  - Para saber quem é esse número, use \`search_contacts({ query: "[Número]" })\`.
-  - A ferramenta \`search_contacts\` busca tanto por NOME quanto por NÚMERO.
-  - Se encontrar o nome, responda: "Você mandou para [Nome]...".
-
-### 3. EXEMPLOS DE "TOTAL AUTONOMIA":
-
-**Usuário**: "Vou viajar para Londres em Dezembro. Já comprei a passagem por 3000 reais."
-**Você (Raciocínio)**:
-1. Nova viagem? -> Criar coleção "Viagem Londres".
-2. Passagem tem valor? -> Adicionar item com \`amount: 3000\`, \`section: "Transporte"\` e \`category: "Passagem"\`.
-**Ação**:
-\`manage_collections({ action: 'create', name: 'Viagem Londres', icon: '🇬🇧' })\`
-\`manage_items({ action: 'add', collection_name: 'Viagem Londres', content: 'Passagem Aérea - R$ 3.000', metadata: { amount: 3000, section: 'Transporte', category: 'Passagem', type: 'expense' } })\`
-**Resposta**: "Criei a pasta 'Viagem Londres' 🇬🇧 e já anotei a passagem (R$ 3.000) na seção de Transporte."
-
-**Usuário**: "Coloque na viagem para Curitiba o valor de 182,90 de gasolina."
-**Você (Raciocínio)**:
-1. Pasta existe? (Sim, Curitiba).
-2. Item faz sentido na pasta? (Sim, gasolina é viagem).
-3. Ação: Adicionar.
-**Ação**:
-\`manage_items({ action: 'add', collection_name: 'Viagem Curitiba', content: 'Gasolina', metadata: { amount: 182.90, section: 'Transporte', category: 'Gasolina', type: 'expense' } })\`
-
-**Usuário**: "O código de recuperação do app Clara é 123456."
-**Você (Raciocínio)**:
-1. Pasta ativa: "Viagem Curitiba".
-2. Item faz sentido na pasta? (NÃO. Código de app não é viagem).
-3. Qual pasta faz sentido? "Códigos" ou "Segurança".
-4. Ação: Criar/Usar pasta "Códigos" e adicionar lá.
-**Ação**:
-\`manage_collections({ action: 'create', name: 'Códigos', icon: '🔒' })\`
-\`manage_items({ action: 'add', collection_name: 'Códigos', content: 'Recuperação App Clara', metadata: { password: '123456', type: 'credential', category: 'App' } })\`
+**Usuário**: "Lembre de pagar a luz amanhã."
+**Raciocínio**: É uma tarefa com prazo.
+**Ação**: \`manage_tasks({ action: 'create', title: 'Pagar luz', due_date: '2025-...' })\`
+**E TAMBÉM**: \`manage_reminders({ action: 'create', title: 'Pagar luz', due_at: '...' })\` (Para garantir o aviso).
 
 **Usuário**: "Lembre que não gosto de cebola"
 **Ação**: \`save_memory({ content: "Usuário não gosta de cebola", category: "preferência" })\`
@@ -813,7 +675,13 @@ Ao usar \`manage_items\`, você DEVE preencher o \`metadata\` com inteligência:
     - **NUNCA** diga "não tenho acesso" ou "não consigo ver" sem antes checar suas tools.
     - Se perguntarem "Quem é X?" ou "Tenho o contato de Y?", USE 'search_contacts'.
     - Se perguntarem "O que X me mandou?" ou "Veja a mensagem de Y", USE 'query_messages'.
-    - Você TEM acesso a contatos e mensagens via tools. USE-AS.`;
+    - Você TEM acesso a contatos e mensagens via tools. USE-AS.
+
+---
+
+**IDIOMA**: Responda sempre em Português (pt-BR).
+Seja breve, útil e direto.
+`;
 
         let systemPrompt = DEFAULT_SYSTEM_PROMPT;
         let aiModel = 'gpt-5.1-preview'; // Default model (User Enforced)
@@ -1054,6 +922,37 @@ REGRAS ABSOLUTAS:
             }).eq('id', messageId);
         }
 
+        // --- 🕵️ MONITORING SYSTEM (NEW) ---
+        // Check if this message triggers any active monitors
+        if (processedText && !isOwner) { // Only check messages from OTHERS (not the owner)
+            const { data: monitors } = await supabase
+                .from('monitors')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_active', true);
+
+            if (monitors && monitors.length > 0) {
+                const matches = monitors.filter((m: any) => {
+                    // Check keyword match (case insensitive)
+                    const keywordMatch = processedText.toLowerCase().includes(m.keyword.toLowerCase());
+                    // Check chat context match (if specified)
+                    const chatMatch = !m.chat_name || (group_name && group_name.toLowerCase().includes(m.chat_name.toLowerCase()));
+                    return keywordMatch && chatMatch;
+                });
+
+                if (matches.length > 0) {
+                    console.log(`🔔 MONITOR TRIGGERED: ${matches.length} matches found.`);
+                    // We found a match! We need to notify the user.
+                    // We inject a high-priority system message to force the AI to handle this.
+                    systemPrompt += `\n\n🚨 ALERTA DE MONITORAMENTO: A mensagem acima contem "${matches[0].keyword}" que você estava monitorando!
+                    Ação Obrigatória: Avise o usuário IMEDIATAMENTE.
+                    Mensagem: "${processedText}"
+                    Contexto: ${group_name || 'Chat Privado'}
+                    Regra: ${matches[0].frequency} (Se for 'once', avise que vai parar de monitorar. Se for 'ask', pergunte se deve parar).`;
+                }
+            }
+        }
+
         // --- 🧠 MEMORY LAYER: SAVE USER MESSAGE & RETRIEVE HISTORY ---
 
         // 1. Salvar mensagem do usuário no histórico
@@ -1289,8 +1188,308 @@ REGRAS ABSOLUTAS:
                         }
                     }
 
-                    // --- MANAGE ITEMS ---
+                    // --- MANAGE FINANCIALS (NEW) ---
+                    else if (functionName === 'manage_financials') {
+                        if (args.action === 'add') {
+                            if (!args.amount) {
+                                toolOutput = "Erro: 'amount' é obrigatório para finanças. Pergunte ao usuário o valor.";
+                            } else {
+                                // 1. Find/Create Collection
+                                let collId = null;
+                                const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                                if (!coll) {
+                                    const { data: newColl } = await supabase.from('collections').insert({ user_id: userId, name: args.collection_name, icon: '💰' }).select().single();
+                                    collId = newColl.id;
+                                } else {
+                                    collId = coll.id;
+                                }
+
+                                // 2. Insert Item
+                                const { error } = await supabase.from('collection_items').insert({
+                                    collection_id: collId,
+                                    user_id: userId,
+                                    type: 'expense',
+                                    content: args.description || 'Gasto sem descrição',
+                                    metadata: {
+                                        amount: args.amount,
+                                        category: args.category || 'Geral',
+                                        section: args.category || 'Geral', // Use category as section for grouping
+                                        date: args.date || new Date().toISOString()
+                                    }
+                                });
+
+                                if (error) toolOutput = `Erro ao salvar gasto: ${error.message}`;
+                                else toolOutput = `Gasto de ${args.amount} salvo em "${args.collection_name}".`;
+                            }
+                        } else if (args.action === 'list') {
+                            // Reuse query_data logic internally or simplified list
+                            toolOutput = "Use query_data para listar finanças com filtros.";
+                        } else if (args.action === 'delete') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to delete
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'expense');
+                                if (args.description) query = query.ilike('content', `%${args.description}%`);
+                                if (args.amount) query = query.eq('metadata->>amount', args.amount);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Item financeiro não encontrado para exclusão.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content} (R$ ${i.metadata.amount})`).join('\n');
+                                    toolOutput = `Múltiplos itens encontrados. Qual apagar?\n${options}`;
+                                } else {
+                                    await supabase.from('collection_items').delete().eq('id', items[0].id);
+                                    toolOutput = "Gasto removido com sucesso.";
+                                }
+                            }
+                        } else if (args.action === 'update') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to update
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'expense');
+                                if (args.description) query = query.ilike('content', `%${args.description}%`);
+                                // If searching by old amount to find the item
+                                if (args.search_amount) query = query.eq('metadata->>amount', args.search_amount);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Item financeiro não encontrado para atualização.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content} (R$ ${i.metadata.amount})`).join('\n');
+                                    toolOutput = `Múltiplos itens encontrados. Qual atualizar?\n${options}`;
+                                } else {
+                                    const targetItem = items[0];
+                                    const newMetadata = { ...targetItem.metadata };
+                                    if (args.amount) newMetadata.amount = args.amount;
+                                    if (args.category) {
+                                        newMetadata.category = args.category;
+                                        newMetadata.section = args.category;
+                                    }
+                                    if (args.date) newMetadata.date = args.date;
+
+                                    await supabase.from('collection_items').update({
+                                        content: args.new_description || targetItem.content,
+                                        metadata: newMetadata
+                                    }).eq('id', targetItem.id);
+                                    toolOutput = "Gasto atualizado com sucesso.";
+                                }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE CREDENTIALS (NEW) ---
+                    else if (functionName === 'manage_credentials') {
+                        if (args.action === 'add') {
+                            // 1. Find/Create Collection
+                            let collId = null;
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                const { data: newColl } = await supabase.from('collections').insert({ user_id: userId, name: args.collection_name, icon: '🔒' }).select().single();
+                                collId = newColl.id;
+                            } else {
+                                collId = coll.id;
+                            }
+
+                            // 2. Insert Item
+                            const { error } = await supabase.from('collection_items').insert({
+                                collection_id: collId,
+                                user_id: userId,
+                                type: 'credential',
+                                content: args.service_name || 'Credencial',
+                                metadata: {
+                                    username: args.username,
+                                    password: args.password,
+                                    url: args.url,
+                                    notes: args.notes,
+                                    type: 'credential' // Redundant but safe
+                                }
+                            });
+
+                            if (error) toolOutput = `Erro ao salvar credencial: ${error.message}`;
+                            else toolOutput = `Credencial para "${args.service_name}" salva com segurança.`;
+                        } else if (args.action === 'delete') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to delete
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'credential');
+                                if (args.service_name) query = query.ilike('content', `%${args.service_name}%`);
+                                if (args.username) query = query.eq('metadata->>username', args.username);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Credencial não encontrada para exclusão.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content} (User: ${i.metadata.username})`).join('\n');
+                                    toolOutput = `Múltiplas credenciais encontradas. Qual apagar?\n${options}`;
+                                } else {
+                                    await supabase.from('collection_items').delete().eq('id', items[0].id);
+                                    toolOutput = "Credencial removida com sucesso.";
+                                }
+                            }
+                        } else if (args.action === 'update') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to update
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'credential');
+                                if (args.service_name) query = query.ilike('content', `%${args.service_name}%`);
+                                if (args.username) query = query.eq('metadata->>username', args.username);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Credencial não encontrada para atualização.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content} (User: ${i.metadata.username})`).join('\n');
+                                    toolOutput = `Múltiplas credenciais encontradas. Qual atualizar?\n${options}`;
+                                } else {
+                                    const targetItem = items[0];
+                                    const newMetadata = { ...targetItem.metadata };
+                                    if (args.new_username) newMetadata.username = args.new_username;
+                                    if (args.new_password) newMetadata.password = args.new_password;
+                                    if (args.url) newMetadata.url = args.url;
+                                    if (args.notes) newMetadata.notes = args.notes;
+
+                                    await supabase.from('collection_items').update({
+                                        content: args.new_service_name || targetItem.content,
+                                        metadata: newMetadata
+                                    }).eq('id', targetItem.id);
+                                    toolOutput = "Credencial atualizada com sucesso.";
+                                }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE INVENTORY (NEW) ---
+                    else if (functionName === 'manage_inventory') {
+                        if (args.action === 'add') {
+                            // 1. Find/Create Collection
+                            let collId = null;
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                const { data: newColl } = await supabase.from('collections').insert({ user_id: userId, name: args.collection_name, icon: '📋' }).select().single();
+                                collId = newColl.id;
+                            } else {
+                                collId = coll.id;
+                            }
+
+                            // 2. Batch Insert
+                            if (args.items && args.items.length > 0) {
+                                const itemsToInsert = args.items.map((item: any) => ({
+                                    collection_id: collId,
+                                    user_id: userId,
+                                    type: 'list_item', // Default for inventory
+                                    content: item.content,
+                                    metadata: {
+                                        quantity: item.quantity,
+                                        category: item.category,
+                                        section: item.category || 'Geral',
+                                        checked: item.checked || false,
+                                        notes: item.notes,
+                                        type: 'list_item'
+                                    }
+                                }));
+
+                                const { error } = await supabase.from('collection_items').insert(itemsToInsert);
+                                if (error) toolOutput = `Erro ao salvar lista: ${error.message}`;
+                                else toolOutput = `${args.items.length} itens adicionados à lista "${args.collection_name}".`;
+                            } else {
+                                toolOutput = "Nenhum item fornecido para a lista.";
+                            }
+                        } else if (args.action === 'delete') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to delete
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'list_item');
+                                if (args.content) query = query.ilike('content', `%${args.content}%`);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Item da lista não encontrado para exclusão.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content}`).join('\n');
+                                    toolOutput = `Múltiplos itens parecidos. Qual apagar?\n${options}`;
+                                } else {
+                                    await supabase.from('collection_items').delete().eq('id', items[0].id);
+                                    toolOutput = "Item removido da lista com sucesso.";
+                                }
+                            }
+                        } else if (args.action === 'update') {
+                            // Find collection
+                            const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+                            if (!coll) {
+                                toolOutput = `Erro: Pasta "${args.collection_name}" não encontrada.`;
+                            } else {
+                                // Search for item to update
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id).eq('type', 'list_item');
+                                if (args.content) query = query.ilike('content', `%${args.content}%`);
+
+                                const { data: items } = await query.limit(5);
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = "Erro: Item da lista não encontrado para atualização.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content}`).join('\n');
+                                    toolOutput = `Múltiplos itens parecidos. Qual atualizar?\n${options}`;
+                                } else {
+                                    const targetItem = items[0];
+                                    const newMetadata = { ...targetItem.metadata };
+                                    if (args.quantity) newMetadata.quantity = args.quantity;
+                                    if (args.category) newMetadata.category = args.category;
+                                    if (args.checked !== undefined) newMetadata.checked = args.checked;
+                                    if (args.notes) newMetadata.notes = args.notes;
+
+                                    await supabase.from('collection_items').update({
+                                        content: args.new_content || targetItem.content,
+                                        metadata: newMetadata
+                                    }).eq('id', targetItem.id);
+                                    toolOutput = "Item da lista atualizado com sucesso.";
+                                }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE ITEMS (LEGACY/GENERIC) ---
                     else if (functionName === 'manage_items') {
+                        // 🛡️ SECURITY & SPECIALIZATION CHECK (STRICT MODE)
+                        // Força a IA a usar as ferramentas corretas para dados sensíveis ou estruturados
+                        if (args.metadata) {
+                            if (args.metadata.password || args.metadata.username) {
+                                throw new Error("FORBIDDEN: You are trying to save CREDENTIALS using the generic 'manage_items' tool. You MUST use 'manage_credentials' for security.");
+                            }
+                            if (args.metadata.amount) {
+                                throw new Error("FORBIDDEN: You are trying to save FINANCIAL data using 'manage_items'. You MUST use 'manage_financials' to ensure correct calculations.");
+                            }
+                        }
+                        if (args.items && Array.isArray(args.items)) {
+                            for (const item of args.items) {
+                                if (item.metadata?.password || item.metadata?.username) {
+                                    throw new Error("FORBIDDEN: You are trying to save CREDENTIALS using 'manage_items'. Use 'manage_credentials'.");
+                                }
+                                if (item.metadata?.amount) {
+                                    throw new Error("FORBIDDEN: You are trying to save FINANCIAL data using 'manage_items'. Use 'manage_financials'.");
+                                }
+                            }
+                        }
                         // Buscar coleção ID
                         const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
 
@@ -1305,75 +1504,113 @@ REGRAS ABSOLUTAS:
                             if (createError || !newColl) {
                                 toolOutput = `Erro: Não foi possível criar a pasta "${args.collection_name}".`;
                             } else {
-                                // Agora adiciona o item na pasta nova
-                                const { error: insertError } = await supabase.from('collection_items').insert({
-                                    collection_id: newColl.id,
-                                    user_id: userId, // Adicionado user_id explicitamente
-                                    type: args.type || 'text',
-                                    content: args.content || null,
-                                    media_url: args.media_url || mediaUrl || null,
-                                    metadata: args.metadata ? {
-                                        ...args.metadata,
-                                        amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
-                                    } : null,
-                                });
+                                // Agora adiciona o item (ou ITENS) na pasta nova
 
-                                if (insertError) {
-                                    console.error('❌ Error inserting item into NEW collection:', insertError);
-                                    toolOutput = `Erro ao salvar item na nova pasta: ${insertError.message} `;
+                                // BATCH MODE FOR NEW COLLECTION
+                                if (args.items && Array.isArray(args.items) && args.items.length > 0) {
+                                    const itemsToInsert = args.items.map((item: any) => ({
+                                        collection_id: newColl.id,
+                                        user_id: userId,
+                                        type: item.metadata?.type || 'text',
+                                        content: item.content || 'Item sem nome',
+                                        media_url: null,
+                                        metadata: item.metadata ? {
+                                            ...item.metadata,
+                                            amount: item.metadata.amount ? Number(item.metadata.amount) : undefined
+                                        } : null
+                                    }));
+
+                                    const { error: batchError } = await supabase.from('collection_items').insert(itemsToInsert);
+                                    if (batchError) {
+                                        toolOutput = `Pasta criada, mas erro ao adicionar itens: ${batchError.message}`;
+                                    } else {
+                                        toolOutput = `Pasta "${args.collection_name}" criada e ${args.items.length} itens adicionados.`;
+                                    }
+
                                 } else {
-                                    console.log(`✅ Item inserted into NEW collection ${newColl.id} `);
-                                    toolOutput = `Pasta "${args.collection_name}" criada automaticamente e item adicionado com sucesso.`;
+                                    // SINGLE MODE FOR NEW COLLECTION
+                                    const { error: insertError } = await supabase.from('collection_items').insert({
+                                        collection_id: newColl.id,
+                                        user_id: userId, // Adicionado user_id explicitamente
+                                        type: args.type || 'text',
+                                        content: args.content || null,
+                                        media_url: args.media_url || mediaUrl || null,
+                                        metadata: args.metadata ? {
+                                            ...args.metadata,
+                                            amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                        } : null,
+                                    });
+
+                                    if (insertError) {
+                                        console.error('❌ Error inserting item into NEW collection:', insertError);
+                                        toolOutput = `Erro ao salvar item na nova pasta: ${insertError.message} `;
+                                    } else {
+                                        console.log(`✅ Item inserted into NEW collection ${newColl.id} `);
+                                        toolOutput = `Pasta "${args.collection_name}" criada automaticamente e item adicionado com sucesso.`;
+                                    }
                                 }
                             }
                         } else {
+                            // Coleção existe
                             if (args.action === 'list') {
-                                // List all items in this collection
-                                const { data: items, error } = await supabase
-                                    .from('collection_items')
-                                    .select('id, content, metadata, created_at, media_url')
-                                    .eq('collection_id', coll.id)
-                                    .order('created_at', { ascending: false });
-
-                                if (error) {
-                                    toolOutput = `Erro ao listar itens: ${error.message}`;
-                                } else if (!items || items.length === 0) {
-                                    toolOutput = `A pasta "${args.collection_name}" está vazia (0 itens).`;
-                                } else {
-                                    toolOutput = `Itens na pasta "${args.collection_name}" (${items.length} total):\n\n` +
-                                        items.map((item, i) => {
-                                            const amountInfo = item.metadata?.amount ? ` → R$ ${item.metadata.amount}` : '';
-                                            const sectionInfo = item.metadata?.section ? ` [${item.metadata.section}]` : '';
-                                            return `${i + 1}. ${item.content || '[sem texto]'}${amountInfo}${sectionInfo}`;
-                                        }).join('\n');
-                                }
+                                const { data: items } = await supabase.from('collection_items').select('*').eq('collection_id', coll.id).order('created_at', { ascending: false }).limit(20);
+                                toolOutput = `Itens na pasta "${args.collection_name}":\n${items?.map((i: any) => `- ${i.content} (${JSON.stringify(i.metadata)})`).join('\n') || 'Vazia'}`;
                             }
                             else if (args.action === 'add') {
-                                const { error: insertError } = await supabase.from('collection_items').insert({
-                                    collection_id: coll.id,
-                                    user_id: userId, // Adicionado user_id explicitamente
-                                    type: args.type || 'text',
-                                    content: args.content || null,
-                                    media_url: args.media_url || mediaUrl || null,
-                                    metadata: args.metadata ? {
-                                        ...args.metadata,
-                                        amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
-                                    } : null,
-                                });
+                                // BATCH MODE SUPPORT
+                                if (args.items && Array.isArray(args.items) && args.items.length > 0) {
+                                    console.log(`🚀 BATCH ADD: ${args.items.length} items to ${args.collection_name}`);
 
-                                if (insertError) {
-                                    console.error('❌ Error inserting item into EXISTING collection:', insertError);
-                                    toolOutput = `Erro ao salvar item: ${insertError.message} `;
+                                    const itemsToInsert = args.items.map((item: any) => ({
+                                        collection_id: coll.id,
+                                        user_id: userId,
+                                        type: item.metadata?.type || 'text',
+                                        content: item.content || 'Item sem nome',
+                                        media_url: null, // Batch doesn't support media yet for simplicity
+                                        metadata: item.metadata ? {
+                                            ...item.metadata,
+                                            amount: item.metadata.amount ? Number(item.metadata.amount) : undefined
+                                        } : null
+                                    }));
+
+                                    const { error: batchError } = await supabase.from('collection_items').insert(itemsToInsert);
+
+                                    if (batchError) {
+                                        console.error('❌ Error in batch insert:', batchError);
+                                        toolOutput = `Erro ao adicionar itens em lote: ${batchError.message}`;
+                                    } else {
+                                        toolOutput = `${args.items.length} itens adicionados com sucesso na pasta "${args.collection_name}".`;
+                                    }
+
                                 } else {
-                                    console.log(`✅ Item inserted into EXISTING collection ${coll.id} `);
-                                    toolOutput = `Item adicionado na pasta "${args.collection_name}".`;
+                                    // SINGLE ITEM MODE (Legacy)
+                                    const { error: insertError } = await supabase.from('collection_items').insert({
+                                        collection_id: coll.id,
+                                        user_id: userId, // Adicionado user_id explicitamente
+                                        type: args.type || 'text',
+                                        content: args.content || null,
+                                        media_url: args.media_url || mediaUrl || null,
+                                        metadata: args.metadata ? {
+                                            ...args.metadata,
+                                            amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                        } : null,
+                                    });
+
+                                    if (insertError) {
+                                        console.error('❌ Error inserting item into EXISTING collection:', insertError);
+                                        toolOutput = `Erro ao salvar item: ${insertError.message} `;
+                                    } else {
+                                        console.log(`✅ Item inserted into EXISTING collection ${coll.id} `);
+                                        toolOutput = `Item adicionado na pasta "${args.collection_name}".`;
+                                    }
                                 }
                             }
                             else if (args.action === 'update' || args.action === 'delete') {
                                 // Lógica de busca para encontrar o item
                                 let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id);
 
-                                if (args.search_content) query = query.ilike('content', `%${args.search_content}%`);
+                                const searchTerm = args.search_content || args.content;
+                                if (searchTerm) query = query.ilike('content', `%${searchTerm}%`);
                                 if (args.search_metadata_key && args.search_metadata_value) {
                                     query = query.eq(`metadata ->> ${args.search_metadata_key} `, args.search_metadata_value);
                                 }
@@ -1414,6 +1651,33 @@ REGRAS ABSOLUTAS:
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // --- MANAGE MONITORS (NEW) ---
+                    else if (functionName === 'manage_monitors') {
+                        if (args.action === 'create') {
+                            if (!args.keyword) {
+                                toolOutput = "Erro: 'keyword' é obrigatório para criar um monitor.";
+                            } else {
+                                const { error } = await supabase.from('monitors').insert({
+                                    user_id: userId,
+                                    keyword: args.keyword,
+                                    chat_name: args.chat_name || null,
+                                    frequency: args.frequency || 'ask'
+                                });
+                                if (error) toolOutput = `Erro ao criar monitor: ${error.message}`;
+                                else toolOutput = `Monitor criado! Vou te avisar se encontrar "${args.keyword}" ${args.chat_name ? `em "${args.chat_name}"` : "em qualquer conversa"}.`;
+                            }
+                        } else if (args.action === 'list') {
+                            const { data } = await supabase.from('monitors').select('*').eq('user_id', userId).eq('is_active', true);
+                            if (!data || data.length === 0) toolOutput = "Nenhum monitor ativo no momento.";
+                            else toolOutput = "Monitores Ativos:\n" + data.map((m: any) => `- "${m.keyword}" (${m.chat_name || 'Todos'}) [${m.frequency}]`).join('\n');
+                        } else if (args.action === 'delete') {
+                            // Delete by keyword match
+                            const { error } = await supabase.from('monitors').delete().eq('user_id', userId).ilike('keyword', `%${args.keyword}%`);
+                            if (error) toolOutput = `Erro ao apagar monitor: ${error.message}`;
+                            else toolOutput = "Monitor removido.";
                         }
                     }
 

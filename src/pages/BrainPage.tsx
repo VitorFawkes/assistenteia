@@ -1,107 +1,47 @@
-import { useEffect, useState } from 'react';
-
-import { Brain, Sparkles, Search, Trash2, Plus, BookOpen, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { Brain, Trash2, Search, Clock, Plus, Check, Eye } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-interface MemoryVector {
-    id: string;
-    content: string;
-    created_at: string | null;
-    similarity?: number;
-}
-
-interface UserRule {
-    id: string;
-    key: string;
-    value: string;
-    created_at: string | null;
-}
-
-export default function BrainPage() {
+export function BrainPage() {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'memories' | 'rules'>('memories');
-
-    // Mobile detection with matchMedia API (more reliable than innerWidth)
-    const [isMobile, setIsMobile] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return window.matchMedia('(max-width: 767px)').matches;
-        }
-        return false;
-    });
-
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(max-width: 767px)');
-        const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-
-        // Set initial value
-        setIsMobile(mediaQuery.matches);
-
-        // Listen for changes
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, []);
-
-    // Memories State
-    const [memories, setMemories] = useState<MemoryVector[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-
-    // Rules State
-    const [rules, setRules] = useState<UserRule[]>([]);
+    const [activeTab, setActiveTab] = useState<'memories' | 'rules' | 'monitors'>('memories');
+    const [memories, setMemories] = useState<any[]>([]);
+    const [rules, setRules] = useState<any[]>([]);
+    const [monitors, setMonitors] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const [newRuleKey, setNewRuleKey] = useState('');
     const [newRuleValue, setNewRuleValue] = useState('');
-    const [isSavingRule, setIsSavingRule] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
-
-
+    const [isSavingRule, setIsSavingRule] = useState(false);
 
     useEffect(() => {
-        if (user) {
-            if (activeTab === 'memories') {
-                fetchMemories();
-            } else if (activeTab === 'rules') {
-                fetchRules();
-            } else if (activeTab === 'rules') {
-                fetchRules();
-            }
-        }
-    }, [user, activeTab]);
+        fetchData();
+    }, [user]);
 
-    // --- MEMORIES LOGIC ---
-    const fetchMemories = async () => {
+    const fetchData = async () => {
         if (!user) return;
-        setIsSearching(true);
+        setLoading(true);
         try {
-            let query = supabase
-                .from('memories')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+            const [memoriesRes, rulesRes, monitorsRes] = await Promise.all([
+                supabase.from('memories').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('user_preferences').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('monitors' as any).select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+            ]);
 
-            if (searchQuery.trim()) {
-                // Using ilike for simple text search on content
-                query = query.ilike('content', `%${searchQuery}%`);
-            }
-
-            const { data, error } = await query.limit(50);
-
-            if (error) throw error;
-            setMemories(data || []);
+            if (memoriesRes.data) setMemories(memoriesRes.data);
+            if (rulesRes.data) setRules(rulesRes.data);
+            if (monitorsRes.data) setMonitors(monitorsRes.data);
         } catch (error) {
-            console.error('Error fetching memories:', error);
+            console.error('Error fetching brain data:', error);
         } finally {
-            setIsSearching(false);
+            setLoading(false);
         }
     };
 
-    const deleteMemory = async (id: string) => {
-        if (!confirm('Esquecer esta memória?')) return;
+    const handleDeleteMemory = async (id: string) => {
+        if (!confirm('Tem certeza que deseja apagar esta memória?')) return;
         try {
             const { error } = await supabase.from('memories').delete().eq('id', id);
             if (error) throw error;
@@ -111,44 +51,33 @@ export default function BrainPage() {
         }
     };
 
-    // --- RULES LOGIC ---
-    const fetchRules = async () => {
-        if (!user) return;
-        console.log('Fetching rules for user:', user.id);
-        const { data, error } = await supabase
-            .from('user_preferences')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error('Error fetching rules:', error);
-        } else {
-            console.log('Rules fetched:', data);
+    const handleDeleteRule = async (id: string) => {
+        if (!confirm('Tem certeza que deseja apagar esta regra?')) return;
+        try {
+            const { error } = await supabase.from('user_preferences').delete().eq('id', id);
+            if (error) throw error;
+            setRules(rules.filter(r => r.id !== id));
+        } catch (error) {
+            console.error('Error deleting rule:', error);
         }
-
-        // Map data to match interface
-        const formattedRules = (data || []).map((r: any) => ({
-            ...r,
-            value: typeof r.value === 'string' ? r.value : JSON.stringify(r.value)
-        }));
-
-        setRules(formattedRules);
     };
 
-    const addRule = async () => {
-        if (!user || !newRuleKey || !newRuleValue) return;
+    const handleAddRule = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user || !newRuleKey.trim() || !newRuleValue.trim()) return;
         setIsSavingRule(true);
+
         try {
             const { error } = await supabase.from('user_preferences').insert({
                 user_id: user.id,
                 key: newRuleKey,
                 value: newRuleValue
             });
+
             if (error) throw error;
             setNewRuleKey('');
             setNewRuleValue('');
-            fetchRules();
+            fetchData();
             setShowSuccess(true);
             setTimeout(() => setShowSuccess(false), 3000);
         } catch (error) {
@@ -158,231 +87,250 @@ export default function BrainPage() {
         }
     };
 
-    const deleteRule = async (id: string) => {
-        if (!confirm('Apagar esta regra?')) return;
+    const handleDeleteMonitor = async (id: string) => {
+        if (!confirm('Apagar este monitor?')) return;
         try {
-            await supabase.from('user_preferences').delete().eq('id', id);
-            setRules(rules.filter(r => r.id !== id));
+            const { error } = await supabase.from('monitors' as any).delete().eq('id', id);
+            if (error) throw error;
+            setMonitors(monitors.filter(m => m.id !== id));
         } catch (error) {
-            console.error('Error deleting rule:', error);
+            console.error('Error deleting monitor:', error);
         }
     };
 
-
+    const filteredMemories = memories.filter(mem =>
+        mem.content.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div className="flex flex-col h-full bg-gray-900 overflow-hidden pb-20 md:pb-0">
-            {/* Mobile Tab Navigation - Only rendered on mobile */}
-            {isMobile && (
-                <div className="bg-gray-800 border-b border-gray-700 p-3 shrink-0 flex flex-col">
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                        <Brain className="text-purple-500" size={24} />
-                        <h2 className="text-lg font-bold text-white">Cérebro</h2>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                        <button
-                            onClick={() => setActiveTab('memories')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'memories'
-                                ? 'bg-purple-600 text-white shadow-lg'
-                                : 'bg-gray-700 text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            <Sparkles size={16} />
-                            Memórias
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('rules')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all shrink-0 ${activeTab === 'rules'
-                                ? 'bg-purple-600 text-white shadow-lg'
-                                : 'bg-gray-700 text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            <BookOpen size={16} />
-                            Regras
-                        </button>
-
-                    </div>
+            {/* Header */}
+            <div className="flex-none p-6 border-b border-gray-800">
+                <div className="flex items-center gap-3 mb-2">
+                    <Brain className="w-8 h-8 text-purple-500" />
+                    <h1 className="text-2xl font-bold text-white">Cérebro da IA</h1>
                 </div>
-            )}
+                <p className="text-gray-400">
+                    Gerencie o que a IA sabe sobre você, suas regras e o que ela está monitorando.
+                </p>
+            </div>
 
-            <div className="flex flex-1 min-h-0">
-                {/* Desktop Sidebar - Only rendered on desktop */}
-                {!isMobile && (
-                    <div className="w-64 bg-gray-800 border-r border-gray-700 p-4 flex flex-col gap-2 shrink-0">
-                        <div className="mb-6 px-2">
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Brain className="text-purple-500" />
-                                Cérebro
-                            </h2>
-                            <p className="text-xs text-gray-400 mt-1">Gerencie a inteligência da IA</p>
-                        </div>
-
-                        <Button
-                            variant={activeTab === 'memories' ? 'primary' : 'ghost'}
-                            onClick={() => setActiveTab('memories')}
-                            className={`w-full justify-start ${activeTab === 'memories' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                            icon={Sparkles}
-                        >
-                            Memórias (RAG)
-                        </Button>
-
-                        <Button
-                            variant={activeTab === 'rules' ? 'primary' : 'ghost'}
-                            onClick={() => setActiveTab('rules')}
-                            className={`w-full justify-start ${activeTab === 'rules' ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20' : ''}`}
-                            icon={BookOpen}
-                        >
-                            Regras & Prefs
-                        </Button>
-
-
-                    </div>
-                )}
-
-                {/* Content Area */}
-                <div className="flex-1 overflow-auto p-4 md:p-6">
-                    {activeTab === 'memories' && (
-                        <div className="max-w-4xl mx-auto">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white">Memórias de Longo Prazo</h2>
-                                    <p className="text-gray-400">O que a IA aprendeu sobre você e lembrou.</p>
-                                </div>
-                                <div className="relative w-64">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar memórias..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    />
-                                </div>
-                            </div>
-
-                            {isSearching ? (
-                                <div className="text-center py-20 text-gray-500">Carregando memórias...</div>
-                            ) : memories.length > 0 ? (
-                                <div className="grid gap-4">
-                                    {memories.map(mem => (
-                                        <Card key={mem.id} className="p-4 flex justify-between items-start group" hover>
-                                            <div>
-                                                <p className="text-gray-200 text-lg">{mem.content}</p>
-                                                <p className="text-xs text-gray-500 mt-2">
-                                                    Aprendido em {mem.created_at ? format(new Date(mem.created_at), "d 'de' MMMM, HH:mm", { locale: ptBR }) : 'Data desconhecida'}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => deleteMemory(mem.id)}
-                                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                                title="Esquecer"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-                                    <Sparkles size={48} className="mx-auto text-gray-700 mb-4" />
-                                    <p className="text-gray-500">Nenhuma memória encontrada.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'rules' && (
-                        <div className="max-w-4xl mx-auto">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white">Regras & Preferências</h2>
-                                    <p className="text-gray-400">Defina comportamentos fixos para a IA.</p>
-                                </div>
-                                <Button
-                                    onClick={fetchRules}
-                                    variant="ghost"
-                                    className="text-gray-400 hover:text-white"
-                                    title="Atualizar lista"
-                                >
-                                    <Sparkles size={18} />
-                                </Button>
-                            </div>
-
-                            <Card className="p-4 mb-8 bg-gray-800/50 border-purple-500/20">
-                                <h3 className="text-lg font-medium text-white mb-4">Adicionar Nova Regra</h3>
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Tópico (ex: Tom de voz)"
-                                        value={newRuleKey}
-                                        onChange={(e) => setNewRuleKey(e.target.value)}
-                                        className="w-full md:w-1/3 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Regra (ex: Sempre seja formal)"
-                                        value={newRuleValue}
-                                        onChange={(e) => setNewRuleValue(e.target.value)}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    />
-                                    <Button
-                                        onClick={addRule}
-                                        isLoading={isSavingRule}
-                                        disabled={!newRuleKey || !newRuleValue}
-                                        icon={Plus}
-                                        className="bg-purple-600 hover:bg-purple-500 w-full md:w-auto"
-                                    >
-                                        Adicionar
-                                    </Button>
-                                </div>
-                            </Card>
-
-                            <div className="grid gap-4">
-                                {rules.map(rule => (
-                                    <Card key={rule.id} className="p-4 flex justify-between items-center group">
-                                        <div className="flex items-center gap-4">
-                                            <div className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-sm font-medium border border-purple-500/20">
-                                                {rule.key}
-                                            </div>
-                                            <p className="text-gray-200">{rule.value}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => deleteRule(rule.id)}
-                                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Remover regra"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </Card>
-                                ))}
-                                {rules.length === 0 && (
-                                    <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-                                        <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <BookOpen size={32} className="text-gray-600" />
-                                        </div>
-                                        <h3 className="text-xl font-medium text-white mb-2">Nenhuma regra definida</h3>
-                                        <p className="text-gray-400 max-w-sm mx-auto">
-                                            Adicione regras para personalizar o comportamento da sua IA.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-
+            {/* Tabs */}
+            <div className="flex-none px-6 border-b border-gray-800">
+                <div className="flex space-x-6">
+                    <button
+                        onClick={() => setActiveTab('memories')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'memories'
+                            ? 'border-purple-500 text-purple-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            }`}
+                    >
+                        Memórias
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('rules')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rules'
+                            ? 'border-purple-500 text-purple-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            }`}
+                    >
+                        Regras & Aprendizado
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('monitors')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'monitors'
+                            ? 'border-purple-500 text-purple-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            }`}
+                    >
+                        Monitores 🕵️
+                    </button>
                 </div>
             </div>
 
-            {/* Success Toast */}
-            {
-                showSuccess && (
-                    <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
-                        <CheckCircle2 size={18} />
-                        <span>Salvo com sucesso!</span>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+                {loading ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                     </div>
-                )
-            }
-        </div >
+                ) : (
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        {/* Monitors Tab Content */}
+                        {activeTab === 'monitors' && (
+                            <div className="space-y-4">
+                                {monitors.length === 0 ? (
+                                    <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+                                        <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Eye className="w-6 h-6 text-gray-400" />
+                                        </div>
+                                        <p className="text-gray-300 font-medium">Nenhum monitor ativo</p>
+                                        <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+                                            Peça para a IA: "Me avise quando falarem sobre 'planilha' no grupo 'Família'" ou "Monitore a palavra 'urgente'".
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4">
+                                        {monitors.map(monitor => (
+                                            <div key={monitor.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-purple-500/50 transition-colors">
+                                                <div>
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <h3 className="font-semibold text-white text-lg">"{monitor.keyword}"</h3>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${monitor.chat_name ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'bg-green-900/50 text-green-200 border border-green-800'}`}>
+                                                            {monitor.chat_name ? `Em: ${monitor.chat_name}` : 'Todos os Chats'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock size={14} />
+                                                            {monitor.frequency === 'once' ? 'Avisar 1 vez' : monitor.frequency === 'always' ? 'Sempre avisar' : 'Perguntar se para'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteMonitor(monitor.id)}
+                                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Parar de monitorar"
+                                                >
+                                                    <Trash2 size={20} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Rules Tab Content */}
+                        {activeTab === 'rules' && (
+                            <div className="space-y-6">
+                                {/* Add Rule Form */}
+                                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+                                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                        <Plus size={20} className="text-purple-500" />
+                                        Adicionar Nova Regra
+                                    </h3>
+                                    <form onSubmit={handleAddRule} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Regra</label>
+                                            <input
+                                                type="text"
+                                                value={newRuleKey}
+                                                onChange={(e) => setNewRuleKey(e.target.value)}
+                                                placeholder="Ex: Preferência de Horário"
+                                                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição / Instrução</label>
+                                            <textarea
+                                                value={newRuleValue}
+                                                onChange={(e) => setNewRuleValue(e.target.value)}
+                                                placeholder="Ex: Sempre me lembre das reuniões 15 minutos antes."
+                                                rows={3}
+                                                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end items-center gap-4">
+                                            {showSuccess && (
+                                                <span className="text-green-400 text-sm flex items-center gap-1">
+                                                    <Check size={16} /> Salvo com sucesso!
+                                                </span>
+                                            )}
+                                            <button
+                                                type="submit"
+                                                disabled={isSavingRule || !newRuleKey.trim() || !newRuleValue.trim()}
+                                                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                                            >
+                                                {isSavingRule ? 'Salvando...' : 'Salvar Regra'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                {/* Rules List */}
+                                <div className="space-y-4">
+                                    {rules.length === 0 ? (
+                                        <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+                                            <p className="text-gray-400">Nenhuma regra definida ainda.</p>
+                                        </div>
+                                    ) : (
+                                        rules.map(rule => (
+                                            <div key={rule.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 group hover:border-purple-500/50 transition-colors">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="font-semibold text-white text-lg">{rule.key}</h4>
+                                                    <button
+                                                        onClick={() => handleDeleteRule(rule.id)}
+                                                        className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                                <p className="text-gray-300 whitespace-pre-wrap">{typeof rule.value === 'string' ? rule.value : JSON.stringify(rule.value)}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Memories Tab Content */}
+                        {activeTab === 'memories' && (
+                            <div className="space-y-6">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        placeholder="Buscar nas memórias..."
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-4">
+                                    {filteredMemories.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <p className="text-gray-500">Nenhuma memória encontrada.</p>
+                                        </div>
+                                    ) : (
+                                        filteredMemories.map(memory => (
+                                            <div key={memory.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 group hover:border-purple-500/50 transition-colors">
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <p className="text-gray-300 flex-1">{memory.content}</p>
+                                                    <button
+                                                        onClick={() => handleDeleteMemory(memory.id)}
+                                                        className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors shrink-0"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                                    <Clock size={12} />
+                                                    {new Date(memory.created_at).toLocaleDateString('pt-BR', {
+                                                        day: '2-digit',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {showSuccess && (
+                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
+                    <Check size={20} />
+                    <span>Salvo com sucesso!</span>
+                </div>
+            )}
+        </div>
     );
 }

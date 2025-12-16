@@ -5,7 +5,7 @@ import Layout from './components/Layout';
 import TasksPage from './pages/TasksPage';
 import RemindersPage from './pages/RemindersPage';
 import CollectionsPage from './pages/CollectionsPage';
-import BrainPage from './pages/BrainPage';
+import { BrainPage } from './pages/BrainPage';
 import DocumentsPage from './pages/DocumentsPage';
 import SettingsPage from './pages/SettingsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
