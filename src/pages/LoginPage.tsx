@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { ElaLogo } from '../components/ElaLogo';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -27,15 +28,14 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-ela-bg p-4">
             <div className="w-full max-w-md">
-                <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-gray-700">
-                    <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <LogIn size={32} className="text-white" />
+                <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                    <div className="text-center mb-8 flex flex-col items-center">
+                        <div className="mb-6 transform scale-150">
+                            <ElaLogo />
                         </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Assistente IA</h1>
-                        <p className="text-gray-400">Entre para continuar</p>
+                        <p className="text-gray-500">Entre para continuar</p>
                     </div>
 
                     {error && (
@@ -46,7 +46,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                                 Email
                             </label>
                             <input
@@ -55,13 +55,13 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all"
                                 placeholder="seu@email.com"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                                 Senha
                             </label>
                             <input
@@ -70,7 +70,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all"
                                 placeholder="••••••••"
                             />
                         </div>
@@ -78,7 +78,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-500 hover:to-purple-500 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-3 bg-ela-pink text-white rounded-lg font-medium hover:bg-pink-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>
@@ -92,9 +92,9 @@ export default function LoginPage() {
                     </form>
 
                     <div className="mt-6 text-center">
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-gray-500 text-sm">
                             Não tem uma conta?{' '}
-                            <Link to="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
+                            <Link to="/signup" className="text-ela-pink hover:text-pink-700 font-medium">
                                 Cadastre-se
                             </Link>
                         </p>

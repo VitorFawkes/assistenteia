@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
                     body: JSON.stringify({
                         reject_call: true,
                         msg_call: "Não aceito chamadas de voz/vídeo. Por favor, envie uma mensagem de texto ou áudio.",
-                        always_online: true
+                        always_online: false
                     })
                 });
                 console.log('✅ Instance settings configured successfully');
@@ -200,36 +200,64 @@ Deno.serve(async (req: Request) => {
             // Always configure before fetching QR (Redundant but safe)
             await configureInstance(instanceName);
 
-            // Fetch QR Code with Retry Logic
-            console.log(`Fetching QR for ${instanceName}...`);
+            // Fetch QR Code OR Pairing Code
+            console.log(`Fetching connection data for ${instanceName}...`);
             let qrCode: string | undefined;
+            let pairingCode: string | undefined;
             let attempts = 0;
             const maxAttempts = 5;
 
-            while (!qrCode && attempts < maxAttempts) {
-                attempts++;
+            // Check if we want Pairing Code (Phone Number provided)
+            const { phoneNumber } = await req.json().catch(() => ({}));
+
+            if (phoneNumber) {
+                console.log(`Generating Pairing Code for ${phoneNumber}...`);
                 try {
-                    const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+                    const pairResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}?number=${phoneNumber}`, {
                         method: 'GET',
                         headers: { 'apikey': evolutionApiKey }
                     });
 
-                    if (qrResponse.ok) {
-                        const qrData = await qrResponse.json();
-                        qrCode = qrData.base64 || qrData.qrcode;
+                    if (pairResponse.ok) {
+                        const pairData = await pairResponse.json();
+                        pairingCode = pairData.code || pairData.pairingCode;
+                        console.log('Got Pairing Code:', pairingCode);
+                    } else {
+                        const errText = await pairResponse.text();
+                        console.error('Failed to get pairing code:', errText);
+                        throw new Error(`Failed to get pairing code: ${errText}`);
                     }
                 } catch (e) {
-                    console.warn(`Attempt ${attempts} to fetch QR failed:`, e);
+                    console.error('Error fetching pairing code:', e);
+                    throw e;
+                }
+            } else {
+                // QR Code Flow
+                while (!qrCode && attempts < maxAttempts) {
+                    attempts++;
+                    try {
+                        const qrResponse = await fetch(`${evolutionApiUrl}/instance/connect/${instanceName}`, {
+                            method: 'GET',
+                            headers: { 'apikey': evolutionApiKey }
+                        });
+
+                        if (qrResponse.ok) {
+                            const qrData = await qrResponse.json();
+                            qrCode = qrData.base64 || qrData.qrcode;
+                        }
+                    } catch (e) {
+                        console.warn(`Attempt ${attempts} to fetch QR failed:`, e);
+                    }
+
+                    if (!qrCode) {
+                        console.log(`QR Code not ready yet, waiting... (${attempts}/${maxAttempts})`);
+                        await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
+                    }
                 }
 
                 if (!qrCode) {
-                    console.log(`QR Code not ready yet, waiting... (${attempts}/${maxAttempts})`);
-                    await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
+                    throw new Error('Failed to generate QR Code after multiple attempts. Please try again.');
                 }
-            }
-
-            if (!qrCode) {
-                throw new Error('Failed to generate QR Code after multiple attempts. Please try again.');
             }
 
             // Upsert Connecting
@@ -237,12 +265,17 @@ Deno.serve(async (req: Request) => {
                 user_id: user.id,
                 instance_name: instanceName,
                 status: 'connecting',
-                qr_code: qrCode,
+                qr_code: qrCode || null,
+                pairing_code: pairingCode || null,
                 type: instanceType,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
-            return new Response(JSON.stringify({ success: true, qr_code: qrCode }), {
+            return new Response(JSON.stringify({
+                success: true,
+                qr_code: qrCode,
+                pairing_code: pairingCode
+            }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }

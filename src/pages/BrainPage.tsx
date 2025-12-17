@@ -103,26 +103,26 @@ export function BrainPage() {
     );
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 overflow-hidden pb-20 md:pb-0">
+        <div className="flex flex-col h-full bg-ela-bg overflow-hidden pb-20 md:pb-0">
             {/* Header */}
-            <div className="flex-none p-6 border-b border-gray-800">
+            <div className="flex-none p-6 border-b border-ela-border bg-white">
                 <div className="flex items-center gap-3 mb-2">
-                    <Brain className="w-8 h-8 text-purple-500" />
-                    <h1 className="text-2xl font-bold text-white">Cérebro da IA</h1>
+                    <Brain className="w-8 h-8 text-ela-pink" />
+                    <h1 className="text-2xl font-bold text-ela-text">Cérebro da IA</h1>
                 </div>
-                <p className="text-gray-400">
+                <p className="text-ela-sub">
                     Gerencie o que a IA sabe sobre você, suas regras e o que ela está monitorando.
                 </p>
             </div>
 
             {/* Tabs */}
-            <div className="flex-none px-6 border-b border-gray-800">
+            <div className="flex-none px-6 border-b border-ela-border bg-white">
                 <div className="flex space-x-6">
                     <button
                         onClick={() => setActiveTab('memories')}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'memories'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            ? 'border-ela-pink text-ela-pink'
+                            : 'border-transparent text-ela-sub hover:text-ela-text'
                             }`}
                     >
                         Memórias
@@ -130,8 +130,8 @@ export function BrainPage() {
                     <button
                         onClick={() => setActiveTab('rules')}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rules'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            ? 'border-ela-pink text-ela-pink'
+                            : 'border-transparent text-ela-sub hover:text-ela-text'
                             }`}
                     >
                         Regras & Aprendizado
@@ -139,8 +139,8 @@ export function BrainPage() {
                     <button
                         onClick={() => setActiveTab('monitors')}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'monitors'
-                            ? 'border-purple-500 text-purple-400'
-                            : 'border-transparent text-gray-400 hover:text-gray-300'
+                            ? 'border-ela-pink text-ela-pink'
+                            : 'border-transparent text-ela-sub hover:text-ela-text'
                             }`}
                     >
                         Monitores 🕵️
@@ -152,7 +152,7 @@ export function BrainPage() {
             <div className="flex-1 overflow-y-auto p-6">
                 {loading ? (
                     <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ela-pink"></div>
                     </div>
                 ) : (
                     <div className="space-y-6 max-w-4xl mx-auto">
@@ -160,27 +160,27 @@ export function BrainPage() {
                         {activeTab === 'monitors' && (
                             <div className="space-y-4">
                                 {monitors.length === 0 ? (
-                                    <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
-                                        <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <div className="text-center py-12 bg-white rounded-xl border border-ela-border shadow-sm">
+                                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                             <Eye className="w-6 h-6 text-gray-400" />
                                         </div>
-                                        <p className="text-gray-300 font-medium">Nenhum monitor ativo</p>
-                                        <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+                                        <p className="text-ela-text font-medium">Nenhum monitor ativo</p>
+                                        <p className="text-sm text-ela-sub mt-2 max-w-md mx-auto">
                                             Peça para a IA: "Me avise quando falarem sobre 'planilha' no grupo 'Família'" ou "Monitore a palavra 'urgente'".
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="grid gap-4">
                                         {monitors.map(monitor => (
-                                            <div key={monitor.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center group hover:border-purple-500/50 transition-colors">
+                                            <div key={monitor.id} className="bg-white p-4 rounded-xl border border-ela-border flex justify-between items-center group hover:border-ela-pink/50 transition-colors shadow-sm">
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="font-semibold text-white text-lg">"{monitor.keyword}"</h3>
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${monitor.chat_name ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'bg-green-900/50 text-green-200 border border-green-800'}`}>
+                                                        <h3 className="font-semibold text-ela-text text-lg">"{monitor.keyword}"</h3>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${monitor.chat_name ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
                                                             {monitor.chat_name ? `Em: ${monitor.chat_name}` : 'Todos os Chats'}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                                                    <div className="flex items-center gap-2 text-sm text-ela-sub">
                                                         <span className="flex items-center gap-1">
                                                             <Clock size={14} />
                                                             {monitor.frequency === 'once' ? 'Avisar 1 vez' : monitor.frequency === 'always' ? 'Sempre avisar' : 'Perguntar se para'}
@@ -189,7 +189,7 @@ export function BrainPage() {
                                                 </div>
                                                 <button
                                                     onClick={() => handleDeleteMonitor(monitor.id)}
-                                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                     title="Parar de monitorar"
                                                 >
                                                     <Trash2 size={20} />
@@ -205,42 +205,42 @@ export function BrainPage() {
                         {activeTab === 'rules' && (
                             <div className="space-y-6">
                                 {/* Add Rule Form */}
-                                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                        <Plus size={20} className="text-purple-500" />
+                                <div className="bg-white p-6 rounded-xl border border-ela-border shadow-sm">
+                                    <h3 className="text-lg font-semibold text-ela-text mb-4 flex items-center gap-2">
+                                        <Plus size={20} className="text-ela-pink" />
                                         Adicionar Nova Regra
                                     </h3>
                                     <form onSubmit={handleAddRule} className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Regra</label>
+                                            <label className="block text-sm font-medium text-ela-sub mb-1">Nome da Regra</label>
                                             <input
                                                 type="text"
                                                 value={newRuleKey}
                                                 onChange={(e) => setNewRuleKey(e.target.value)}
                                                 placeholder="Ex: Preferência de Horário"
-                                                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                className="w-full bg-white border border-ela-border rounded-xl px-4 py-2 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição / Instrução</label>
+                                            <label className="block text-sm font-medium text-ela-sub mb-1">Descrição / Instrução</label>
                                             <textarea
                                                 value={newRuleValue}
                                                 onChange={(e) => setNewRuleValue(e.target.value)}
                                                 placeholder="Ex: Sempre me lembre das reuniões 15 minutos antes."
                                                 rows={3}
-                                                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                className="w-full bg-white border border-ela-border rounded-xl px-4 py-2 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent"
                                             />
                                         </div>
                                         <div className="flex justify-end items-center gap-4">
                                             {showSuccess && (
-                                                <span className="text-green-400 text-sm flex items-center gap-1">
+                                                <span className="text-green-600 text-sm flex items-center gap-1">
                                                     <Check size={16} /> Salvo com sucesso!
                                                 </span>
                                             )}
                                             <button
                                                 type="submit"
                                                 disabled={isSavingRule || !newRuleKey.trim() || !newRuleValue.trim()}
-                                                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                className="bg-ela-pink hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 shadow-md"
                                             >
                                                 {isSavingRule ? 'Salvando...' : 'Salvar Regra'}
                                             </button>
@@ -251,22 +251,22 @@ export function BrainPage() {
                                 {/* Rules List */}
                                 <div className="space-y-4">
                                     {rules.length === 0 ? (
-                                        <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
-                                            <p className="text-gray-400">Nenhuma regra definida ainda.</p>
+                                        <div className="text-center py-12 bg-white rounded-xl border border-ela-border shadow-sm">
+                                            <p className="text-ela-sub">Nenhuma regra definida ainda.</p>
                                         </div>
                                     ) : (
                                         rules.map(rule => (
-                                            <div key={rule.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 group hover:border-purple-500/50 transition-colors">
+                                            <div key={rule.id} className="bg-white p-4 rounded-xl border border-ela-border group hover:border-ela-pink/50 transition-colors shadow-sm">
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <h4 className="font-semibold text-white text-lg">{rule.key}</h4>
+                                                    <h4 className="font-semibold text-ela-text text-lg">{rule.key}</h4>
                                                     <button
                                                         onClick={() => handleDeleteRule(rule.id)}
-                                                        className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors"
+                                                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </div>
-                                                <p className="text-gray-300 whitespace-pre-wrap">{typeof rule.value === 'string' ? rule.value : JSON.stringify(rule.value)}</p>
+                                                <p className="text-ela-sub whitespace-pre-wrap">{typeof rule.value === 'string' ? rule.value : JSON.stringify(rule.value)}</p>
                                             </div>
                                         ))
                                     )}
@@ -278,34 +278,34 @@ export function BrainPage() {
                         {activeTab === 'memories' && (
                             <div className="space-y-6">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                                     <input
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                         placeholder="Buscar nas memórias..."
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-500"
+                                        className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-4 py-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent placeholder-gray-400 shadow-sm"
                                     />
                                 </div>
 
                                 <div className="space-y-4">
                                     {filteredMemories.length === 0 ? (
                                         <div className="text-center py-12">
-                                            <p className="text-gray-500">Nenhuma memória encontrada.</p>
+                                            <p className="text-ela-sub">Nenhuma memória encontrada.</p>
                                         </div>
                                     ) : (
                                         filteredMemories.map(memory => (
-                                            <div key={memory.id} className="bg-gray-800 p-4 rounded-lg border border-gray-700 group hover:border-purple-500/50 transition-colors">
+                                            <div key={memory.id} className="bg-white p-4 rounded-xl border border-ela-border group hover:border-ela-pink/50 transition-colors shadow-sm">
                                                 <div className="flex justify-between items-start gap-4">
-                                                    <p className="text-gray-300 flex-1">{memory.content}</p>
+                                                    <p className="text-ela-text flex-1">{memory.content}</p>
                                                     <button
                                                         onClick={() => handleDeleteMemory(memory.id)}
-                                                        className="text-gray-500 hover:text-red-400 p-1 rounded transition-colors shrink-0"
+                                                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors shrink-0"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </div>
-                                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                                <div className="mt-2 flex items-center gap-2 text-xs text-ela-sub">
                                                     <Clock size={12} />
                                                     {new Date(memory.created_at).toLocaleDateString('pt-BR', {
                                                         day: '2-digit',

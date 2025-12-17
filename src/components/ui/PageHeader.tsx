@@ -14,13 +14,13 @@ export default function PageHeader({ title, subtitle, icon: Icon, iconColor = "t
         <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
                 {Icon && (
-                    <div className={clsx("p-3 rounded-xl bg-gray-800 border border-gray-700", iconColor)}>
+                    <div className={clsx("p-3 rounded-xl bg-gray-50 border border-gray-100", iconColor)}>
                         <Icon size={32} />
                     </div>
                 )}
                 <div>
-                    <h1 className="text-3xl font-bold text-white tracking-tight">{title}</h1>
-                    {subtitle && <p className="text-gray-400 mt-1">{subtitle}</p>}
+                    <h1 className="text-3xl font-bold text-ela-text tracking-tight">{title}</h1>
+                    {subtitle && <p className="text-ela-sub mt-1">{subtitle}</p>}
                 </div>
             </div>
             {action && (

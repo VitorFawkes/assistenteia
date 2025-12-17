@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#3b82f6', // Example premium blue
-        secondary: '#1e293b', // Slate 800
-        accent: '#8b5cf6', // Violet
+        primary: 'var(--color-ela-pink)',
+        secondary: 'var(--color-ela-sub)',
+        accent: 'var(--color-ela-pink)',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

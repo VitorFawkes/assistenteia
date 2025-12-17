@@ -104,7 +104,7 @@ export default function SwipeableItem({
             {/* Content */}
             <div
                 ref={itemRef}
-                className="relative bg-gray-800 transition-transform duration-200 ease-out"
+                className="relative bg-white transition-transform duration-200 ease-out"
                 style={{ transform: `translateX(${offsetX}px)` }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}

@@ -138,14 +138,14 @@ export default function CalendarPage() {
         <div className="p-6 max-w-4xl mx-auto pb-32">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Calendário</h1>
-                    <p className="text-gray-400">Gerencie seus eventos do Google e Outlook.</p>
+                    <h1 className="text-3xl font-bold text-ela-text mb-2">Calendário</h1>
+                    <p className="text-ela-sub">Gerencie seus eventos do Google e Outlook.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="secondary" onClick={fetchEvents} disabled={isLoading}>
+                    <Button variant="secondary" onClick={fetchEvents} disabled={isLoading} className="bg-white hover:bg-gray-50 text-ela-sub border border-ela-border shadow-sm">
                         <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
                     </Button>
-                    <Button onClick={() => setShowModal(true)}>
+                    <Button onClick={() => setShowModal(true)} className="bg-ela-pink hover:bg-pink-600 text-white shadow-lg shadow-pink-900/20">
                         <Plus size={20} className="mr-2" />
                         Novo Evento
                     </Button>
@@ -154,76 +154,78 @@ export default function CalendarPage() {
 
             {isLoading && events.length === 0 ? (
                 <div className="flex justify-center py-20">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                    <Loader2 className="w-10 h-10 text-ela-pink animate-spin" />
                 </div>
             ) : events.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
+                <div className="text-center py-20 text-ela-sub">
                     <CalendarIcon className="w-16 h-16 mx-auto mb-4 opacity-20" />
                     <p>Nenhum evento encontrado para os próximos 30 dias.</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {events.map(event => (
-                        <div key={event.id} className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex items-start justify-between hover:bg-gray-800 transition-colors group">
-                            <div className="flex gap-4">
-                                <div className={`w-1 h-full rounded-full ${event.provider === 'google' ? 'bg-blue-500' : 'bg-blue-700'}`}></div>
-                                <div>
-                                    <h3 className="font-semibold text-white text-lg">{event.title}</h3>
-                                    <div className="flex flex-col gap-1 mt-1 text-sm text-gray-400">
-                                        <div className="flex items-center gap-2">
-                                            <Clock size={14} />
-                                            <span>
-                                                {formatEventDate(event.start, event.allDay)}
-                                                {!event.allDay && ` - ${new Date(event.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
-                                            </span>
-                                        </div>
-                                        {event.location && (
+                    <div className="space-y-4">
+                        {events.map(event => (
+                            <div key={event.id} className="bg-white border border-ela-border rounded-xl p-4 flex items-start justify-between hover:bg-gray-50 transition-colors group shadow-sm">
+                                <div className="flex gap-4">
+                                    <div className={`w-1 h-full rounded-full ${event.provider === 'google' ? 'bg-blue-500' : 'bg-blue-700'}`}></div>
+                                    <div>
+                                        <h3 className="font-semibold text-ela-text text-lg">{event.title}</h3>
+                                        <div className="flex flex-col gap-1 mt-1 text-sm text-ela-sub">
                                             <div className="flex items-center gap-2">
-                                                <MapPin size={14} />
-                                                <span>{event.location}</span>
+                                                <Clock size={14} />
+                                                <span>
+                                                    {formatEventDate(event.start, event.allDay)}
+                                                    {!event.allDay && ` - ${new Date(event.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+                                                </span>
                                             </div>
-                                        )}
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full border ${event.provider === 'google'
-                                                    ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                                                    : 'border-blue-700/30 text-blue-300 bg-blue-700/10'
-                                                }`}>
-                                                {event.provider === 'google' ? 'Google Calendar' : 'Outlook'}
-                                            </span>
+                                            {event.location && (
+                                                <div className="flex items-center gap-2">
+                                                    <MapPin size={14} />
+                                                    <span>{event.location}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className={`text-xs px-2 py-0.5 rounded-full border ${event.provider === 'google'
+                                                    ? 'border-blue-200 text-blue-600 bg-blue-50'
+                                                    : 'border-blue-300 text-blue-700 bg-blue-100'
+                                                    }`}>
+                                                    {event.provider === 'google' ? 'Google Calendar' : 'Outlook'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {event.link && (
+                                        <a href={event.link} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-ela-pink hover:bg-gray-100 rounded-lg">
+                                            Link
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => handleDeleteEvent(event.id, event.provider)}
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {event.link && (
-                                    <a href={event.link} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg">
-                                        Link
-                                    </a>
-                                )}
-                                <button
-                                    onClick={() => handleDeleteEvent(event.id, event.provider)}
-                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
             {/* Create Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                        <h2 className="text-xl font-bold text-white mb-6">Novo Evento</h2>
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white border border-ela-border rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                        <h2 className="text-xl font-bold text-ela-text mb-6">Novo Evento</h2>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Título</label>
+                                <label className="block text-sm text-ela-sub mb-1">Título</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                                    className="w-full bg-white border border-ela-border rounded-lg p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none"
                                     value={newEvent.title}
                                     onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
                                     placeholder="Ex: Reunião de Projeto"
@@ -232,19 +234,19 @@ export default function CalendarPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm text-gray-400 mb-1">Início</label>
+                                    <label className="block text-sm text-ela-sub mb-1">Início</label>
                                     <input
                                         type="datetime-local"
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                                        className="w-full bg-white border border-ela-border rounded-lg p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none"
                                         value={newEvent.start}
                                         onChange={e => setNewEvent({ ...newEvent, start: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm text-gray-400 mb-1">Fim</label>
+                                    <label className="block text-sm text-ela-sub mb-1">Fim</label>
                                     <input
                                         type="datetime-local"
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                                        className="w-full bg-white border border-ela-border rounded-lg p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none"
                                         value={newEvent.end}
                                         onChange={e => setNewEvent({ ...newEvent, end: e.target.value })}
                                     />
@@ -257,16 +259,16 @@ export default function CalendarPage() {
                                     id="allDay"
                                     checked={newEvent.allDay}
                                     onChange={e => setNewEvent({ ...newEvent, allDay: e.target.checked })}
-                                    className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-blue-600"
+                                    className="w-4 h-4 rounded border-gray-300 text-ela-pink focus:ring-ela-pink"
                                 />
-                                <label htmlFor="allDay" className="text-sm text-gray-300">Dia inteiro</label>
+                                <label htmlFor="allDay" className="text-sm text-ela-sub">Dia inteiro</label>
                             </div>
 
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Local</label>
+                                <label className="block text-sm text-ela-sub mb-1">Local</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                                    className="w-full bg-white border border-ela-border rounded-lg p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none"
                                     value={newEvent.location}
                                     onChange={e => setNewEvent({ ...newEvent, location: e.target.value })}
                                     placeholder="Ex: Sala 1 ou Link do Meet"
@@ -274,9 +276,9 @@ export default function CalendarPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm text-gray-400 mb-1">Descrição</label>
+                                <label className="block text-sm text-ela-sub mb-1">Descrição</label>
                                 <textarea
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none h-24 resize-none"
+                                    className="w-full bg-white border border-ela-border rounded-lg p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none h-24 resize-none"
                                     value={newEvent.description}
                                     onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
                                     placeholder="Detalhes do evento..."
@@ -285,10 +287,10 @@ export default function CalendarPage() {
                         </div>
 
                         <div className="flex gap-3 mt-8">
-                            <Button variant="ghost" className="flex-1" onClick={() => setShowModal(false)}>
+                            <Button variant="ghost" className="flex-1 text-ela-sub hover:bg-gray-100" onClick={() => setShowModal(false)}>
                                 Cancelar
                             </Button>
-                            <Button className="flex-1" onClick={handleCreateEvent} disabled={isCreating}>
+                            <Button className="flex-1 bg-ela-pink hover:bg-pink-600 text-white" onClick={handleCreateEvent} disabled={isCreating}>
                                 {isCreating ? <Loader2 className="animate-spin" /> : 'Criar Evento'}
                             </Button>
                         </div>

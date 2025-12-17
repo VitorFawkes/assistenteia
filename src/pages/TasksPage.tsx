@@ -222,10 +222,10 @@ export default function TasksPage() {
             onSwipeRight={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
             onSwipeLeft={() => deleteTask(task.id)}
             leftActionIcon={task.status === 'done' ? <Circle size={24} /> : <CheckCircle2 size={24} />}
-            leftActionColor={task.status === 'done' ? 'bg-gray-600' : 'bg-green-600'}
-            rightActionColor="bg-red-600"
+            leftActionColor={task.status === 'done' ? 'bg-gray-400' : 'bg-green-500'}
+            rightActionColor="bg-red-500"
         >
-            <Card className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-900 border-gray-800' : ''} ${selectedTasks.has(task.id) ? 'border-blue-500/50 bg-blue-500/5' : ''}`} hover>
+            <Card className={`p-4 group transition-all ${task.status === 'done' ? 'opacity-60 bg-gray-50 border-gray-100' : 'bg-white border-gray-200'} ${selectedTasks.has(task.id) ? 'border-rose-600/50 bg-rose-600/5' : ''}`} hover>
                 <div className="flex items-start gap-3">
                     {/* Selection Checkbox */}
                     <div className="pt-1">
@@ -233,25 +233,25 @@ export default function TasksPage() {
                             type="checkbox"
                             checked={selectedTasks.has(task.id)}
                             onChange={() => toggleSelectTask(task.id)}
-                            className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900 cursor-pointer"
+                            className="w-5 h-5 rounded border-gray-300 bg-white text-rose-600 focus:ring-rose-600 focus:ring-offset-white cursor-pointer"
                         />
                     </div>
 
                     <button
                         onClick={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-                        className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-400'} transition-colors mt-1 shrink-0`}
+                        className={`${task.status === 'done' ? 'text-green-500' : 'text-gray-400 hover:text-green-500'} transition-colors mt-1 shrink-0`}
                     >
                         {task.status === 'done' ? <CheckCircle2 size={22} /> : <Circle size={22} />}
                     </button>
 
                     <div className="flex-1 min-w-0">
-                        <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-white'}`}>
+                        <p className={`text-base font-medium ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                             {task.title}
                         </p>
 
                         {/* Description / Checklist Rendering */}
                         {task.description && (
-                            <div className="mt-3 space-y-1 text-sm text-gray-300">
+                            <div className="mt-3 space-y-1 text-sm text-gray-600">
                                 {task.description.split('\n').map((line, index) => {
                                     const isChecklist = line.includes('[ ]') || line.includes('[x]');
                                     if (!isChecklist) {
@@ -271,12 +271,12 @@ export default function TasksPage() {
                                             }}
                                         >
                                             <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${isChecked
-                                                ? 'bg-blue-500 border-blue-500 text-white'
-                                                : 'border-gray-500 group-hover/item:border-blue-400'
+                                                ? 'bg-rose-600 border-rose-600 text-white'
+                                                : 'border-gray-300 group-hover/item:border-rose-600'
                                                 }`}>
                                                 {isChecked && <Check size={10} strokeWidth={3} />}
                                             </div>
-                                            <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                                            <span className={`${isChecked ? 'line-through text-gray-400' : 'text-gray-600'}`}>
                                                 {text}
                                             </span>
                                         </div>
@@ -288,16 +288,16 @@ export default function TasksPage() {
                         <div className="flex flex-wrap items-center gap-2 mt-2">
                             {task.due_date && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${task.status !== 'done' && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date))
-                                    ? 'bg-red-500/20 text-red-400'
+                                    ? 'bg-red-100 text-red-600'
                                     : isToday(parseISO(task.due_date))
-                                        ? 'bg-amber-500/20 text-amber-400'
-                                        : 'bg-gray-700 text-gray-400'
+                                        ? 'bg-amber-100 text-amber-600'
+                                        : 'bg-gray-100 text-gray-500'
                                     }`}>
                                     <Calendar size={12} />
                                     {isToday(parseISO(task.due_date)) ? 'Hoje' : format(parseISO(task.due_date), "dd/MM", { locale: ptBR })}
                                 </span>
                             )}
-                            <span className="text-xs text-gray-600">
+                            <span className="text-xs text-gray-400">
                                 Criado em {format(new Date(task.created_at), "dd/MM", { locale: ptBR })}
                             </span>
                         </div>
@@ -314,7 +314,7 @@ export default function TasksPage() {
         </SwipeableItem>
     );
 
-    if (isLoading) return <div className="p-8 text-center text-gray-400">Carregando tarefas...</div>;
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Carregando tarefas...</div>;
 
     return (
         <div className="p-4 md:p-6 pb-28 md:pb-6 max-w-4xl mx-auto h-full overflow-y-auto overflow-x-hidden box-border w-full">
@@ -322,20 +322,20 @@ export default function TasksPage() {
                 title="Tarefas"
                 subtitle="Gerencie suas atividades"
                 icon={CheckSquare}
-                iconColor="text-green-400"
+                iconColor="text-rose-600"
             />
 
             {/* Add Task Form */}
-            <Card className="mb-6 md:mb-8 p-4 w-full box-border">
+            <Card className="mb-6 md:mb-8 p-4 w-full box-border bg-white border-gray-200">
                 <form onSubmit={addTask} className="flex gap-3 w-full">
                     <input
                         type="text"
                         value={newTaskTitle}
                         onChange={(e) => setNewTaskTitle(e.target.value)}
                         placeholder="Nova tarefa para hoje..."
-                        className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        className="flex-1 bg-gray-50 border border-ela-border rounded-xl p-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all placeholder:text-gray-400"
                     />
-                    <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/20 shrink-0">
+                    <Button type="submit" icon={Plus} variant="primary" className="shrink-0 shadow-lg shadow-rose-900/20">
                         <span className="hidden md:inline">Adicionar</span>
                     </Button>
                 </form>
@@ -345,16 +345,16 @@ export default function TasksPage() {
             {todayTasks.length > 0 && (
                 <div className="mb-8">
                     <div className="flex items-center gap-2 mb-4">
-                        <Sun className="text-amber-400" size={24} />
-                        <h2 className="text-xl font-bold text-white">Foco de Hoje</h2>
-                        <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded-full font-medium">
+                        <Sun className="text-amber-500" size={24} />
+                        <h2 className="text-xl font-bold text-gray-800">Foco de Hoje</h2>
+                        <span className="bg-amber-100 text-amber-600 text-xs px-2 py-1 rounded-full font-medium">
                             {todayTasks.length}
                         </span>
                     </div>
                     <div className="space-y-3">
                         {todayTasks.map(renderTaskItem)}
                     </div>
-                    <div className="my-6 border-t border-gray-800"></div>
+                    <div className="my-6 border-t border-gray-200"></div>
                 </div>
             )}
 
@@ -362,13 +362,13 @@ export default function TasksPage() {
             <div className="mb-6 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                         <input
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar tarefas..."
-                            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-4 py-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink transition-all placeholder:text-gray-400"
                         />
                     </div>
 
@@ -377,7 +377,7 @@ export default function TasksPage() {
                             <Button
                                 variant="danger"
                                 onClick={deleteSelectedTasks}
-                                className="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 whitespace-nowrap"
+                                className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 whitespace-nowrap"
                                 icon={Trash2}
                             >
                                 Excluir ({selectedTasks.size})
@@ -387,7 +387,7 @@ export default function TasksPage() {
                         <select
                             value={sortOption}
                             onChange={(e) => setSortOption(e.target.value as any)}
-                            className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[160px]"
+                            className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-600 transition-all appearance-none cursor-pointer min-w-[160px]"
                         >
                             <option value="created_desc">✨ Mais Recentes</option>
                             <option value="created_asc">📅 Mais Antigas</option>
@@ -407,8 +407,8 @@ export default function TasksPage() {
                             key={filter.id}
                             onClick={() => setActiveFilter(filter.id as any)}
                             className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${activeFilter === filter.id
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-900/20'
+                                : 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 border border-gray-200'
                                 }`}
                         >
                             {filter.label}
@@ -420,8 +420,8 @@ export default function TasksPage() {
             {/* Main Task List */}
             <div className="space-y-3">
                 {otherTasks.length === 0 ? (
-                    <div className="text-center py-16 bg-gray-800/30 rounded-2xl border border-dashed border-gray-700">
-                        <Filter className="mx-auto text-gray-600 mb-3" size={48} />
+                    <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                        <Filter className="mx-auto text-gray-400 mb-3" size={48} />
                         <p className="text-gray-500 font-medium">Nenhuma tarefa encontrada</p>
                     </div>
                 ) : (
@@ -432,7 +432,7 @@ export default function TasksPage() {
             {/* Mobile FAB */}
             <button
                 onClick={() => setIsAddTaskOpen(true)}
-                className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center z-40 active:scale-95 transition-transform"
+                className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-rose-600 text-white rounded-full shadow-lg shadow-rose-900/40 flex items-center justify-center z-40 active:scale-95 transition-transform"
             >
                 <Plus size={28} />
             </button>
@@ -441,14 +441,14 @@ export default function TasksPage() {
             {isAddTaskOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center md:hidden" onClick={() => setIsAddTaskOpen(false)}>
                     <div
-                        className="bg-gray-900 border-t border-gray-700 rounded-t-3xl p-6 w-full shadow-2xl animate-in slide-in-from-bottom-full duration-300"
+                        className="bg-white border-t border-gray-200 rounded-t-3xl p-6 w-full shadow-2xl animate-in slide-in-from-bottom-full duration-300"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex justify-center mb-6">
-                            <div className="w-12 h-1.5 bg-gray-700 rounded-full"></div>
+                            <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
                         </div>
 
-                        <h3 className="text-xl font-bold text-white mb-4">Nova Tarefa</h3>
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Nova Tarefa</h3>
 
                         <form onSubmit={addTask} className="flex flex-col gap-4">
                             <input
@@ -456,10 +456,10 @@ export default function TasksPage() {
                                 value={newTaskTitle}
                                 onChange={(e) => setNewTaskTitle(e.target.value)}
                                 placeholder="O que precisa ser feito hoje?"
-                                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-600 text-lg"
                                 autoFocus
                             />
-                            <Button type="submit" icon={Plus} className="bg-blue-600 hover:bg-blue-700 w-full justify-center py-3 text-lg">
+                            <Button type="submit" icon={Plus} className="bg-rose-600 hover:bg-rose-700 w-full justify-center py-3 text-lg text-white">
                                 Adicionar Tarefa
                             </Button>
                         </form>

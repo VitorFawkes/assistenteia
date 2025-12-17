@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
 import { supabase } from '../lib/supabase';
+import { ElaLogo } from './ElaLogo';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -58,21 +59,21 @@ export default function Layout() {
     ];
 
     return (
-        <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="flex h-screen bg-ela-bg text-ela-text overflow-hidden">
             {/* Sidebar - Desktop Only */}
             <aside
                 className={clsx(
-                    "hidden md:flex bg-gray-800 border-r border-gray-700 transition-all duration-300 flex-col",
+                    "hidden md:flex bg-white border-r border-ela-border transition-all duration-300 flex-col shadow-sm z-10",
                     isSidebarOpen ? "w-64" : "w-20"
                 )}
             >
-                <div className="p-4 flex items-center justify-between border-b border-gray-700">
-                    <div className={clsx("font-bold text-xl bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent truncate", !isSidebarOpen && "hidden")}>
-                        Assistente IA
+                <div className="p-4 flex items-center justify-between border-b border-ela-border">
+                    <div className={clsx("truncate", !isSidebarOpen && "hidden")}>
+                        <ElaLogo />
                     </div>
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                        className="p-2 hover:bg-gray-100 text-gray-500 rounded-lg transition-colors"
                     >
                         <Menu size={20} />
                     </button>
@@ -87,8 +88,8 @@ export default function Layout() {
                                 clsx(
                                     "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group",
                                     isActive
-                                        ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50"
-                                        : "text-gray-400 hover:bg-gray-700 hover:text-white"
+                                        ? "bg-ela-pink-light text-ela-pink font-semibold"
+                                        : "text-ela-sub hover:bg-gray-100 hover:text-ela-pink"
                                 )
                             }
                         >
@@ -98,7 +99,7 @@ export default function Layout() {
                             </span>
                             {/* Tooltip for collapsed state */}
                             {!isSidebarOpen && (
-                                <div className="absolute left-16 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap border border-gray-700">
+                                <div className="absolute left-16 bg-white text-gray-800 px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap border border-gray-200 shadow-sm">
                                     {item.label}
                                 </div>
                             )}
@@ -106,15 +107,15 @@ export default function Layout() {
                     ))}
                 </nav>
 
-                <div className="p-4 border-t border-gray-700 space-y-2">
+                <div className="p-4 border-t border-ela-border space-y-2">
                     <NavLink
                         to="/settings"
                         className={({ isActive }) =>
                             clsx(
                                 "flex items-center gap-3 p-3 rounded-xl w-full transition-colors",
                                 isActive
-                                    ? "bg-gray-700 text-white"
-                                    : "text-gray-400 hover:text-white hover:bg-gray-700"
+                                    ? "bg-gray-100 text-ela-pink"
+                                    : "text-ela-sub hover:text-ela-pink hover:bg-gray-100"
                             )
                         }
                     >
@@ -123,7 +124,7 @@ export default function Layout() {
                     </NavLink>
                     <button
                         onClick={signOut}
-                        className="flex items-center gap-3 p-3 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-xl w-full transition-colors"
+                        className="flex items-center gap-3 p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl w-full transition-colors"
                     >
                         <LogOut size={24} />
                         <span className={clsx("font-medium whitespace-nowrap", !isSidebarOpen && "hidden")}>Sair</span>
@@ -134,13 +135,11 @@ export default function Layout() {
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto relative flex flex-col pb-24 md:pb-0">
                 {/* Mobile Header */}
-                <div className="md:hidden p-4 border-b border-gray-800 bg-gray-900/95 backdrop-blur flex items-center justify-between sticky top-0 z-20">
-                    <div className="font-bold text-xl bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        Assistente IA
-                    </div>
+                <div className="md:hidden p-4 border-b border-gray-200 bg-white/90 backdrop-blur flex items-center justify-between sticky top-0 z-20">
+                    <ElaLogo />
                     <button
                         onClick={signOut}
-                        className="p-2 text-gray-400 hover:text-white"
+                        className="p-2 text-gray-400 hover:text-red-500"
                     >
                         <LogOut size={20} />
                     </button>

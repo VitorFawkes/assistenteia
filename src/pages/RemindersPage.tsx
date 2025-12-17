@@ -275,7 +275,7 @@ export default function RemindersPage() {
     };
 
     if (isLoading) {
-        return <div className="p-8 text-center text-gray-400">Carregando lembretes...</div>;
+        return <div className="p-8 text-center text-gray-500">Carregando lembretes...</div>;
     }
 
     return (
@@ -284,26 +284,26 @@ export default function RemindersPage() {
                 title="Lembretes"
                 subtitle="Gerencie suas tarefas e compromissos"
                 icon={Clock}
-                iconColor="text-blue-400"
+                iconColor="text-rose-600"
             />
 
             {/* Add New Reminder */}
-            <Card className="mb-6 md:mb-8 p-4 w-full box-border">
+            <Card className="mb-6 md:mb-8 p-4 w-full box-border bg-white border-ela-border">
                 <form onSubmit={addReminder} className="flex flex-col gap-3 w-full">
                     <input
                         type="text"
                         value={newReminder}
                         onChange={(e) => setNewReminder(e.target.value)}
                         placeholder="Novo lembrete..."
-                        className="flex-1 bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        className="flex-1 bg-gray-50 border border-ela-border rounded-xl p-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all"
                     />
                     <input
                         type="datetime-local"
                         value={newDate}
                         onChange={(e) => setNewDate(e.target.value)}
-                        className="bg-gray-900 border border-gray-600 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
+                        className="bg-gray-50 border border-ela-border rounded-xl p-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all w-full"
                     />
-                    <Button type="submit" icon={Plus} className="w-full shrink-0">
+                    <Button type="submit" icon={Plus} className="w-full shrink-0 bg-rose-600 hover:bg-rose-700 text-white">
                         Adicionar
                     </Button>
                 </form>
@@ -319,12 +319,12 @@ export default function RemindersPage() {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="Buscar lembretes..."
-                            className="w-full bg-gray-900/50 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                            className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-4 py-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink transition-all"
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600"
                             >
                                 <X size={16} />
                             </button>
@@ -334,7 +334,7 @@ export default function RemindersPage() {
                     <select
                         value={sortOption}
                         onChange={(e) => setSortOption(e.target.value as any)}
-                        className="bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer min-w-[200px]"
+                        className="bg-gray-50 border border-ela-border rounded-xl px-4 py-3 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink transition-all appearance-none cursor-pointer min-w-[200px]"
                     >
                         <option value="due_asc">📅 Data (Mais Próximo)</option>
                         <option value="due_desc">📅 Data (Mais Distante)</option>
@@ -357,8 +357,8 @@ export default function RemindersPage() {
                             key={filter.id}
                             onClick={() => setActiveFilter(filter.id as any)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${activeFilter === filter.id
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700'
+                                ? 'bg-ela-pink text-white shadow-lg shadow-rose-900/20'
+                                : 'bg-white text-ela-sub hover:bg-gray-50 hover:text-ela-pink border border-ela-border'
                                 }`}
                         >
                             {filter.icon && <filter.icon size={14} />}
@@ -370,9 +370,9 @@ export default function RemindersPage() {
 
             {/* List Header & Bulk Actions */}
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-300 flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
                     {activeFilter === 'completed' ? 'Concluídos' : 'A Fazer'}
-                    <span className="bg-gray-800 text-gray-400 text-xs px-2 py-1 rounded-full">{filteredReminders.length}</span>
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">{filteredReminders.length}</span>
                 </h2>
 
                 {filteredReminders.length > 0 && (
@@ -399,7 +399,7 @@ export default function RemindersPage() {
                         )}
                         <button
                             onClick={toggleSelectAll}
-                            className="text-sm text-gray-400 hover:text-white transition-colors"
+                            className="text-sm text-gray-400 hover:text-rose-600 transition-colors"
                         >
                             {selectedReminders.size === filteredReminders.length ? 'Desmarcar todos' : 'Selecionar todos'}
                         </button>
@@ -410,15 +410,15 @@ export default function RemindersPage() {
             {/* Reminders List */}
             <div className="space-y-3">
                 {filteredReminders.length === 0 ? (
-                    <div className="text-center py-16 bg-gray-800/30 rounded-2xl border border-dashed border-gray-700">
-                        <Filter className="mx-auto text-gray-600 mb-3" size={48} />
+                    <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                        <Filter className="mx-auto text-gray-400 mb-3" size={48} />
                         <p className="text-gray-500 font-medium">Nenhum lembrete encontrado</p>
-                        <p className="text-gray-600 text-sm mt-1">Tente mudar os filtros ou criar um novo.</p>
+                        <p className="text-gray-400 text-sm mt-1">Tente mudar os filtros ou criar um novo.</p>
                     </div>
                 ) : (
                     filteredReminders.map(reminder => (
-                        <Card key={reminder.id} className={`p-4 flex items-center justify-between group transition-all ${selectedReminders.has(reminder.id) ? 'border-blue-500/50 bg-blue-500/5' :
-                            reminder.is_completed ? 'opacity-60 hover:opacity-100 bg-gray-900 border-gray-800' : ''
+                        <Card key={reminder.id} className={`p-4 flex items-center justify-between group transition-all ${selectedReminders.has(reminder.id) ? 'border-rose-600/50 bg-rose-600/5' :
+                            reminder.is_completed ? 'opacity-60 hover:opacity-100 bg-gray-50 border-gray-100' : 'bg-white border-gray-200'
                             }`} hover>
                             <div className="flex items-center gap-4 flex-1">
                                 <div className="flex items-center gap-3">
@@ -426,18 +426,18 @@ export default function RemindersPage() {
                                         type="checkbox"
                                         checked={selectedReminders.has(reminder.id)}
                                         onChange={() => toggleSelection(reminder.id)}
-                                        className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
+                                        className="w-5 h-5 rounded border-gray-300 bg-white text-rose-600 focus:ring-rose-600 focus:ring-offset-white"
                                     />
                                     <button
                                         onClick={() => toggleComplete(reminder.id, reminder.is_completed)}
-                                        className={`${reminder.is_completed ? 'text-green-500 hover:text-green-400' : 'text-gray-400 hover:text-blue-400'} transition-colors`}
+                                        className={`${reminder.is_completed ? 'text-green-500 hover:text-green-600' : 'text-gray-400 hover:text-rose-600'} transition-colors`}
                                     >
                                         {reminder.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
                                     </button>
                                 </div>
 
                                 <div className="flex-1">
-                                    <p className={`text-lg font-medium ${reminder.is_completed ? 'text-gray-500 line-through' : 'text-white'}`}>
+                                    <p className={`text-lg font-medium ${reminder.is_completed ? 'text-gray-400 line-through' : 'text-ela-text'}`}>
                                         {reminder.title}
                                     </p>
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
@@ -449,10 +449,10 @@ export default function RemindersPage() {
 
                                         {/* Due Date */}
                                         {reminder.due_at && !reminder.is_completed && (
-                                            <p className={`text-xs flex items-center gap-1 ${isPast(parseISO(reminder.due_at)) ? 'text-red-400' : 'text-blue-300'}`} title="Data de realização prevista">
+                                            <p className={`text-xs flex items-center gap-1 ${isPast(parseISO(reminder.due_at)) ? 'text-red-500' : 'text-blue-500'}`} title="Data de realização prevista">
                                                 <span className="opacity-70">⏰ Para:</span>
                                                 {format(parseISO(reminder.due_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                                                {isPast(parseISO(reminder.due_at)) && <span className="font-bold bg-red-500/10 px-1.5 rounded text-[10px] ml-1">Atrasado</span>}
+                                                {isPast(parseISO(reminder.due_at)) && <span className="font-bold bg-red-100 px-1.5 rounded text-[10px] ml-1">Atrasado</span>}
                                             </p>
                                         )}
 
@@ -466,7 +466,7 @@ export default function RemindersPage() {
                                     </div>
 
                                     {getRecurrenceText(reminder) && !reminder.is_completed && (
-                                        <p className="text-xs text-purple-400 mt-1 font-medium bg-purple-500/10 inline-block px-2 py-0.5 rounded-full">
+                                        <p className="text-xs text-purple-600 mt-1 font-medium bg-purple-100 inline-block px-2 py-0.5 rounded-full">
                                             {getRecurrenceText(reminder)}
                                         </p>
                                     )}
@@ -486,14 +486,14 @@ export default function RemindersPage() {
 
             {/* Confirmation Modal */}
             {reminderToDelete && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={cancelDelete}>
-                    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-white mb-3">Confirmar Exclusão</h3>
-                        <p className="text-gray-300 mb-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={cancelDelete}>
+                    <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-gray-900 mb-3">Confirmar Exclusão</h3>
+                        <p className="text-gray-600 mb-6">
                             Tem certeza que deseja excluir este lembrete?
                         </p>
                         <div className="flex gap-3 justify-end">
-                            <Button variant="secondary" onClick={cancelDelete}>
+                            <Button variant="secondary" onClick={cancelDelete} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
                                 Cancelar
                             </Button>
                             <Button variant="danger" onClick={confirmDelete}>

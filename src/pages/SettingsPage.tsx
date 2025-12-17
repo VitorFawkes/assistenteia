@@ -32,6 +32,8 @@ export default function SettingsPage() {
     const [storageDownloadDocuments, setStorageDownloadDocuments] = useState(true);
     const [storageTrackStatus, setStorageTrackStatus] = useState(true);
 
+    const [isAdmin, setIsAdmin] = useState(false);
+
     useEffect(() => {
         loadSettings();
     }, []);
@@ -42,7 +44,10 @@ export default function SettingsPage() {
             if (!user) return;
 
             setUserId(user.id);
+            const adminStatus = user.email === 'vitorgambetti@gmail.com';
+            setIsAdmin(adminStatus);
 
+            // Load User Settings
             const { data, error } = await supabase
                 .from('user_settings')
                 .select('*')
@@ -60,7 +65,7 @@ export default function SettingsPage() {
                 setPhone(rawPhone.startsWith('+55') ? rawPhone.slice(3) : rawPhone);
                 setPrivacyReadScope(settings.privacy_read_scope || 'all');
                 setPrivacyAllowOutgoing(settings.privacy_allow_outgoing !== false);
-                setCustomPrompt(settings.custom_system_prompt || '');
+                // setCustomPrompt(settings.custom_system_prompt || ''); // Non-admins don't see/edit prompt
                 // setAiModel('gpt-5.1-preview'); // State removed, enforced server-side
 
                 // Daily Briefing
@@ -75,6 +80,22 @@ export default function SettingsPage() {
                 setStorageDownloadDocuments(settings.storage_download_documents !== false);
                 setStorageTrackStatus(settings.storage_track_status !== false);
             }
+
+            // Load System Prompt (Admin Only - from Registry)
+            if (adminStatus) {
+                const { data: promptData } = await (supabase as any)
+                    .from('prompts')
+                    .select('content')
+                    .eq('key', 'system_core')
+                    .maybeSingle();
+
+                if (promptData) {
+                    setCustomPrompt(promptData.content);
+                }
+            } else {
+                setCustomPrompt(''); // Non-admins don't see/edit prompt
+            }
+
         } catch (error) {
             console.error('Error loading settings:', error);
         } finally {
@@ -90,6 +111,7 @@ export default function SettingsPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
+            // 1. Save User Settings
             // Format phone: if empty or just +55, send null. Otherwise ensure +55 prefix.
             const cleanPhone = phone.replace(/\D/g, '');
             const formattedPhone = cleanPhone ? (cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`) : null;
@@ -103,7 +125,11 @@ export default function SettingsPage() {
                     phone_number: formattedPhone,
                     privacy_read_scope: privacyReadScope,
                     privacy_allow_outgoing: privacyAllowOutgoing,
-                    custom_system_prompt: customPrompt,
+                    // Non-admins don't save custom_system_prompt anymore
+                    // Admins save to Registry, so we don't need to save here either, 
+                    // BUT we might want to clear it or keep it as legacy. 
+                    // Let's just ignore it here for simplicity.
+
                     ai_model: 'gpt-5.1-preview', // Always enforce 5.1 on save
 
                     // Daily Briefing
@@ -121,6 +147,21 @@ export default function SettingsPage() {
                 }, { onConflict: 'user_id' });
 
             if (error) throw error;
+
+            // 2. Save System Prompt to Registry (Admin Only)
+            if (isAdmin) {
+                const { error: promptError } = await (supabase as any)
+                    .from('prompts')
+                    .upsert({
+                        key: 'system_core',
+                        content: customPrompt,
+                        visibility: 'execution',
+                        is_active: true,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'key' });
+
+                if (promptError) throw promptError;
+            }
 
             setMessage({ type: 'success', text: 'Configurações salvas com sucesso!' });
             setTimeout(() => setMessage(null), 3000);
@@ -147,28 +188,28 @@ export default function SettingsPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-full bg-gray-900">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="flex items-center justify-center h-full bg-ela-bg">
+                <Loader2 className="w-8 h-8 animate-spin text-ela-pink" />
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 p-4 md:p-6 pb-28 md:pb-6 overflow-auto">
+        <div className="flex flex-col h-full bg-ela-bg p-4 md:p-6 pb-28 md:pb-6 overflow-auto">
             <div className="max-w-3xl mx-auto w-full space-y-8">
 
                 {/* Header & Main Save */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Configurações da IA</h1>
-                        <p className="text-gray-400">Personalize como sua assistente interage e armazena dados.</p>
+                        <h1 className="text-3xl font-bold text-ela-text mb-2">Configurações da IA</h1>
+                        <p className="text-ela-sub">Personalize como sua assistente interage e armazena dados.</p>
                     </div>
                     <div className="flex gap-3">
                         <Button
                             variant="secondary"
                             onClick={handleTestReminders}
                             icon={Bot}
-                            className="bg-gray-800 hover:bg-gray-700 text-gray-300 shadow-lg shadow-black/20"
+                            className="bg-white hover:bg-gray-50 text-ela-sub border border-ela-border shadow-sm"
                         >
                             Testar Lembretes
                         </Button>
@@ -177,7 +218,7 @@ export default function SettingsPage() {
                             disabled={isSaving}
                             isLoading={isSaving}
                             icon={Save}
-                            className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
+                            className="bg-ela-pink hover:bg-pink-600 shadow-lg shadow-pink-900/20 text-white"
                         >
                             Salvar Alterações
                         </Button>
@@ -193,16 +234,16 @@ export default function SettingsPage() {
                 )}
 
                 {/* SECTION 1: PERFIL & CONTATO */}
-                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-8 backdrop-blur-sm">
+                <div className="bg-white border border-ela-border rounded-2xl p-6 md:p-8 space-y-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <User className="w-6 h-6 text-purple-400" />
-                        <h2 className="text-xl font-bold text-white">Seu Perfil</h2>
+                        <User className="w-6 h-6 text-ela-pink" />
+                        <h2 className="text-xl font-bold text-ela-text">Seu Perfil</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Preferred Name */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-2">
                                 Como devo te chamar?
                             </label>
                             <input
@@ -210,13 +251,13 @@ export default function SettingsPage() {
                                 value={preferredName}
                                 onChange={(e) => setPreferredName(e.target.value)}
                                 placeholder="Ex: Chefe, Vitor..."
-                                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all outline-none placeholder:text-gray-600"
+                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-gray-400"
                             />
                         </div>
 
                         {/* AI Name */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-2">
                                 Nome da IA
                             </label>
                             <input
@@ -224,13 +265,13 @@ export default function SettingsPage() {
                                 value={aiName}
                                 onChange={(e) => setAiName(e.target.value)}
                                 placeholder="Ex: Jarvis, Sexta-feira..."
-                                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all outline-none placeholder:text-gray-600"
+                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-gray-400"
                             />
                         </div>
 
                         {/* Phone */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-2">
                                 Seu WhatsApp (com DDD)
                             </label>
                             <div className="relative">
@@ -239,13 +280,13 @@ export default function SettingsPage() {
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     placeholder="11 999999999"
-                                    className="w-full bg-gray-900/50 border border-gray-700 rounded-xl p-3 pl-12 text-white focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition-all outline-none placeholder:text-gray-600"
+                                    className="w-full bg-white border border-ela-border rounded-xl p-3 pl-12 text-ela-text focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none placeholder:text-gray-400"
                                 />
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium pointer-events-none">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium pointer-events-none">
                                     +55
                                 </div>
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
+                            <p className="text-xs text-ela-sub mt-2">
                                 Usado para identificar quando <b>você</b> fala com a IA ("Note to Self").
                             </p>
                         </div>
@@ -253,15 +294,15 @@ export default function SettingsPage() {
                 </div>
 
                 {/* SECTION 2: PRIVACIDADE & COMPORTAMENTO */}
-                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-8 backdrop-blur-sm">
+                <div className="bg-white border border-ela-border rounded-2xl p-6 md:p-8 space-y-8 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <Bot className="w-6 h-6 text-indigo-400" />
-                        <h2 className="text-xl font-bold text-white">Privacidade da IA</h2>
+                        <Bot className="w-6 h-6 text-indigo-500" />
+                        <h2 className="text-xl font-bold text-ela-text">Privacidade da IA</h2>
                     </div>
 
                     {/* Read Scope */}
                     <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wider">
+                        <h3 className="text-sm font-medium text-ela-sub uppercase tracking-wider">
                             O que a IA pode ler?
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -275,37 +316,37 @@ export default function SettingsPage() {
                                     key={opt.id}
                                     onClick={() => setPrivacyReadScope(opt.id as any)}
                                     className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${privacyReadScope === opt.id
-                                        ? 'bg-indigo-500/20 border-indigo-500/50 text-white shadow-lg shadow-indigo-500/10'
-                                        : 'bg-gray-900/30 border-gray-700/50 text-gray-400 hover:bg-gray-800 hover:border-gray-600'
+                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
+                                        : 'bg-white border-ela-border text-ela-sub hover:bg-gray-50 hover:border-gray-300'
                                         }`}
                                 >
-                                    <div className={`font-bold mb-1 ${privacyReadScope === opt.id ? 'text-indigo-300' : 'text-gray-300'}`}>
+                                    <div className={`font-bold mb-1 ${privacyReadScope === opt.id ? 'text-indigo-700' : 'text-ela-text'}`}>
                                         {opt.label}
                                     </div>
                                     <div className="text-xs opacity-70 leading-relaxed">
                                         {opt.desc}
                                     </div>
                                     {privacyReadScope === opt.id && (
-                                        <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
+                                        <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full shadow-sm" />
                                     )}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    <div className="h-px bg-gray-700/30" />
+                    <div className="h-px bg-gray-100" />
 
                     {/* Outgoing Permission */}
                     <div className="flex items-center justify-between">
                         <div>
-                            <div className="font-medium text-white">Permitir envio para terceiros?</div>
-                            <div className="text-sm text-gray-400 mt-1 max-w-md">
+                            <div className="font-medium text-ela-text">Permitir envio para terceiros?</div>
+                            <div className="text-sm text-ela-sub mt-1 max-w-md">
                                 Se ativado, você pode pedir para a IA enviar mensagens para outras pessoas.
                             </div>
                         </div>
                         <button
                             onClick={() => setPrivacyAllowOutgoing(!privacyAllowOutgoing)}
-                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-700'
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-200'
                                 }`}
                         >
                             <span
@@ -319,19 +360,19 @@ export default function SettingsPage() {
 
 
                 {/* SECTION 3: ARMAZENAMENTO (COFRE) */}
-                <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 md:p-8 space-y-6 backdrop-blur-sm">
+                <div className="bg-white border border-ela-border rounded-2xl p-6 md:p-8 space-y-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
-                        <Save className="w-6 h-6 text-blue-400" />
+                        <Save className="w-6 h-6 text-blue-500" />
                         <div>
-                            <h2 className="text-xl font-bold text-white">Cofre Pessoal</h2>
-                            <p className="text-sm text-gray-400">
+                            <h2 className="text-xl font-bold text-ela-text">Cofre Pessoal</h2>
+                            <p className="text-sm text-ela-sub">
                                 O que devo salvar quando <b>você</b> me envia arquivos?
                             </p>
                         </div>
                     </div>
 
-                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 mb-6">
-                        <p className="text-xs text-blue-300 flex items-start gap-2">
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                        <p className="text-xs text-blue-700 flex items-start gap-2">
                             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                             <span>
                                 <b>Nota:</b> Para economizar espaço, mídias de terceiros (Grupos/Outros) <b>nunca</b> são baixadas, exceto áudios (para transcrição). Estas opções abaixo controlam apenas o seu "Note to Self".
@@ -346,11 +387,11 @@ export default function SettingsPage() {
                             { label: 'Meus Áudios', state: storageDownloadAudio, setter: setStorageDownloadAudio },
                             { label: 'Meus Documentos', state: storageDownloadDocuments, setter: setStorageDownloadDocuments },
                         ].map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-gray-900/30 p-4 rounded-xl border border-gray-700/30">
-                                <span className="text-sm text-gray-300 font-medium">{item.label}</span>
+                            <div key={idx} className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                <span className="text-sm text-ela-text font-medium">{item.label}</span>
                                 <button
                                     onClick={() => item.setter(!item.state)}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${item.state ? 'bg-blue-500' : 'bg-gray-700'}`}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${item.state ? 'bg-blue-500' : 'bg-gray-200'}`}
                                 >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${item.state ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
@@ -361,24 +402,23 @@ export default function SettingsPage() {
 
                 {/* SECTION 4: CONEXÕES */}
                 <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-white">Integrações</h2>
+                    <h2 className="text-2xl font-bold text-ela-text">Integrações</h2>
 
                     {/* WhatsApp */}
                     {userId && <WhatsAppConnection userId={userId} />}
 
                     {/* External Services */}
-                    {/* External Services */}
                     <div className="space-y-6">
                         {/* AI Brain (Full Width) */}
-                        <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-                            <div className="p-6 border-b border-gray-700/50">
+                        <div className="bg-white border border-ela-border rounded-2xl overflow-hidden shadow-sm">
+                            <div className="p-6 border-b border-ela-border">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-2 bg-purple-900/20 rounded-lg">
-                                        <Brain className="w-5 h-5 text-purple-400" />
+                                    <div className="p-2 bg-purple-50 rounded-lg">
+                                        <Brain className="w-5 h-5 text-purple-500" />
                                     </div>
-                                    <h2 className="text-lg font-semibold text-white">Cérebro da IA</h2>
+                                    <h2 className="text-lg font-semibold text-ela-text">Cérebro da IA</h2>
                                 </div>
-                                <p className="text-sm text-gray-400">
+                                <p className="text-sm text-ela-sub">
                                     Personalize como a inteligência artificial pensa e se comporta.
                                 </p>
                             </div>
@@ -386,40 +426,50 @@ export default function SettingsPage() {
                             <div className="p-6 space-y-8">
                                 {/* AI Model - HIDDEN & ENFORCED */}
                                 <div className="hidden">
-                                    <label className="block text-sm font-medium text-gray-300 mb-3">
+                                    <label className="block text-sm font-medium text-ela-sub mb-3">
                                         Modelo de Inteligência
                                     </label>
-                                    <div className="p-4 border border-gray-700/50 rounded-xl bg-gray-800/50 flex items-center gap-3">
-                                        <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                                        <span className="text-gray-300 font-medium">GPT 5.1 (Enforced)</span>
+                                    <div className="p-4 border border-ela-border rounded-xl bg-gray-50 flex items-center gap-3">
+                                        <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-sm" />
+                                        <span className="text-ela-text font-medium">GPT 5.1 (Enforced)</span>
                                     </div>
                                 </div>
 
-                                {/* System Prompt */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-3">
-                                        Personalidade (System Prompt)
-                                    </label>
-                                    <div className="relative group">
-                                        <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
-                                        <textarea
-                                            value={customPrompt}
-                                            onChange={(e) => setCustomPrompt(e.target.value)}
-                                            rows={6}
-                                            className="relative w-full px-5 py-4 rounded-xl border border-gray-700 bg-gray-900/90 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none font-mono text-sm leading-relaxed shadow-xl"
-                                            placeholder="Ex: Você é um assistente especialista em finanças..."
-                                        />
-                                        <div className="absolute bottom-4 right-4 text-xs text-gray-500 font-mono bg-gray-900/80 px-2 py-1 rounded-md border border-gray-800">
-                                            {customPrompt.length} chars
+                                {/* System Prompt - ADMIN ONLY */}
+                                {isAdmin ? (
+                                    <div>
+                                        <label className="block text-sm font-medium text-ela-sub mb-3 flex items-center gap-2">
+                                            Personalidade (System Prompt)
+                                            <span className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Admin Only</span>
+                                        </label>
+                                        <div className="relative group">
+                                            <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-400 to-blue-400 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
+                                            <textarea
+                                                value={customPrompt}
+                                                onChange={(e) => setCustomPrompt(e.target.value)}
+                                                rows={12}
+                                                className="relative w-full px-5 py-4 rounded-xl border border-ela-border bg-white text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all resize-none font-mono text-sm leading-relaxed shadow-sm"
+                                                placeholder="Ex: Você é um assistente especialista em finanças..."
+                                            />
+                                            <div className="absolute bottom-4 right-4 text-xs text-gray-400 font-mono bg-white px-2 py-1 rounded-md border border-gray-200">
+                                                {customPrompt.length} chars
+                                            </div>
                                         </div>
+                                        <p className="mt-3 text-xs text-ela-sub flex items-center gap-1.5 flex-wrap">
+                                            <Info className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                            <span>
+                                                Use <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 border border-gray-200">{'{{preferred_name}}'}</code> para seu nome e <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 border border-gray-200">{'{{CURRENT_DATETIME}}'}</code> para a hora atual.
+                                            </span>
+                                        </p>
                                     </div>
-                                    <p className="mt-3 text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
-                                        <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                        <span>
-                                            Use <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">{'{{preferred_name}}'}</code> para seu nome e <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">{'{{CURRENT_DATETIME}}'}</code> para a hora atual.
+                                ) : (
+                                    <div className="p-4 bg-gray-50 border border-ela-border rounded-xl flex items-center gap-3 text-ela-sub">
+                                        <Info className="w-5 h-5 text-gray-400" />
+                                        <span className="text-sm">
+                                            O comportamento da IA é gerenciado pelo administrador do sistema.
                                         </span>
-                                    </p>
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -427,15 +477,15 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                             {/* Daily Briefing Column */}
-                            <div className={`bg-gray-800/40 border transition-all duration-300 rounded-2xl overflow-hidden backdrop-blur-sm ${dailyBriefingEnabled ? 'border-yellow-500/30 shadow-lg shadow-yellow-900/10' : 'border-gray-700/50'}`}>
-                                <div className="p-6 border-b border-gray-700/50 flex items-center justify-between">
+                            <div className={`bg-white border transition-all duration-300 rounded-2xl overflow-hidden shadow-sm ${dailyBriefingEnabled ? 'border-yellow-400 shadow-yellow-100' : 'border-ela-border'}`}>
+                                <div className="p-6 border-b border-ela-border flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg transition-colors ${dailyBriefingEnabled ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700/50 text-gray-400'}`}>
+                                        <div className={`p-2 rounded-lg transition-colors ${dailyBriefingEnabled ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-50 text-gray-400'}`}>
                                             <Sun size={20} />
                                         </div>
                                         <div>
-                                            <h2 className="text-lg font-semibold text-white">Resumo Diário</h2>
-                                            <p className="text-xs text-gray-400">Briefing matinal no WhatsApp</p>
+                                            <h2 className="text-lg font-semibold text-ela-text">Resumo Diário</h2>
+                                            <p className="text-xs text-ela-sub">Briefing matinal no WhatsApp</p>
                                         </div>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
@@ -445,7 +495,7 @@ export default function SettingsPage() {
                                             checked={dailyBriefingEnabled}
                                             onChange={(e) => setDailyBriefingEnabled(e.target.checked)}
                                         />
-                                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500 shadow-inner"></div>
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500 shadow-inner"></div>
                                     </label>
                                 </div>
 
@@ -453,23 +503,23 @@ export default function SettingsPage() {
                                     <div className="p-6 space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">
+                                                <label className="block text-xs font-medium text-ela-sub mb-1.5 uppercase tracking-wider">
                                                     Horário
                                                 </label>
                                                 <input
                                                     type="time"
                                                     value={dailyBriefingTime}
                                                     onChange={(e) => setDailyBriefingTime(e.target.value)}
-                                                    className="w-full bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all text-center font-mono"
+                                                    className="w-full bg-white border border-ela-border rounded-lg px-3 py-2 text-ela-text focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all text-center font-mono"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">
+                                                <label className="block text-xs font-medium text-ela-sub mb-1.5 uppercase tracking-wider">
                                                     Teste
                                                 </label>
                                                 <Button
                                                     variant="secondary"
-                                                    className="w-full justify-center bg-gray-700/50 hover:bg-gray-600 border-gray-600"
+                                                    className="w-full justify-center bg-gray-50 hover:bg-gray-100 border-ela-border text-ela-text"
                                                     size="sm"
                                                     onClick={async () => {
                                                         if (!confirm('Enviar resumo agora para o seu WhatsApp?')) return;
@@ -501,20 +551,20 @@ export default function SettingsPage() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">
+                                            <label className="block text-xs font-medium text-ela-sub mb-1.5 uppercase tracking-wider">
                                                 Instruções
                                             </label>
                                             <textarea
                                                 value={dailyBriefingPrompt}
                                                 onChange={(e) => setDailyBriefingPrompt(e.target.value)}
                                                 placeholder="Ex: Seja engraçado, foque em finanças..."
-                                                className="w-full h-24 bg-gray-900/50 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all resize-none placeholder:text-gray-600"
+                                                className="w-full h-24 bg-white border border-ela-border rounded-lg px-3 py-2 text-sm text-ela-text focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all resize-none placeholder:text-gray-400"
                                             />
                                         </div>
                                     </div>
                                 )}
                                 {!dailyBriefingEnabled && (
-                                    <div className="p-8 text-center text-gray-500 text-sm italic">
+                                    <div className="p-8 text-center text-ela-sub text-sm italic">
                                         Ative para receber um resumo diário das suas tarefas e agenda.
                                     </div>
                                 )}
@@ -523,19 +573,19 @@ export default function SettingsPage() {
                             {/* Integrations Column */}
                             <div className="space-y-4">
                                 {/* Google */}
-                                <div className="group bg-gray-800/40 border border-gray-700/50 hover:border-gray-600 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-800/60 backdrop-blur-sm">
+                                <div className="group bg-white border border-ela-border hover:border-gray-300 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50 shadow-sm">
                                     <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white rounded-xl shadow-lg shadow-white/5 group-hover:scale-110 transition-transform duration-300">
+                                        <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300">
                                             <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-white text-lg">Google</h3>
-                                            <p className="text-xs text-gray-400">Agenda, Email & Drive</p>
+                                            <h3 className="font-bold text-ela-text text-lg">Google</h3>
+                                            <p className="text-xs text-ela-sub">Agenda, Email & Drive</p>
                                         </div>
                                     </div>
                                     <Button
                                         onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-google/login'}
-                                        className="bg-gray-700/50 hover:bg-white hover:text-black text-white border border-gray-600 hover:border-white transition-all duration-300"
+                                        className="bg-white hover:bg-gray-50 text-ela-text border border-ela-border hover:border-gray-300 transition-all duration-300"
                                         size="sm"
                                     >
                                         Conectar
@@ -543,7 +593,7 @@ export default function SettingsPage() {
                                 </div>
 
                                 {/* Microsoft */}
-                                <div className="group bg-gray-800/40 border border-gray-700/50 hover:border-[#00a4ef]/50 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-800/60 backdrop-blur-sm">
+                                <div className="group bg-white border border-ela-border hover:border-[#00a4ef]/50 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50 shadow-sm">
                                     <div className="flex items-center gap-4">
                                         <div className="p-3 bg-[#00a4ef]/10 rounded-xl group-hover:scale-110 transition-transform duration-300">
                                             <svg className="w-6 h-6 text-[#00a4ef]" viewBox="0 0 23 23" fill="currentColor">
@@ -551,13 +601,13 @@ export default function SettingsPage() {
                                             </svg>
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-white text-lg">Outlook</h3>
-                                            <p className="text-xs text-gray-400">Agenda & Email</p>
+                                            <h3 className="font-bold text-ela-text text-lg">Outlook</h3>
+                                            <p className="text-xs text-ela-sub">Agenda & Email</p>
                                         </div>
                                     </div>
                                     <Button
                                         onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-microsoft/login'}
-                                        className="bg-gray-700/50 hover:bg-[#00a4ef] hover:text-white text-white border border-gray-600 hover:border-[#00a4ef] transition-all duration-300"
+                                        className="bg-white hover:bg-[#00a4ef] hover:text-white text-ela-text border border-ela-border hover:border-[#00a4ef] transition-all duration-300"
                                         size="sm"
                                     >
                                         Conectar
@@ -574,7 +624,7 @@ export default function SettingsPage() {
                         disabled={isSaving}
                         isLoading={isSaving}
                         icon={Save}
-                        className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 px-8 py-3 text-lg shadow-xl shadow-blue-900/20 transition-all hover:scale-105 active:scale-95"
+                        className="w-full md:w-auto bg-ela-pink hover:bg-pink-600 px-8 py-3 text-lg shadow-xl shadow-pink-900/20 transition-all hover:scale-105 active:scale-95 text-white"
                     >
                         Salvar Tudo
                     </Button>

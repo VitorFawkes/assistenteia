@@ -167,19 +167,19 @@ export default function DocumentsPage() {
     // ... (fetchDocuments, handleFileUpload, etc. remain the same)
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 p-6 overflow-auto">
+        <div className="flex flex-col h-full bg-ela-bg p-6 overflow-auto">
             <div className="max-w-5xl mx-auto w-full">
                 <PageHeader
                     title="Documentos"
                     subtitle="Gerencie seus arquivos e documentos importantes"
                     icon={FolderOpen}
-                    iconColor="text-yellow-400"
+                    iconColor="text-ela-pink"
                     action={
                         <div className="flex items-center gap-3">
                             <select
                                 value={sortOption}
                                 onChange={(e) => setSortOption(e.target.value as any)}
-                                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer"
+                                className="bg-white border border-ela-border rounded-xl px-3 py-2 text-sm text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink transition-all appearance-none cursor-pointer shadow-sm"
                             >
                                 <option value="date_desc">📅 Recentes</option>
                                 <option value="date_asc">📅 Antigos</option>
@@ -187,10 +187,10 @@ export default function DocumentsPage() {
                                 <option value="size_desc">💾 Tamanho</option>
                             </select>
 
-                            <div className="bg-gray-800 p-1 rounded-lg border border-gray-700 flex">
+                            <div className="bg-white p-1 rounded-xl border border-ela-border flex shadow-sm">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-ela-pink text-white shadow-sm' : 'text-ela-sub hover:text-ela-text hover:bg-gray-100'}`}
                                 >
                                     <div className="grid grid-cols-2 gap-0.5 w-4 h-4">
                                         <div className="bg-current rounded-[1px]"></div>
@@ -201,7 +201,7 @@ export default function DocumentsPage() {
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-ela-pink text-white shadow-sm' : 'text-ela-sub hover:text-ela-text hover:bg-gray-100'}`}
                                 >
                                     <div className="flex flex-col gap-0.5 w-4 h-4 justify-center">
                                         <div className="bg-current h-[2px] w-full rounded-full"></div>
@@ -211,7 +211,7 @@ export default function DocumentsPage() {
                                 </button>
                             </div>
 
-                            <div className="h-6 w-px bg-gray-700"></div>
+                            <div className="h-6 w-px bg-gray-200"></div>
 
                             <input
                                 type="file"
@@ -223,7 +223,7 @@ export default function DocumentsPage() {
                                 onClick={() => fileInputRef.current?.click()}
                                 isLoading={isUploading}
                                 icon={Upload}
-                                className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
+                                className="bg-ela-pink hover:bg-pink-600 shadow-lg shadow-pink-900/20 text-white"
                             >
                                 Upload
                             </Button>
@@ -233,28 +233,28 @@ export default function DocumentsPage() {
 
                 {isLoading ? (
                     <div className="flex justify-center py-20">
-                        <Loader2 size={40} className="animate-spin text-blue-500" />
+                        <Loader2 size={40} className="animate-spin text-ela-pink" />
                     </div>
                 ) : documents.length > 0 ? (
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {sortedDocuments.map(doc => (
-                                <Card key={doc.id} className="p-4 flex flex-col gap-3 group relative overflow-hidden" hover>
+                                <Card key={doc.id} className="p-4 flex flex-col gap-3 group relative overflow-hidden bg-white border border-ela-border" hover>
                                     <div className="flex items-start justify-between">
-                                        <div className="p-3 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                                             {getFileIcon(doc.file_type)}
                                         </div>
                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
                                             <button
                                                 onClick={() => handleDownload(doc)}
-                                                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                                                className="p-2 text-gray-400 hover:text-ela-pink hover:bg-gray-100 rounded-lg transition-colors"
                                                 title="Baixar"
                                             >
                                                 <Download size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(doc)}
-                                                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors"
                                                 title="Excluir"
                                             >
                                                 <Trash2 size={18} />
@@ -262,11 +262,11 @@ export default function DocumentsPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 className="font-medium text-white truncate text-lg" title={doc.filename}>
+                                        <h3 className="font-medium text-ela-text truncate text-lg" title={doc.filename}>
                                             {doc.filename}
                                         </h3>
-                                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                                            <span className="bg-gray-800 px-2 py-0.5 rounded text-gray-400">{formatSize(doc.size_bytes)}</span>
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-ela-sub">
+                                            <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-500 border border-gray-200">{formatSize(doc.size_bytes)}</span>
                                             <span>•</span>
                                             <span>{format(new Date(doc.created_at), "d MMM, HH:mm", { locale: ptBR })}</span>
                                         </div>
@@ -275,9 +275,9 @@ export default function DocumentsPage() {
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-gray-800/50 border border-gray-700 rounded-2xl overflow-hidden">
-                            <table className="w-full text-left text-sm text-gray-400">
-                                <thead className="bg-gray-800 text-gray-200 uppercase text-xs font-medium">
+                        <div className="bg-white border border-ela-border rounded-2xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-sm text-ela-sub">
+                                <thead className="bg-gray-50 text-ela-sub uppercase text-xs font-medium border-b border-ela-border">
                                     <tr>
                                         <th className="px-6 py-4">Nome</th>
                                         <th className="px-6 py-4">Tamanho</th>
@@ -285,10 +285,10 @@ export default function DocumentsPage() {
                                         <th className="px-6 py-4 text-right">Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-700">
+                                <tbody className="divide-y divide-gray-100">
                                     {sortedDocuments.map(doc => (
-                                        <tr key={doc.id} className="hover:bg-gray-700/30 transition-colors group">
-                                            <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
+                                        <tr key={doc.id} className="hover:bg-gray-50 transition-colors group">
+                                            <td className="px-6 py-4 font-medium text-ela-text flex items-center gap-3">
                                                 {getFileIcon(doc.file_type)}
                                                 {doc.filename}
                                             </td>
@@ -296,8 +296,8 @@ export default function DocumentsPage() {
                                             <td className="px-6 py-4">{format(new Date(doc.created_at), "d MMM, HH:mm", { locale: ptBR })}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleDownload(doc)} className="p-1.5 hover:bg-gray-600 rounded text-gray-400 hover:text-white"><Download size={16} /></button>
-                                                    <button onClick={() => handleDelete(doc)} className="p-1.5 hover:bg-gray-600 rounded text-gray-400 hover:text-red-400"><Trash2 size={16} /></button>
+                                                    <button onClick={() => handleDownload(doc)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-ela-pink"><Download size={16} /></button>
+                                                    <button onClick={() => handleDelete(doc)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -307,18 +307,18 @@ export default function DocumentsPage() {
                         </div>
                     )
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-gray-800 rounded-3xl bg-gray-900/50">
-                        <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-black/20">
-                            <Upload size={32} className="text-blue-500" />
+                    <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-gray-200 rounded-3xl bg-white">
+                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
+                            <Upload size={32} className="text-ela-pink" />
                         </div>
-                        <h3 className="text-2xl font-bold text-white mb-2">Seus documentos, organizados.</h3>
-                        <p className="text-gray-400 mb-8 max-w-md text-center leading-relaxed">
+                        <h3 className="text-2xl font-bold text-ela-text mb-2">Seus documentos, organizados.</h3>
+                        <p className="text-ela-sub mb-8 max-w-md text-center leading-relaxed">
                             Faça upload de contratos, recibos ou anotações. A IA poderá ler e usar essas informações para te ajudar.
                         </p>
                         <Button
                             onClick={() => fileInputRef.current?.click()}
                             icon={Upload}
-                            className="bg-blue-600 hover:bg-blue-500 px-8 py-3 h-auto text-lg shadow-xl shadow-blue-900/20"
+                            className="bg-ela-pink hover:bg-pink-600 px-8 py-3 h-auto text-lg shadow-xl shadow-pink-900/20 text-white"
                         >
                             Fazer Upload Agora
                         </Button>

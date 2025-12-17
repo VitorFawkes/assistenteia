@@ -6,7 +6,7 @@ export default function CardMedia({ url }: { url: string }) {
     if (error) return null;
 
     return (
-        <div className="mb-3 rounded-lg overflow-hidden bg-black/20 border border-gray-800">
+        <div className="mb-3 rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
             <img
                 src={url}
                 alt="Media"

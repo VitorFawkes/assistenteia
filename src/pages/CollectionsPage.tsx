@@ -462,11 +462,11 @@ export default function CollectionsPage() {
     return (
         <div className="flex h-full overflow-hidden">
             {/* Sidebar - Collections List - Full width on mobile when no collection selected */}
-            <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-800 md:border-r border-gray-700 flex-col shrink-0 h-full`}>
-                <div className="p-6 border-b border-gray-700 shrink-0">
+            <div className={`${selectedCollection ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-gray-50 md:border-r border-gray-200 flex-col shrink-0 h-full`}>
+                <div className="p-6 border-b border-gray-200 shrink-0">
                     <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Folder className="text-blue-400" size={28} />
+                        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <Folder className="text-rose-600" size={28} />
                             Coleções
                         </h1>
                         <button
@@ -474,7 +474,7 @@ export default function CollectionsPage() {
                                 setCollectionForm({ name: '', description: '', icon: '📁' });
                                 setIsCreateModalOpen(true);
                             }}
-                            className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                            className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors"
                             title="Nova Coleção"
                         >
                             <Plus size={20} />
@@ -482,13 +482,12 @@ export default function CollectionsPage() {
                     </div>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <input
                                 type="text"
-                                placeholder="Buscar coleções..."
                                 value={collectionSearch}
                                 onChange={(e) => setCollectionSearch(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg pl-9 pr-8 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full bg-gray-50 border border-ela-border rounded-lg pl-9 pr-8 py-2 text-sm text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white"
                             />
                             {collectionSearch && (
                                 <button
@@ -501,14 +500,14 @@ export default function CollectionsPage() {
                         </div>
 
                         <div className="relative group">
-                            <button className="h-full px-2 bg-gray-900 border border-gray-600 rounded-lg text-gray-400 hover:text-white hover:border-gray-500 transition-all flex items-center justify-center">
+                            <button className="h-full px-2 bg-white border border-ela-border rounded-lg text-ela-sub hover:text-ela-pink hover:border-ela-pink transition-all flex items-center justify-center">
                                 <ArrowUpDown size={16} />
                             </button>
                             <div className="absolute right-0 pt-2 w-40 z-20 hidden group-hover:block">
-                                <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                                    <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'name' ? 'text-blue-400' : 'text-gray-300'}`}>Nome (A-Z)</button>
-                                    <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'count' ? 'text-blue-400' : 'text-gray-300'}`}>Qtd. Itens</button>
-                                    <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 hover:text-white ${collectionSort === 'date' ? 'text-blue-400' : 'text-gray-300'}`}>Mais Recentes</button>
+                                <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                                    <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 hover:text-rose-600 ${collectionSort === 'name' ? 'text-rose-600' : 'text-gray-600'}`}>Nome (A-Z)</button>
+                                    <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 hover:text-rose-600 ${collectionSort === 'count' ? 'text-rose-600' : 'text-gray-600'}`}>Qtd. Itens</button>
+                                    <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 hover:text-rose-600 ${collectionSort === 'date' ? 'text-rose-600' : 'text-gray-600'}`}>Mais Recentes</button>
                                 </div>
                             </div>
                         </div>
@@ -518,22 +517,22 @@ export default function CollectionsPage() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     <div
                         className={`w-full p-3 rounded-xl transition-all flex items-center gap-3 cursor-pointer ${!selectedCollection
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700'}`}
+                            ? 'bg-ela-pink text-white shadow-lg shadow-rose-900/20'
+                            : 'bg-white text-ela-sub hover:bg-gray-50 hover:text-ela-pink border border-ela-border'}`}
                         onClick={() => setSelectedCollection(null)}
                     >
                         <Grid size={20} />
                         <span className="font-medium">Todas as Coleções</span>
                     </div>
 
-                    <div className="h-px bg-gray-700 my-2 mx-2"></div>
+                    <div className="h-px bg-gray-200 my-2 mx-2"></div>
 
                     {filteredCollections.map(collection => (
                         <div
                             key={collection.id}
                             className={`w-full p-3 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${selectedCollection?.id === collection.id
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700'
+                                ? 'bg-ela-pink text-white shadow-lg shadow-rose-900/20'
+                                : 'bg-white text-ela-sub hover:bg-gray-50 hover:text-ela-pink border border-ela-border'
                                 }`}
                             onClick={() => setSelectedCollection(collection)}
                         >
@@ -541,7 +540,7 @@ export default function CollectionsPage() {
                                 <span className="text-xl">{collection.icon || '📁'}</span>
                                 <div className="truncate">
                                     <p className="font-medium truncate">{collection.name}</p>
-                                    <p className={`text-xs truncate ${selectedCollection?.id === collection.id ? 'text-blue-200' : 'text-gray-500'}`}>
+                                    <p className={`text-xs truncate ${selectedCollection?.id === collection.id ? 'text-rose-100' : 'text-gray-400'}`}>
                                         {collection.item_count || 0} itens
                                     </p>
                                 </div>
@@ -552,49 +551,49 @@ export default function CollectionsPage() {
             </div>
 
             {/* Main Content Area - Hidden on mobile when no collection selected */}
-            <div className={`${selectedCollection ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-gray-900 min-w-0`}>
+            <div className={`${selectedCollection ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-white min-w-0`}>
                 {selectedCollection ? (
                     <>
                         {/* Mobile Back Button */}
                         <button
                             onClick={() => setSelectedCollection(null)}
-                            className="md:hidden flex items-center gap-2 px-4 py-3 text-gray-400 hover:text-white bg-gray-800/50 border-b border-gray-800 transition-colors"
+                            className="md:hidden flex items-center gap-2 px-4 py-3 text-gray-500 hover:text-rose-600 bg-white border-b border-gray-200 transition-colors"
                         >
                             <ArrowLeft size={20} />
                             <span className="font-medium">Voltar às Coleções</span>
                         </button>
 
                         {/* Header with Financial Widget - Compact on mobile */}
-                        <div className="p-3 md:p-8 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-10">
+                        <div className="p-3 md:p-8 border-b border-gray-200 bg-white/80 backdrop-blur-xl sticky top-0 z-10">
                             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 md:gap-6">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 md:gap-4 mb-1 md:mb-2">
-                                        <div className="text-2xl md:text-5xl filter drop-shadow-lg shrink-0">{selectedCollection.icon || '📁'}</div>
+                                        <div className="text-2xl md:text-5xl filter drop-shadow-sm shrink-0">{selectedCollection.icon || '📁'}</div>
                                         <div className="min-w-0">
-                                            <h2 className="text-xl md:text-4xl font-bold text-white tracking-tight flex items-center gap-2 md:gap-3 truncate">
+                                            <h2 className="text-xl md:text-4xl font-bold text-gray-900 tracking-tight flex items-center gap-2 md:gap-3 truncate">
                                                 <span className="truncate">{selectedCollection.name}</span>
                                                 <button
                                                     onClick={() => openEditModal(selectedCollection)}
-                                                    className="text-gray-600 hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="text-gray-400 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
                                                 >
                                                     <Edit2 size={20} />
                                                 </button>
                                             </h2>
-                                            <p className="text-gray-400 text-sm md:text-lg mt-0.5 font-light line-clamp-1">{selectedCollection.description || 'Sem descrição'}</p>
+                                            <p className="text-gray-500 text-sm md:text-lg mt-0.5 font-light line-clamp-1">{selectedCollection.description || 'Sem descrição'}</p>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Financial Summary Widget - Hidden on mobile for more scroll space */}
                                 {items.some(i => i.metadata?.amount || i.metadata?.value) && (
-                                    <div className="hidden md:block bg-gradient-to-br from-gray-800 to-gray-900 p-5 rounded-2xl border border-gray-700 shadow-xl min-w-[280px]">
+                                    <div className="hidden md:block bg-gradient-to-br from-white to-gray-50 p-5 rounded-2xl border border-gray-200 shadow-lg min-w-[280px]">
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="text-gray-400 text-sm font-medium uppercase tracking-wider">Investimento Total</span>
-                                            <div className="bg-green-500/10 p-1.5 rounded-lg">
-                                                <span className="text-green-400 text-xs font-bold">BRL</span>
+                                            <span className="text-gray-500 text-sm font-medium uppercase tracking-wider">Investimento Total</span>
+                                            <div className="bg-green-100 p-1.5 rounded-lg">
+                                                <span className="text-green-600 text-xs font-bold">BRL</span>
                                             </div>
                                         </div>
-                                        <div className="text-3xl font-bold text-white mb-1">
+                                        <div className="text-3xl font-bold text-gray-900 mb-1">
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                                                 items.reduce((acc, item) => {
                                                     const val = item.metadata?.amount || item.metadata?.value;
@@ -613,20 +612,19 @@ export default function CollectionsPage() {
                             {/* Controls Bar */}
                             <div className="flex flex-col gap-2 mt-3 md:mt-8">
                                 <div className="relative w-full group">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-rose-600 transition-colors" size={18} />
                                     <input
                                         type="text"
-                                        placeholder="Buscar..."
                                         value={itemSearch}
                                         onChange={(e) => setItemSearch(e.target.value)}
-                                        className="w-full bg-gray-800/50 border border-gray-700 text-white pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder-gray-600 text-sm"
+                                        className="w-full bg-gray-50 border border-ela-border text-ela-text pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-ela-pink focus:border-ela-pink focus:bg-white transition-all placeholder-gray-400 text-sm"
                                     />
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mt-3 md:mt-8">
                                     {/* Type Filter */}
                                     <div className="relative group z-30">
-                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                        <button className="h-full px-3 bg-white text-gray-500 rounded-xl border border-gray-200 hover:text-rose-600 hover:border-rose-600 transition-all flex items-center gap-2">
                                             <Filter size={18} />
                                             <span className="text-sm">
                                                 {itemTypeFilter === 'all' ? 'Todos' :
@@ -636,19 +634,19 @@ export default function CollectionsPage() {
                                             </span>
                                         </button>
                                         <div className="absolute right-0 pt-2 w-40 hidden group-hover:block">
-                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                                                <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Todos</button>
-                                                <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Gastos</button>
-                                                <button onClick={() => setItemTypeFilter('note')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Notas</button>
-                                                <button onClick={() => setItemTypeFilter('credential')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Senhas</button>
-                                                <button onClick={() => setItemTypeFilter('task')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Tarefas</button>
+                                            <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                                                <button onClick={() => setItemTypeFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Todos</button>
+                                                <button onClick={() => setItemTypeFilter('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Gastos</button>
+                                                <button onClick={() => setItemTypeFilter('note')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Notas</button>
+                                                <button onClick={() => setItemTypeFilter('credential')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Senhas</button>
+                                                <button onClick={() => setItemTypeFilter('task')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Tarefas</button>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Date Filter */}
                                     <div className="relative group z-20">
-                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                        <button className="h-full px-3 bg-white text-gray-500 rounded-xl border border-gray-200 hover:text-rose-600 hover:border-rose-600 transition-all flex items-center gap-2">
                                             <Calendar size={18} />
                                             <span className="text-sm">
                                                 {itemDateFilter === 'all' ? 'Qualquer Data' :
@@ -657,12 +655,12 @@ export default function CollectionsPage() {
                                             </span>
                                         </button>
                                         <div className="absolute right-0 pt-2 w-64 hidden group-hover:block">
-                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden p-2">
-                                                <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Qualquer Data</button>
-                                                <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Este Mês</button>
-                                                <button onClick={() => setItemDateFilter('last_month')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Mês Passado</button>
-                                                <button onClick={() => setItemDateFilter('future')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg">Futuro</button>
-                                                <div className="border-t border-gray-700 my-1"></div>
+                                            <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden p-2">
+                                                <button onClick={() => setItemDateFilter('all')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600 rounded-lg">Qualquer Data</button>
+                                                <button onClick={() => setItemDateFilter('this_month')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600 rounded-lg">Este Mês</button>
+                                                <button onClick={() => setItemDateFilter('last_month')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600 rounded-lg">Mês Passado</button>
+                                                <button onClick={() => setItemDateFilter('future')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600 rounded-lg">Futuro</button>
+                                                <div className="border-t border-gray-200 my-1"></div>
                                                 <div className="px-2 py-1">
                                                     <span className="text-xs text-gray-500 block mb-1">Personalizado</span>
                                                     <div className="flex gap-2">
@@ -673,7 +671,7 @@ export default function CollectionsPage() {
                                                                 setCustomDateRange(prev => ({ ...prev, start: e.target.value }));
                                                                 setItemDateFilter('custom');
                                                             }}
-                                                            className="w-full bg-gray-900 border border-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                                                            className="w-full bg-white border border-gray-200 text-gray-900 text-xs rounded px-2 py-1 focus:outline-none focus:border-rose-600"
                                                         />
                                                         <input
                                                             type="date"
@@ -682,7 +680,7 @@ export default function CollectionsPage() {
                                                                 setCustomDateRange(prev => ({ ...prev, end: e.target.value }));
                                                                 setItemDateFilter('custom');
                                                             }}
-                                                            className="w-full bg-gray-900 border border-gray-700 text-white text-xs rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                                                            className="w-full bg-white border border-gray-200 text-gray-900 text-xs rounded px-2 py-1 focus:outline-none focus:border-rose-600"
                                                         />
                                                     </div>
                                                 </div>
@@ -692,30 +690,30 @@ export default function CollectionsPage() {
 
                                     {/* Sort */}
                                     <div className="relative group z-10">
-                                        <button className="h-full px-3 bg-gray-800 text-gray-400 rounded-xl border border-gray-700 hover:text-white hover:bg-gray-700 transition-all flex items-center gap-2">
+                                        <button className="h-full px-3 bg-white text-gray-500 rounded-xl border border-gray-200 hover:text-rose-600 hover:border-rose-600 transition-all flex items-center gap-2">
                                             <ArrowUpDown size={18} />
                                         </button>
                                         <div className="absolute right-0 pt-2 w-40 hidden group-hover:block">
-                                            <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                                                <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Recentes</button>
-                                                <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Mais Antigos</button>
-                                                <button onClick={() => setItemSort('amount_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Maior Valor</button>
+                                            <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                                                <button onClick={() => setItemSort('date_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Mais Recentes</button>
+                                                <button onClick={() => setItemSort('date_asc')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Mais Antigos</button>
+                                                <button onClick={() => setItemSort('amount_desc')} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-rose-600">Maior Valor</button>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="w-px bg-gray-700 mx-1 hidden md:block"></div>
+                                    <div className="w-px bg-gray-200 mx-1 hidden md:block"></div>
 
                                     <Button
                                         variant="danger"
                                         onClick={() => handleDeleteCollectionClick(selectedCollection.id)}
-                                        className="h-full px-4 bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 ml-auto md:ml-0"
+                                        className="h-full px-4 bg-red-50 text-red-600 border-red-200 hover:bg-red-100 ml-auto md:ml-0"
                                         icon={Trash2}
                                     >
                                         Excluir
                                     </Button>
 
-                                    <div className="w-px bg-gray-700 mx-1 hidden md:block"></div>
+                                    <div className="w-px bg-gray-200 mx-1 hidden md:block"></div>
 
                                     <button
                                         onClick={() => {
@@ -723,8 +721,8 @@ export default function CollectionsPage() {
                                             setSelectedItems(new Set());
                                         }}
                                         className={`h-full px-4 rounded-xl border transition-all flex items-center gap-2 ${isSelectionMode
-                                            ? 'bg-blue-600 text-white border-blue-500'
-                                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-700'
+                                            ? 'bg-rose-600 text-white border-rose-600'
+                                            : 'bg-white text-gray-500 border-gray-200 hover:text-rose-600 hover:border-rose-600'
                                             }`}
                                     >
                                         <CheckSquareIcon size={18} />
@@ -746,7 +744,7 @@ export default function CollectionsPage() {
                         </div>
 
                         {/* Items List - Masonry Layout with Subcategories */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-8 bg-gray-950">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-8 bg-white">
                             {isLoadingItems ? (
                                 <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -756,16 +754,16 @@ export default function CollectionsPage() {
                                 <div className="space-y-12">
                                     {sortedCategories.map(category => (
                                         <div key={category} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                            <div className="flex items-center gap-3 mb-6 pb-2 border-b border-gray-800/50">
-                                                <h3 className="text-xl font-bold text-white tracking-tight">{category}</h3>
-                                                <span className="text-xs font-medium text-gray-400 bg-gray-900 px-2.5 py-1 rounded-full border border-gray-800">
+                                            <div className="flex items-center gap-3 mb-6 pb-2 border-b border-gray-100">
+                                                <h3 className="text-xl font-bold text-gray-800 tracking-tight">{category}</h3>
+                                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full border border-gray-200">
                                                     {groupedItems[category].length}
                                                 </span>
                                                 {/* Section Total */}
                                                 {groupedItems[category].some(i => i.metadata?.amount || i.metadata?.value) && (
-                                                    <div className="ml-auto flex items-center gap-2 bg-green-500/10 px-3 py-1 rounded-lg border border-green-500/20">
-                                                        <span className="text-xs text-green-400 font-medium uppercase">Total</span>
-                                                        <span className="text-sm font-bold text-green-400">
+                                                    <div className="ml-auto flex items-center gap-2 bg-green-50/50 px-3 py-1 rounded-lg border border-green-100">
+                                                        <span className="text-xs text-green-600 font-medium uppercase">Total</span>
+                                                        <span className="text-sm font-bold text-green-600">
                                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                                                                 groupedItems[category].reduce((acc, item) => {
                                                                     const val = item.metadata?.amount || item.metadata?.value;
@@ -811,7 +809,7 @@ export default function CollectionsPage() {
                                                                     : undefined
                                                             }
                                                             leftActionIcon={<CheckSquareIcon size={24} />}
-                                                            leftActionColor="bg-blue-600"
+                                                            leftActionColor="bg-ela-pink"
                                                             rightActionColor="bg-red-600"
                                                         >
                                                             <div
@@ -835,8 +833,8 @@ export default function CollectionsPage() {
                                                                     {/* Selection Checkbox */}
                                                                     {isSelectionMode && (
                                                                         <div className={`mt-1.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedItems.has(item.id)
-                                                                            ? 'bg-blue-600 border-blue-600 text-white'
-                                                                            : 'border-gray-600 bg-gray-800'
+                                                                            ? 'bg-ela-pink border-ela-pink text-white'
+                                                                            : 'border-gray-300 bg-white'
                                                                             }`}>
                                                                             {selectedItems.has(item.id) && <Check size={14} />}
                                                                         </div>
@@ -844,33 +842,33 @@ export default function CollectionsPage() {
 
                                                                     {/* Icon */}
                                                                     {item.metadata?.type === 'expense' || hasAmount ? (
-                                                                        <div className="bg-green-500/10 text-green-400 p-2 rounded-lg mt-1">
+                                                                        <div className="bg-green-100 text-green-600 p-2 rounded-lg mt-1">
                                                                             <DollarSign size={16} />
                                                                         </div>
                                                                     ) : item.metadata?.type === 'credential' ? (
-                                                                        <div className="bg-purple-500/10 text-purple-400 p-2 rounded-lg mt-1">
+                                                                        <div className="bg-purple-100 text-purple-600 p-2 rounded-lg mt-1">
                                                                             <Lock size={16} />
                                                                         </div>
                                                                     ) : item.metadata?.type === 'task' ? (
-                                                                        <div className="bg-orange-500/10 text-orange-400 p-2 rounded-lg mt-1">
+                                                                        <div className="bg-orange-100 text-orange-600 p-2 rounded-lg mt-1">
                                                                             <CheckCircle size={16} />
                                                                         </div>
                                                                     ) : item.metadata?.type === 'shopping_item' ? (
                                                                         <div
                                                                             onClick={(e) => handleToggleCheck(item, e)}
-                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                                                                         >
                                                                             {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
                                                                         </div>
                                                                     ) : item.metadata?.type === 'list_item' ? (
                                                                         <div
                                                                             onClick={(e) => handleToggleCheck(item, e)}
-                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-blue-500/20 text-blue-400' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
+                                                                            className={`p-2 rounded-lg mt-1 transition-colors cursor-pointer ${item.metadata?.checked ? 'bg-blue-100 text-blue-600' : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100'}`}
                                                                         >
                                                                             {item.metadata?.checked ? <CheckSquareIcon size={16} /> : <Square size={16} />}
                                                                         </div>
                                                                     ) : (
-                                                                        <div className="bg-blue-500/10 text-blue-400 p-2 rounded-lg mt-1">
+                                                                        <div className="bg-blue-50 text-blue-500 p-2 rounded-lg mt-1">
                                                                             <FileText size={16} />
                                                                         </div>
                                                                     )}
@@ -878,16 +876,16 @@ export default function CollectionsPage() {
                                                                     <div className="flex-1 min-w-0">
                                                                         {isCredential ? (
                                                                             <div className="space-y-2">
-                                                                                <p className="text-gray-200 font-medium">{item.content}</p>
-                                                                                <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50 flex flex-col gap-2">
+                                                                                <p className="text-gray-700 font-medium">{item.content}</p>
+                                                                                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 flex flex-col gap-2">
                                                                                     {item.metadata?.username && (
                                                                                         <div className="flex items-center justify-between text-sm">
                                                                                             <span className="text-gray-500">Usuário:</span>
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <span className="text-gray-300 font-mono">{item.metadata.username}</span>
+                                                                                                <span className="text-gray-800 font-mono">{item.metadata.username}</span>
                                                                                                 <button
                                                                                                     onClick={(e) => copyToClipboard(item.metadata.username, e)}
-                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    className="text-gray-400 hover:text-ela-pink p-1 rounded transition-colors"
                                                                                                     title="Copiar usuário"
                                                                                                 >
                                                                                                     <Copy size={12} />
@@ -899,19 +897,19 @@ export default function CollectionsPage() {
                                                                                         <div className="flex items-center justify-between text-sm">
                                                                                             <span className="text-gray-500">Senha:</span>
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <span className={`font-mono transition-all ${isRevealed ? 'text-white' : 'text-transparent bg-white/10 px-2 rounded blur-[2px] select-none'}`}>
+                                                                                                <span className={`font-mono transition-all ${isRevealed ? 'text-gray-800' : 'text-transparent bg-gray-200 px-2 rounded blur-[2px] select-none'}`}>
                                                                                                     {isRevealed ? item.metadata.password : '••••••••••••'}
                                                                                                 </span>
                                                                                                 <button
                                                                                                     onClick={toggleReveal}
-                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    className="text-gray-400 hover:text-ela-pink p-1 rounded transition-colors"
                                                                                                     title={isRevealed ? "Ocultar" : "Revelar"}
                                                                                                 >
                                                                                                     {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
                                                                                                 </button>
                                                                                                 <button
                                                                                                     onClick={(e) => copyToClipboard(item.metadata.password, e)}
-                                                                                                    className="text-gray-600 hover:text-blue-400 p-1 rounded transition-colors"
+                                                                                                    className="text-gray-400 hover:text-ela-pink p-1 rounded transition-colors"
                                                                                                     title="Copiar senha"
                                                                                                 >
                                                                                                     <Copy size={12} />
@@ -923,11 +921,11 @@ export default function CollectionsPage() {
                                                                             </div>
                                                                         ) : item.metadata?.type === 'shopping_item' ? (
                                                                             <div className="flex items-center gap-3">
-                                                                                <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
+                                                                                <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-400 line-through decoration-gray-400' : 'text-ela-text'}`}>
                                                                                     {item.content}
                                                                                 </p>
                                                                                 {item.metadata?.quantity && (
-                                                                                    <span className="text-xs font-bold bg-blue-600/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                                                                    <span className="text-xs font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
                                                                                         {item.metadata.quantity}
                                                                                     </span>
                                                                                 )}
@@ -935,7 +933,7 @@ export default function CollectionsPage() {
                                                                         ) : item.metadata?.type === 'list_item' ? (
                                                                             <div className="flex flex-col gap-1">
                                                                                 <div className="flex items-center gap-3">
-                                                                                    <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-500 line-through decoration-gray-600' : 'text-white'}`}>
+                                                                                    <p className={`text-lg font-medium transition-all ${item.metadata?.checked ? 'text-gray-400 line-through decoration-gray-400' : 'text-ela-text'}`}>
                                                                                         {item.content}
                                                                                     </p>
                                                                                     {item.metadata?.rating && (
@@ -952,9 +950,9 @@ export default function CollectionsPage() {
                                                                             </div>
                                                                         ) : (
                                                                             <div>
-                                                                                <p className="text-gray-200 text-sm font-light whitespace-pre-wrap leading-relaxed">
+                                                                                <p className="text-gray-600 text-sm font-light whitespace-pre-wrap leading-relaxed">
                                                                                     {item.content.split('|').map((part, i) => (
-                                                                                        <span key={i} className={i > 0 ? "block mt-1 text-gray-400" : ""}>
+                                                                                        <span key={i} className={i > 0 ? "block mt-1 text-gray-500" : ""}>
                                                                                             {part.trim()}
                                                                                         </span>
                                                                                     ))}
@@ -963,9 +961,9 @@ export default function CollectionsPage() {
                                                                         )}
 
                                                                         <div className="flex items-center gap-2 mt-2">
-                                                                            <span className="text-xs text-gray-500">{format(parseDate(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
+                                                                            <span className="text-xs text-gray-400">{format(parseDate(item.metadata?.date || item.created_at), "d MMM", { locale: ptBR })}</span>
                                                                             {item.metadata?.category && (
-                                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
                                                                                     {item.metadata.category}
                                                                                 </span>
                                                                             )}
@@ -983,7 +981,7 @@ export default function CollectionsPage() {
                                                                             e.stopPropagation();
                                                                             handleDeleteItemClick(item.id);
                                                                         }}
-                                                                        className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                                                     >
                                                                         <Trash2 size={16} />
                                                                     </button>
@@ -998,37 +996,37 @@ export default function CollectionsPage() {
                                 </div>
                             ) : (
                                 <div className="text-center py-20">
-                                    <div className="bg-gray-800/50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                                        <Filter className="text-gray-600" size={32} />
+                                    <div className="bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                                        <Filter className="text-gray-400" size={32} />
                                     </div>
-                                    <p className="text-gray-400 font-medium">Nenhum item encontrado</p>
-                                    <p className="text-gray-600 text-sm mt-1">Tente mudar os filtros ou a busca</p>
+                                    <p className="text-gray-500 font-medium">Nenhum item encontrado</p>
+                                    <p className="text-gray-400 text-sm mt-1">Tente mudar os filtros ou a busca</p>
                                 </div>
                             )}
                         </div>
                     </>
                 ) : (
                     // Collections Dashboard (All Collections View)
-                    <div className="flex-1 flex flex-col bg-gray-900 p-8 overflow-y-auto">
+                    <div className="flex-1 flex flex-col bg-white p-8 overflow-y-auto">
                         <div className="flex items-center justify-between mb-8">
                             <div>
-                                <h2 className="text-3xl font-bold text-white">Minhas Coleções</h2>
-                                <p className="text-gray-400 mt-2">Gerencie todas as suas pastas e arquivos</p>
+                                <h2 className="text-3xl font-bold text-gray-900">Minhas Coleções</h2>
+                                <p className="text-gray-500 mt-2">Gerencie todas as suas pastas e arquivos</p>
                             </div>
                             <div className="flex gap-3">
                                 {/* Sort Dropdown */}
                                 <div className="relative group">
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700">
+                                    <button className="flex items-center gap-2 px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200">
                                         <ArrowUpDown size={16} />
                                         <span className="text-sm font-medium">
                                             {collectionSort === 'name' ? 'Nome' : collectionSort === 'count' ? 'Qtd. Itens' : 'Data'}
                                         </span>
                                         <ChevronDown size={14} />
                                     </button>
-                                    <div className="absolute right-0 mt-2 w-40 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
-                                        <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'name' ? 'text-blue-400' : 'text-gray-300'}`}>Nome</button>
-                                        <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'count' ? 'text-blue-400' : 'text-gray-300'}`}>Qtd. Itens</button>
-                                        <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${collectionSort === 'date' ? 'text-blue-400' : 'text-gray-300'}`}>Data</button>
+                                    <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-20 hidden group-hover:block">
+                                        <button onClick={() => setCollectionSort('name')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${collectionSort === 'name' ? 'text-ela-pink' : 'text-gray-600'}`}>Nome</button>
+                                        <button onClick={() => setCollectionSort('count')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${collectionSort === 'count' ? 'text-ela-pink' : 'text-gray-600'}`}>Qtd. Itens</button>
+                                        <button onClick={() => setCollectionSort('date')} className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${collectionSort === 'date' ? 'text-ela-pink' : 'text-gray-600'}`}>Data</button>
                                     </div>
                                 </div>
 
@@ -1038,6 +1036,7 @@ export default function CollectionsPage() {
                                         setIsCreateModalOpen(true);
                                     }}
                                     icon={Plus}
+                                    className="bg-ela-pink hover:bg-pink-600 text-white"
                                 >
                                     Nova Coleção
                                 </Button>
@@ -1049,11 +1048,11 @@ export default function CollectionsPage() {
                                 {filteredCollections.map(collection => (
                                     <Card
                                         key={collection.id}
-                                        className="p-6 hover:border-blue-500/50 hover:bg-gray-800/50 transition-all cursor-pointer group relative"
+                                        className="p-6 hover:border-ela-pink/50 hover:bg-gray-50 transition-all cursor-pointer group relative bg-white border-ela-border"
                                         onClick={() => setSelectedCollection(collection)}
                                     >
                                         <div className="flex items-start justify-between mb-4">
-                                            <div className="text-4xl p-3 bg-gray-800 rounded-2xl border border-gray-700 group-hover:border-blue-500/30 transition-colors">
+                                            <div className="text-4xl p-3 bg-gray-50 rounded-2xl border border-gray-100 group-hover:border-ela-pink/30 transition-colors">
                                                 {collection.icon || '📁'}
                                             </div>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1062,7 +1061,7 @@ export default function CollectionsPage() {
                                                         e.stopPropagation();
                                                         openEditModal(collection);
                                                     }}
-                                                    className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700"
+                                                    className="p-2 rounded-lg bg-white text-gray-400 hover:text-ela-pink hover:bg-gray-100 border border-gray-200"
                                                     title="Editar"
                                                 >
                                                     <Edit2 size={16} />
@@ -1072,7 +1071,7 @@ export default function CollectionsPage() {
                                                         e.stopPropagation();
                                                         handleDeleteCollectionClick(collection.id);
                                                     }}
-                                                    className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-red-400 hover:bg-gray-700"
+                                                    className="p-2 rounded-lg bg-white text-gray-400 hover:text-red-500 hover:bg-gray-100 border border-gray-200"
                                                     title="Excluir"
                                                 >
                                                     <Trash2 size={16} />
@@ -1080,12 +1079,12 @@ export default function CollectionsPage() {
                                             </div>
                                         </div>
 
-                                        <h3 className="text-xl font-bold text-white mb-2">{collection.name}</h3>
-                                        <p className="text-gray-400 text-sm line-clamp-2 mb-4 h-10">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2">{collection.name}</h3>
+                                        <p className="text-gray-500 text-sm line-clamp-2 mb-4 h-10">
                                             {collection.description || 'Sem descrição'}
                                         </p>
 
-                                        <div className="flex items-center justify-between pt-4 border-t border-gray-800 text-sm text-gray-500">
+                                        <div className="flex items-center justify-between pt-4 border-t border-gray-100 text-sm text-gray-400">
                                             <span>{collection.item_count || 0} itens</span>
                                             <span>{format(new Date(collection.created_at), "d MMM, yyyy", { locale: ptBR })}</span>
                                         </div>
@@ -1094,10 +1093,10 @@ export default function CollectionsPage() {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-                                <div className="bg-gray-800 rounded-full p-6 mb-4">
-                                    <Folder size={48} className="text-gray-600" />
+                                <div className="bg-gray-50 rounded-full p-6 mb-4">
+                                    <Folder size={48} className="text-gray-400" />
                                 </div>
-                                <p className="text-xl font-medium text-white mb-2">Nenhuma coleção encontrada</p>
+                                <p className="text-xl font-medium text-gray-900 mb-2">Nenhuma coleção encontrada</p>
                                 <p className="mb-6">Crie sua primeira coleção para começar a organizar.</p>
                                 <Button
                                     onClick={() => {
@@ -1105,6 +1104,7 @@ export default function CollectionsPage() {
                                         setIsCreateModalOpen(true);
                                     }}
                                     icon={Plus}
+                                    className="bg-ela-pink hover:bg-pink-600 text-white"
                                 >
                                     Criar Coleção
                                 </Button>
@@ -1118,7 +1118,7 @@ export default function CollectionsPage() {
                         setCollectionForm({ name: '', description: '', icon: '📁' });
                         setIsCreateModalOpen(true);
                     }}
-                    className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-900/50 flex items-center justify-center z-40 active:scale-95 transition-transform"
+                    className="md:hidden fixed bottom-24 right-4 w-14 h-14 bg-ela-pink text-white rounded-full shadow-lg shadow-pink-900/50 flex items-center justify-center z-40 active:scale-95 transition-transform"
                 >
                     <Plus size={28} />
                 </button>
@@ -1127,52 +1127,52 @@ export default function CollectionsPage() {
             {/* Create/Edit Collection Modal - Bottom Sheet on Mobile, Centered on Desktop */}
             {
                 (isCreateModalOpen || isEditModalOpen) && (
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center" onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}>
                         <div
-                            className="bg-gray-900 md:bg-gray-800 border-t md:border border-gray-700 rounded-t-3xl md:rounded-2xl p-6 w-full md:max-w-md md:mx-4 shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 duration-300"
+                            className="bg-white md:bg-white border-t md:border border-gray-200 rounded-t-3xl md:rounded-2xl p-6 w-full md:max-w-md md:mx-4 shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 duration-300"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex justify-center md:hidden mb-6">
-                                <div className="w-12 h-1.5 bg-gray-700 rounded-full"></div>
+                                <div className="w-12 h-1.5 bg-gray-200 rounded-full"></div>
                             </div>
 
-                            <h3 className="text-xl font-bold text-white mb-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-6">
                                 {isEditModalOpen ? 'Editar Coleção' : 'Nova Coleção'}
                             </h3>
 
                             <div className="space-y-5">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Nome</label>
+                                    <label className="block text-sm font-medium text-gray-500 mb-1.5">Nome</label>
                                     <input
                                         type="text"
                                         value={collectionForm.name}
                                         onChange={(e) => setCollectionForm({ ...collectionForm, name: e.target.value })}
-                                        className="w-full bg-gray-800 md:bg-gray-900 border border-gray-700 md:border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-ela-pink text-lg"
                                         placeholder="Ex: Viagem para Paris"
                                         autoFocus
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Descrição (Opcional)</label>
+                                    <label className="block text-sm font-medium text-gray-500 mb-1.5">Descrição (Opcional)</label>
                                     <textarea
                                         value={collectionForm.description}
                                         onChange={(e) => setCollectionForm({ ...collectionForm, description: e.target.value })}
-                                        className="w-full bg-gray-800 md:bg-gray-900 border border-gray-700 md:border-gray-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none text-base"
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-ela-pink h-24 resize-none text-base"
                                         placeholder="Detalhes sobre esta coleção..."
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-2">Ícone</label>
+                                    <label className="block text-sm font-medium text-gray-500 mb-2">Ícone</label>
                                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
                                         {['📁', '✈️', '💼', '🏠', '🎓', '💡', '📅', '🛒', '🎵', '📷', '🍔', '💪', '💰', '🏥', '🎮'].map(icon => (
                                             <button
                                                 key={icon}
                                                 onClick={() => setCollectionForm({ ...collectionForm, icon })}
                                                 className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl transition-all ${collectionForm.icon === icon
-                                                    ? 'bg-blue-600 text-white scale-110 shadow-lg shadow-blue-900/50'
-                                                    : 'bg-gray-800 md:bg-gray-900 text-gray-400 hover:bg-gray-700'
+                                                    ? 'bg-ela-pink text-white scale-110 shadow-lg shadow-pink-900/50'
+                                                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                                                     }`}
                                             >
                                                 {icon}
@@ -1186,14 +1186,14 @@ export default function CollectionsPage() {
                                 <Button
                                     variant="secondary"
                                     onClick={() => { setIsCreateModalOpen(false); setIsEditModalOpen(false); }}
-                                    className="flex-1 md:flex-none justify-center py-3"
+                                    className="flex-1 md:flex-none justify-center py-3 bg-gray-100 text-gray-700 hover:bg-gray-200"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={isEditModalOpen ? handleEditCollection : handleCreateCollection}
                                     disabled={!collectionForm.name}
-                                    className="flex-1 md:flex-none justify-center py-3 bg-blue-600 hover:bg-blue-500"
+                                    className="flex-1 md:flex-none justify-center py-3 bg-ela-pink hover:bg-pink-600 text-white"
                                 >
                                     {isEditModalOpen ? 'Salvar' : 'Criar'}
                                 </Button>
@@ -1206,14 +1206,14 @@ export default function CollectionsPage() {
             {/* Delete Confirmation Modals */}
             {
                 collectionToDelete && (
-                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setCollectionToDelete(null)}>
-                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-white mb-3">Excluir Coleção?</h3>
-                            <p className="text-gray-300 mb-6">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setCollectionToDelete(null)}>
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-gray-900 mb-3">Excluir Coleção?</h3>
+                            <p className="text-gray-600 mb-6">
                                 Isso apagará a coleção e <strong>TODOS os itens</strong> nela permanentemente.
                             </p>
                             <div className="flex gap-3 justify-end">
-                                <Button variant="secondary" onClick={() => setCollectionToDelete(null)}>
+                                <Button variant="secondary" onClick={() => setCollectionToDelete(null)} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
                                     Cancelar
                                 </Button>
                                 <Button variant="danger" onClick={confirmDeleteCollection}>
@@ -1227,14 +1227,14 @@ export default function CollectionsPage() {
 
             {
                 itemToDelete && (
-                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setItemToDelete(null)}>
-                        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-white mb-3">Excluir Item?</h3>
-                            <p className="text-gray-300 mb-6">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setItemToDelete(null)}>
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-gray-900 mb-3">Excluir Item?</h3>
+                            <p className="text-gray-600 mb-6">
                                 Tem certeza que deseja excluir este item?
                             </p>
                             <div className="flex gap-3 justify-end">
-                                <Button variant="secondary" onClick={() => setItemToDelete(null)}>
+                                <Button variant="secondary" onClick={() => setItemToDelete(null)} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
                                     Cancelar
                                 </Button>
                                 <Button variant="danger" onClick={confirmDeleteItem}>

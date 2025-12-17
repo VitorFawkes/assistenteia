@@ -118,13 +118,13 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4">
-            <div className="bg-gray-900 w-full md:w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-gray-800 flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-10 duration-300">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/20 backdrop-blur-sm p-0 md:p-4">
+            <div className="bg-white w-full md:w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl shadow-2xl border border-ela-border flex flex-col max-h-[90vh] md:max-h-[85vh] animate-in slide-in-from-bottom-10 duration-300">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-800">
-                    <h2 className="text-xl font-bold text-white">Editar Item</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white p-2">
+                <div className="flex items-center justify-between p-4 md:p-6 border-b border-ela-border">
+                    <h2 className="text-xl font-bold text-ela-text">Editar Item</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-ela-text p-2">
                         <X size={24} />
                     </button>
                 </div>
@@ -133,7 +133,7 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                 <div className="p-4 md:p-6 space-y-6 overflow-y-auto custom-scrollbar">
 
                     {/* Type Selector - Scrollable on mobile */}
-                    <div className="flex gap-2 p-1 bg-gray-950/50 rounded-xl overflow-x-auto no-scrollbar pb-2 md:pb-1">
+                    <div className="flex gap-2 p-1 bg-gray-50 rounded-xl overflow-x-auto no-scrollbar pb-2 md:pb-1">
                         {[
                             { id: 'note', icon: FileText, label: 'Nota' },
                             { id: 'expense', icon: DollarSign, label: 'Gasto' },
@@ -143,7 +143,7 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                             <button
                                 key={t.id}
                                 onClick={() => setType(t.id as ItemType)}
-                                className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${type === t.id ? 'bg-blue-600 text-white shadow-lg scale-[1.02]' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                                className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${type === t.id ? 'bg-ela-pink text-white shadow-lg scale-[1.02]' : 'text-ela-sub hover:text-ela-text hover:bg-gray-100'}`}
                             >
                                 <t.icon size={18} />
                                 {t.label}
@@ -153,11 +153,11 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
 
                     {/* Common Content */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Conteúdo / Título</label>
+                        <label className="block text-sm font-medium text-ela-sub mb-1">Conteúdo / Título</label>
                         <textarea
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
+                            className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink h-24 resize-none"
                             placeholder="Descrição do item..."
                         />
                     </div>
@@ -165,7 +165,7 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                     {/* DYNAMIC FIELDS */}
                     {type === 'expense' && (
                         <div className="animate-in fade-in slide-in-from-top-2">
-                            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                 <DollarSign size={14} /> Valor (R$)
                             </label>
                             <input
@@ -173,7 +173,7 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                                 step="0.01"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                 placeholder="0.00"
                             />
                         </div>
@@ -182,38 +182,38 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                     {type === 'credential' && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                                <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                     <User size={14} /> Usuário / Login
                                 </label>
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                     placeholder="user@email.com"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                                <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                     <Lock size={14} /> Senha / Código
                                 </label>
                                 <input
                                     type="text"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                                    className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink font-mono"
                                     placeholder="••••••"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                                <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                     <Link size={14} /> URL / Site
                                 </label>
                                 <input
                                     type="text"
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                     placeholder="https://..."
                                 />
                             </div>
@@ -223,39 +223,39 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                     {type === 'task' && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                                <label className="block text-sm font-medium text-ela-sub mb-1">Status</label>
                                 <select
                                     value={status}
                                     onChange={(e) => setStatus(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                 >
                                     <option value="todo">A Fazer</option>
                                     <option value="done">Concluído</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Data Limite</label>
+                                <label className="block text-sm font-medium text-ela-sub mb-1">Data Limite</label>
                                 <input
                                     type="date"
                                     value={dueDate}
                                     onChange={(e) => setDueDate(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                 />
                             </div>
                         </div>
                     )}
 
                     {/* Common Metadata */}
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-700/50">
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                 <Layers size={14} /> Seção
                             </label>
                             <input
                                 type="text"
                                 value={section}
                                 onChange={(e) => setSection(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                 placeholder="Ex: Transporte"
                                 list="sections-list"
                             />
@@ -270,28 +270,28 @@ export default function EditItemModal({ isOpen, onClose, onSave, item }: EditIte
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                            <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                                 <Tag size={14} /> Categoria
                             </label>
                             <input
                                 type="text"
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                                 placeholder="Ex: Uber"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                        <label className="block text-sm font-medium text-ela-sub mb-1 flex items-center gap-2">
                             <Calendar size={14} /> Data do Evento
                         </label>
                         <input
                             type="date"
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full bg-white border border-ela-border rounded-lg px-4 py-2 text-ela-text focus:outline-none focus:ring-2 focus:ring-ela-pink"
                         />
                     </div>
                 </div>

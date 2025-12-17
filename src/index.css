@@ -96,9 +96,26 @@ body,
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+
+  /* Design System Tokens */
+  --color-ela-pink: #E11D48;
+  /* Rose 600 */
+  --color-ela-pink-light: #FFE4E6;
+  /* Rose 100 */
+  --color-ela-bg: #F9FAFB;
+  /* Gray 50 - Darker than white for contrast */
+  --color-ela-card: #FFFFFF;
+  /* White */
+  --color-ela-text: #1F2937;
+  /* Gray 800 */
+  --color-ela-sub: #6B7280;
+  /* Gray 500 */
+  --color-ela-border: #E5E7EB;
+  /* Gray 200 */
+
+  color: var(--color-ela-text);
+  background-color: var(--color-ela-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -106,14 +123,30 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
+@theme {
+  --color-ela-pink: var(--color-ela-pink);
+  --color-ela-pink-light: var(--color-ela-pink-light);
+  --color-ela-bg: var(--color-ela-bg);
+  --color-ela-card: var(--color-ela-card);
+  --color-ela-text: var(--color-ela-text);
+  --color-ela-sub: var(--color-ela-sub);
+  --color-ela-border: var(--color-ela-border);
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  background-color: #111827;
-  /* gray-900 to match app theme */
+  background-color: var(--color-ela-bg);
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+  color: #1F2937;
 }
+
+/* Global Button Styles - Removed to allow utility classes to work */
+/* .btn-primary, .btn-ghost styles removed */
+
+/* Global Input Styles - Removed to allow utility classes to work */
+/* input, textarea, select styles removed */
