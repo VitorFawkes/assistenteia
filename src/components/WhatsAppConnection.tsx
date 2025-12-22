@@ -38,20 +38,26 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
                 setStatus(data.status as any);
                 setQrCode(data.qr_code);
                 setPairingCode((data as any).pairing_code as string | null);
-                if (data.instance_name) setInstanceName(data.instance_name);
+                if (data.instance_name) {
+                    setInstanceName(data.instance_name);
+                    return data.instance_name; // Return for chaining
+                }
             }
+            return null;
         } catch (error) {
             console.error('Error checking status:', error);
+            return null;
         }
     };
 
-    const syncWithEvolution = async () => {
+    const syncWithEvolution = async (targetInstanceName?: string) => {
+        const nameToUse = targetInstanceName || instanceName;
         try {
-            console.log('Syncing status with Evolution for:', instanceName);
+            console.log('Syncing status with Evolution for:', nameToUse);
             const { error } = await supabase.functions.invoke('whatsapp-manager', {
                 body: {
                     action: 'get_status',
-                    instanceName: instanceName,
+                    instanceName: nameToUse,
                     type: 'user_personal'
                 }
             });
@@ -59,6 +65,7 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
             if (error) console.error('Sync failed:', error);
 
             // Always fetch latest DB state after sync attempt
+            // We don't await this here to avoid blocking UI, but it will update state
             checkInstanceStatus();
         } catch (e) {
             console.error('Sync error:', e);
@@ -73,8 +80,20 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
 
     // useEffect para inicialização (só roda uma vez por userId)
     useEffect(() => {
-        checkInstanceStatus();
-        syncWithEvolution();
+        const init = async () => {
+            // 1. Check DB first to get correct instance name
+            const dbInstanceName = await checkInstanceStatus();
+
+            // 2. Sync with Evolution using the CORRECT name (or default if none in DB)
+            if (dbInstanceName) {
+                syncWithEvolution(dbInstanceName);
+            } else {
+                // If no instance in DB, use the default state name
+                syncWithEvolution(instanceName);
+            }
+        };
+
+        init();
 
         // Real-time subscription for status updates
         const channel = supabase
