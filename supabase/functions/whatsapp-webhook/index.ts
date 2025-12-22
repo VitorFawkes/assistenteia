@@ -63,9 +63,23 @@ async function fetchGroupInfo(instanceName: string, groupJid: string) {
 Deno.serve(async (req: Request) => {
     try {
         const body = await req.json();
-        const { instance, data, event } = body;
+        const { event, instance, data } = body;
 
-        console.log(`Webhook HIT: ${instance} - ${event}`);
+        // --- CATCH-ALL DEBUG LOGGING ---
+        // Log every event to debug_logs for observability
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        await supabase.from('debug_logs').insert({
+            function_name: 'whatsapp-webhook',
+            level: 'debug',
+            message: `Event: ${event}`,
+            meta: { event, instance, data_summary: Array.isArray(data) ? `${data.length} items` : 'object' }
+        });
+        // -------------------------------
+
+        console.log(`📩 Webhook received: ${event} from instance ${instance}`);
 
         // 0. HANDLE CONNECTION UPDATES
         if (event === 'CONNECTION_UPDATE') {
@@ -87,8 +101,8 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ success: true, status: newStatus }), { headers: { 'Content-Type': 'application/json' } });
         }
 
-        // 1. FILTER: Only process messages.upsert OR messages.update
-        if (event !== 'messages.upsert' && event !== 'messages.update') {
+        // 1. FILTER: Only process messages.upsert, messages.update OR chats.update
+        if (event !== 'messages.upsert' && event !== 'messages.update' && event !== 'chats.update') {
             return new Response(JSON.stringify({ ignored: true }), { headers: { 'Content-Type': 'application/json' } });
         }
 
@@ -102,7 +116,13 @@ Deno.serve(async (req: Request) => {
             function_name: 'whatsapp-webhook',
             level: 'info',
             message: 'Webhook received',
-            meta: { event, instance, key: message.key || (Array.isArray(message) ? 'batch_update' : 'unknown') }
+            meta: {
+                event,
+                instance,
+                key: message.key || (Array.isArray(message) ? 'batch_update' : 'unknown'),
+                remoteJid: message.key?.remoteJid,
+                fromMe: message.key?.fromMe
+            }
         });
 
         // 1.5 FETCH INSTANCE DATA (Early)
@@ -188,11 +208,20 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ success: true, type: 'status_update' }), { headers: { 'Content-Type': 'application/json' } });
         }
 
+
+
         // 2. CHECK INSTANCE TYPE & EXTRACT JID
         // For upsert, message is an object with key
         if (!message.key) {
             // If we are here and it's not status update, it might be an issue, or maybe we just return
             // But we already filtered events.
+
+            // FIX: Handle chats.update which is an array and has no key
+            if (event === 'chats.update') {
+                console.log('ℹ️ Chats Update received. Ignoring as it contains no message content.');
+                return new Response(JSON.stringify({ ignored: 'chats_update' }), { headers: { 'Content-Type': 'application/json' } });
+            }
+
             // If it's upsert, it MUST have key.
             if (event === 'messages.upsert') {
                 return new Response(JSON.stringify({ error: 'No message key' }), { headers: { 'Content-Type': 'application/json' } });
@@ -476,7 +505,7 @@ Deno.serve(async (req: Request) => {
 
         console.log(`🚀 Forwarding to process-message. Content: "${content}", Media: ${mediaType}`);
 
-        // 4.5 INSERT MESSAGE INTO DATABASE
+        // 4.5 INSERT MESSAGE INTO DATABASE (ENCRYPTED)
         // Extract Metadata
         const { id: waMessageId, participant } = message.key;
         const pushName = message.pushName || (fromMe ? 'Me' : 'Unknown');
@@ -498,40 +527,53 @@ Deno.serve(async (req: Request) => {
         const quotedMessage = contextInfo?.quotedMessage;
         const quotedContent = quotedMessage?.conversation || quotedMessage?.extendedTextMessage?.text || (quotedMessage?.imageMessage ? '[Imagem]' : null) || (quotedMessage?.audioMessage ? '[Áudio]' : null) || (quotedMessage?.videoMessage ? '[Vídeo]' : null) || null;
 
-        const { data: insertedMessage, error: insertError } = await supabase.from('messages').insert({
-            user_id: userData.user_id,
-            role: 'user', // Default to user for incoming messages
-            content: content || (mediaType ? `[${mediaType.toUpperCase()}]` : null),
-            media_url: finalMediaUrl || null,
-            media_type: mediaType || null,
-            // New Metadata
-            sender_number: senderNumber,
-            sender_name: pushName,
-            group_name: groupName,
-            is_group: isGroup,
-            is_from_me: fromMe,
-            wa_message_id: waMessageId,
-            message_timestamp: messageTimestamp,
-            // Threading
-            quoted_message_id: quotedMessageId,
-            quoted_content: quotedContent,
-            // Rich Media
-            file_path: storagePath,
-            file_name: fileName,
-            mime_type: mimeType,
-            file_size: fileSize
-        }).select('id').single();
+        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+        if (!encryptionKey) {
+            console.error('❌ CRITICAL: ENCRYPTION_KEY not set. Message will be saved UNENCRYPTED (Fallback).');
+        }
 
-        if (insertError) {
-            console.error('❌ Error saving user message to DB:', insertError);
-            await supabase.from('debug_logs').insert({
-                function_name: 'whatsapp-webhook',
-                level: 'error',
-                message: 'Failed to save user message',
-                meta: { error: insertError }
+        let insertedMessageId = null;
+
+        if (encryptionKey) {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('insert_message_encrypted', {
+                p_user_id: userData.user_id,
+                p_role: 'user',
+                p_content: content || (mediaType ? `[${mediaType.toUpperCase()}]` : null),
+                p_encryption_key: encryptionKey,
+                p_media_url: finalMediaUrl || null,
+                p_media_type: mediaType || null,
+                p_sender_number: senderNumber,
+                p_sender_name: pushName,
+                p_group_name: groupName,
+                p_is_group: isGroup,
+                p_is_from_me: fromMe,
+                p_wa_message_id: waMessageId,
+                p_message_timestamp: messageTimestamp,
+                p_quoted_message_id: quotedMessageId,
+                p_quoted_content: quotedContent,
+                p_file_path: storagePath,
+                p_file_name: fileName,
+                p_mime_type: mimeType,
+
+                p_file_size: fileSize
             });
+
+            if (rpcError) {
+                console.error('❌ Error saving ENCRYPTED message:', rpcError);
+                // Fallback to normal insert? No, fail safe.
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'error',
+                    message: 'Failed to save encrypted message',
+                    meta: { error: rpcError }
+                });
+            } else {
+                insertedMessageId = rpcData;
+                console.log('🔒 User message saved ENCRYPTED:', insertedMessageId);
+            }
         } else {
-            console.log('✅ User message saved to DB:', insertedMessage?.id);
+            // Fallback: DO NOT Insert Unencrypted
+            console.error('❌ CRITICAL: ENCRYPTION_KEY missing. Message NOT saved to database to prevent data leak.');
         }
 
         // Call Edge Function
@@ -595,7 +637,7 @@ Deno.serve(async (req: Request) => {
                 },
                 body: JSON.stringify({
                     number: remoteJid,
-                    options: { delay: 1200, presence: 'composing' },
+                    options: { delay: 1200 },
                     text: (userData?.ai_name ? `${userData.ai_name}: ` : '') + processData.response
                 })
             });
@@ -618,6 +660,8 @@ Deno.serve(async (req: Request) => {
                     message: 'Response sent to WhatsApp',
                     meta: { response: responseText, statusCode: sendResponse.status }
                 });
+
+
             }
         }
 

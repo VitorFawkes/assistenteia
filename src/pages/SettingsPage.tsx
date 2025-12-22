@@ -195,7 +195,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="flex flex-col h-full bg-ela-bg p-4 md:p-6 pb-28 md:pb-6 overflow-auto">
+        <div className="flex flex-col h-full bg-ela-bg p-4 md:p-6 pb-32 md:pb-6 overflow-auto">
             <div className="max-w-3xl mx-auto w-full space-y-8">
 
                 {/* Header & Main Save */}
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                 </div>
 
                 {message && (
-                    <div className={`p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    <div className={`p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'
                         }`}>
                         {message.type === 'success' ? <Check size={20} /> : <AlertCircle size={20} />}
                         {message.text}
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                                 value={preferredName}
                                 onChange={(e) => setPreferredName(e.target.value)}
                                 placeholder="Ex: Chefe, Vitor..."
-                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-gray-400"
+                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-ela-sub/50"
                             />
                         </div>
 
@@ -265,7 +265,7 @@ export default function SettingsPage() {
                                 value={aiName}
                                 onChange={(e) => setAiName(e.target.value)}
                                 placeholder="Ex: Jarvis, Sexta-feira..."
-                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-gray-400"
+                                className="w-full bg-white border border-ela-border rounded-xl p-3 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-ela-sub/50"
                             />
                         </div>
 
@@ -280,7 +280,7 @@ export default function SettingsPage() {
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     placeholder="11 999999999"
-                                    className="w-full bg-white border border-ela-border rounded-xl p-3 pl-12 text-ela-text focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none placeholder:text-gray-400"
+                                    className="w-full bg-white border border-ela-border rounded-xl p-3 pl-12 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent transition-all outline-none placeholder:text-ela-sub/50"
                                 />
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium pointer-events-none">
                                     +55
@@ -316,18 +316,18 @@ export default function SettingsPage() {
                                     key={opt.id}
                                     onClick={() => setPrivacyReadScope(opt.id as any)}
                                     className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group ${privacyReadScope === opt.id
-                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm'
+                                        ? 'bg-ela-pink/5 border-ela-pink/20 text-ela-pink shadow-sm'
                                         : 'bg-white border-ela-border text-ela-sub hover:bg-gray-50 hover:border-gray-300'
                                         }`}
                                 >
-                                    <div className={`font-bold mb-1 ${privacyReadScope === opt.id ? 'text-indigo-700' : 'text-ela-text'}`}>
+                                    <div className={`font-bold mb-1 ${privacyReadScope === opt.id ? 'text-ela-pink' : 'text-ela-text'}`}>
                                         {opt.label}
                                     </div>
                                     <div className="text-xs opacity-70 leading-relaxed">
                                         {opt.desc}
                                     </div>
                                     {privacyReadScope === opt.id && (
-                                        <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full shadow-sm" />
+                                        <div className="absolute top-2 right-2 w-2 h-2 bg-ela-pink rounded-full shadow-sm" />
                                     )}
                                 </button>
                             ))}
@@ -346,7 +346,7 @@ export default function SettingsPage() {
                         </div>
                         <button
                             onClick={() => setPrivacyAllowOutgoing(!privacyAllowOutgoing)}
-                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-200'
+                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-ela-pink/50 ${privacyAllowOutgoing ? 'bg-green-500' : 'bg-gray-200'
                                 }`}
                         >
                             <span
@@ -387,11 +387,11 @@ export default function SettingsPage() {
                             { label: 'Meus Áudios', state: storageDownloadAudio, setter: setStorageDownloadAudio },
                             { label: 'Meus Documentos', state: storageDownloadDocuments, setter: setStorageDownloadDocuments },
                         ].map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <div key={idx} className="flex items-center justify-between bg-gray-50/50 p-4 rounded-xl border border-ela-border">
                                 <span className="text-sm text-ela-text font-medium">{item.label}</span>
                                 <button
                                     onClick={() => item.setter(!item.state)}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${item.state ? 'bg-blue-500' : 'bg-gray-200'}`}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${item.state ? 'bg-ela-pink' : 'bg-gray-200'}`}
                                 >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${item.state ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
@@ -402,10 +402,15 @@ export default function SettingsPage() {
 
                 {/* SECTION 4: CONEXÕES */}
                 <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-ela-text">Integrações</h2>
+                    <h2 className="text-2xl font-bold text-ela-text">Canais de Comunicação</h2>
 
                     {/* WhatsApp */}
-                    {userId && <WhatsAppConnection userId={userId} />}
+                    <div className="relative">
+                        <div className="absolute -top-3 left-4 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full border border-green-200 shadow-sm z-10 uppercase tracking-wide">
+                            Recomendado
+                        </div>
+                        {userId && <WhatsAppConnection userId={userId} />}
+                    </div>
 
                     {/* External Services */}
                     <div className="space-y-6">
@@ -429,7 +434,7 @@ export default function SettingsPage() {
                                     <label className="block text-sm font-medium text-ela-sub mb-3">
                                         Modelo de Inteligência
                                     </label>
-                                    <div className="p-4 border border-ela-border rounded-xl bg-gray-50 flex items-center gap-3">
+                                    <div className="p-4 border border-ela-border rounded-xl bg-gray-50/50 flex items-center gap-3">
                                         <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-sm" />
                                         <span className="text-ela-text font-medium">GPT 5.1 (Enforced)</span>
                                     </div>
@@ -463,7 +468,7 @@ export default function SettingsPage() {
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="p-4 bg-gray-50 border border-ela-border rounded-xl flex items-center gap-3 text-ela-sub">
+                                    <div className="p-4 bg-gray-50/50 border border-ela-border rounded-xl flex items-center gap-3 text-ela-sub">
                                         <Info className="w-5 h-5 text-gray-400" />
                                         <span className="text-sm">
                                             O comportamento da IA é gerenciado pelo administrador do sistema.
@@ -477,7 +482,7 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                             {/* Daily Briefing Column */}
-                            <div className={`bg-white border transition-all duration-300 rounded-2xl overflow-hidden shadow-sm ${dailyBriefingEnabled ? 'border-yellow-400 shadow-yellow-100' : 'border-ela-border'}`}>
+                            <div className={`bg-white border transition-all duration-300 rounded-2xl overflow-hidden shadow-sm ${dailyBriefingEnabled ? 'border-ela-pink/30 shadow-ela-pink/5' : 'border-ela-border'}`}>
                                 <div className="p-6 border-b border-ela-border flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg transition-colors ${dailyBriefingEnabled ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-50 text-gray-400'}`}>
@@ -495,7 +500,7 @@ export default function SettingsPage() {
                                             checked={dailyBriefingEnabled}
                                             onChange={(e) => setDailyBriefingEnabled(e.target.checked)}
                                         />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500 shadow-inner"></div>
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ela-pink shadow-inner"></div>
                                     </label>
                                 </div>
 
@@ -510,7 +515,7 @@ export default function SettingsPage() {
                                                     type="time"
                                                     value={dailyBriefingTime}
                                                     onChange={(e) => setDailyBriefingTime(e.target.value)}
-                                                    className="w-full bg-white border border-ela-border rounded-lg px-3 py-2 text-ela-text focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all text-center font-mono"
+                                                    className="w-full bg-white border border-ela-border rounded-lg px-3 py-2 text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none transition-all text-center font-mono"
                                                 />
                                             </div>
                                             <div>
@@ -519,7 +524,7 @@ export default function SettingsPage() {
                                                 </label>
                                                 <Button
                                                     variant="secondary"
-                                                    className="w-full justify-center bg-gray-50 hover:bg-gray-100 border-ela-border text-ela-text"
+                                                    className="w-full justify-center bg-gray-50/50 hover:bg-gray-100 border-ela-border text-ela-text"
                                                     size="sm"
                                                     onClick={async () => {
                                                         if (!confirm('Enviar resumo agora para o seu WhatsApp?')) return;
@@ -558,7 +563,7 @@ export default function SettingsPage() {
                                                 value={dailyBriefingPrompt}
                                                 onChange={(e) => setDailyBriefingPrompt(e.target.value)}
                                                 placeholder="Ex: Seja engraçado, foque em finanças..."
-                                                className="w-full h-24 bg-white border border-ela-border rounded-lg px-3 py-2 text-sm text-ela-text focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all resize-none placeholder:text-gray-400"
+                                                className="w-full h-24 bg-white border border-ela-border rounded-lg px-3 py-2 text-sm text-ela-text focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none transition-all resize-none placeholder:text-ela-sub/50"
                                             />
                                         </div>
                                     </div>
@@ -570,50 +575,58 @@ export default function SettingsPage() {
                                 )}
                             </div>
 
-                            {/* Integrations Column */}
-                            <div className="space-y-4">
-                                {/* Google */}
-                                <div className="group bg-white border border-ela-border hover:border-gray-300 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50 shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300">
-                                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
+                            {/* Integrations Column - HIDDEN PER USER REQUEST */}
+                            {false && (
+                                <div className="space-y-4">
+                                    {/* Google */}
+                                    <div className="group bg-white border border-ela-border hover:border-ela-pink/30 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50/50 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-bl-lg font-bold uppercase tracking-wide">
+                                            Opcional
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-ela-text text-lg">Google</h3>
-                                            <p className="text-xs text-ela-sub">Agenda, Email & Drive</p>
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300">
+                                                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-ela-text text-lg">Google</h3>
+                                                <p className="text-xs text-ela-sub">Agenda, Email & Drive</p>
+                                            </div>
                                         </div>
+                                        <Button
+                                            onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-google/login'}
+                                            className="bg-white hover:bg-gray-50 text-ela-text border border-ela-border hover:border-gray-300 transition-all duration-300"
+                                            size="sm"
+                                        >
+                                            Conectar
+                                        </Button>
                                     </div>
-                                    <Button
-                                        onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-google/login'}
-                                        className="bg-white hover:bg-gray-50 text-ela-text border border-ela-border hover:border-gray-300 transition-all duration-300"
-                                        size="sm"
-                                    >
-                                        Conectar
-                                    </Button>
-                                </div>
 
-                                {/* Microsoft */}
-                                <div className="group bg-white border border-ela-border hover:border-[#00a4ef]/50 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50 shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-[#00a4ef]/10 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                                            <svg className="w-6 h-6 text-[#00a4ef]" viewBox="0 0 23 23" fill="currentColor">
-                                                <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" />
-                                            </svg>
+                                    {/* Microsoft */}
+                                    <div className="group bg-white border border-ela-border hover:border-ela-pink/30 rounded-2xl p-5 flex items-center justify-between transition-all hover:bg-gray-50/50 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-bl-lg font-bold uppercase tracking-wide">
+                                            Opcional
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-ela-text text-lg">Outlook</h3>
-                                            <p className="text-xs text-ela-sub">Agenda & Email</p>
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-[#00a4ef]/10 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                                <svg className="w-6 h-6 text-[#00a4ef]" viewBox="0 0 23 23" fill="currentColor">
+                                                    <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-ela-text text-lg">Outlook</h3>
+                                                <p className="text-xs text-ela-sub">Agenda & Email</p>
+                                            </div>
                                         </div>
+                                        <Button
+                                            onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-microsoft/login'}
+                                            className="bg-white hover:bg-[#00a4ef] hover:text-white text-ela-text border border-ela-border hover:border-[#00a4ef] transition-all duration-300"
+                                            size="sm"
+                                        >
+                                            Conectar
+                                        </Button>
                                     </div>
-                                    <Button
-                                        onClick={() => window.location.href = 'https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/auth-microsoft/login'}
-                                        className="bg-white hover:bg-[#00a4ef] hover:text-white text-ela-text border border-ela-border hover:border-[#00a4ef] transition-all duration-300"
-                                        size="sm"
-                                    >
-                                        Conectar
-                                    </Button>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

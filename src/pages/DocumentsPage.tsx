@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -307,22 +308,14 @@ export default function DocumentsPage() {
                         </div>
                     )
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed border-gray-200 rounded-3xl bg-white">
-                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
-                            <Upload size={32} className="text-ela-pink" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-ela-text mb-2">Seus documentos, organizados.</h3>
-                        <p className="text-ela-sub mb-8 max-w-md text-center leading-relaxed">
-                            Faça upload de contratos, recibos ou anotações. A IA poderá ler e usar essas informações para te ajudar.
-                        </p>
-                        <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            icon={Upload}
-                            className="bg-ela-pink hover:bg-pink-600 px-8 py-3 h-auto text-lg shadow-xl shadow-pink-900/20 text-white"
-                        >
-                            Fazer Upload Agora
-                        </Button>
-                    </div>
+                    <EmptyState
+                        icon={Upload}
+                        title="Seus documentos, organizados"
+                        description="Faça upload de contratos, recibos ou anotações. A IA poderá ler e usar essas informações para te ajudar."
+                        exampleCommand="Resuma este contrato em 3 pontos principais"
+                        actionLabel="Fazer Upload Agora"
+                        onAction={() => fileInputRef.current?.click()}
+                    />
                 )}
             </div>
         </div>

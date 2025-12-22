@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Loader2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { ElaLogo } from '../components/ElaLogo';
 
 export default function SignupPage() {
     const [email, setEmail] = useState('');
@@ -29,26 +31,27 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-ela-bg p-4">
             <div className="w-full max-w-md">
-                <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-gray-700">
-                    <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <UserPlus size={32} className="text-white" />
-                        </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Criar Conta</h1>
-                        <p className="text-gray-400">Comece a usar seu assistente</p>
+                <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex justify-center mb-6">
+                        <ElaLogo className="scale-150" />
                     </div>
+                    <h1 className="text-3xl font-bold text-ela-text mb-2">Criar Conta</h1>
+                    <p className="text-ela-sub">Comece a usar seu assistente pessoal</p>
+                </div>
 
+                <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-ela-border animate-in fade-in zoom-in duration-500 delay-100">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 mb-6">
-                            <p className="text-red-400 text-sm">{error}</p>
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6 flex items-start gap-3">
+                            <div className="w-1 h-full bg-red-500 rounded-full"></div>
+                            <p className="text-red-600 text-sm font-medium">{error}</p>
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label htmlFor="fullName" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="fullName" className="block text-sm font-medium text-ela-text mb-1.5">
                                 Nome Completo
                             </label>
                             <input
@@ -57,13 +60,13 @@ export default function SignupPage() {
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-gray-50 border border-ela-border rounded-xl text-ela-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all"
                                 placeholder="Seu nome"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-ela-text mb-1.5">
                                 Email
                             </label>
                             <input
@@ -72,13 +75,13 @@ export default function SignupPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-gray-50 border border-ela-border rounded-xl text-ela-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all"
                                 placeholder="seu@email.com"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+                            <label htmlFor="password" className="block text-sm font-medium text-ela-text mb-1.5">
                                 Senha
                             </label>
                             <input
@@ -88,32 +91,26 @@ export default function SignupPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 minLength={6}
-                                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-gray-50 border border-ela-border rounded-xl text-ela-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-ela-pink focus:bg-white transition-all"
                                 placeholder="••••••••"
                             />
-                            <p className="text-gray-500 text-xs mt-1">Mínimo 6 caracteres</p>
+                            <p className="text-gray-400 text-xs mt-1.5 ml-1">Mínimo 6 caracteres</p>
                         </div>
 
-                        <button
+                        <Button
                             type="submit"
-                            disabled={loading}
-                            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:from-purple-500 hover:to-pink-500 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            isLoading={loading}
+                            className="w-full py-3 text-lg bg-ela-pink hover:bg-pink-600 shadow-lg shadow-pink-900/20 text-white mt-2"
+                            icon={ArrowRight}
                         >
-                            {loading ? (
-                                <>
-                                    <Loader2 size={20} className="animate-spin" />
-                                    Criando conta...
-                                </>
-                            ) : (
-                                'Criar Conta'
-                            )}
-                        </button>
+                            Criar Conta
+                        </Button>
                     </form>
 
-                    <div className="mt-6 text-center">
-                        <p className="text-gray-400 text-sm">
+                    <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                        <p className="text-ela-sub text-sm">
                             Já tem uma conta?{' '}
-                            <Link to="/login" className="text-purple-400 hover:text-purple-300 font-medium">
+                            <Link to="/login" className="text-ela-pink hover:text-pink-700 font-semibold transition-colors">
                                 Entrar
                             </Link>
                         </p>

@@ -1,0 +1,500 @@
+                                    toolOutput = `Encontrei múltiplos lembretes pendentes. Qual deles alterar?\n${options}`;
+                                } else {
+                                    // Try completed
+                                    const { data: anyRem } = await supabase.from('reminders').select('*').eq('user_id', userId).ilike('title', `%${search}%`).limit(1);
+                                    reminder = anyRem?.[0];
+                                }
+                            }
+
+                            if (!reminder && !toolOutput) {
+                                toolOutput = `Erro: Lembrete não encontrado para atualização.`;
+                            } else if (reminder) {
+                                const updateData: any = {};
+                                if (args.title) updateData.title = args.title;
+
+                                // Recalculate time if provided
+                                if (args.time_config || args.relative_time || overrideDueAt) {
+                                    const newDueAt = calculateDueAt(args, brasiliaTime, overrideDueAt);
+                                    if (newDueAt) updateData.due_at = newDueAt;
+                                }
+
+                                if (args.recurrence_type) updateData.recurrence_type = args.recurrence_type;
+                                if (args.recurrence_interval) updateData.recurrence_interval = args.recurrence_interval;
+                                if (args.recurrence_unit) updateData.recurrence_unit = args.recurrence_unit;
+                                if (args.weekdays) updateData.weekdays = args.weekdays;
+                                if (args.recurrence_count) updateData.recurrence_count = args.recurrence_count;
+
+                                const { error } = await supabase.from('reminders').update(updateData).eq('id', reminder.id);
+                                if (error) throw error;
+                                toolOutput = `Lembrete atualizado com sucesso.`;
+                            }
+                        } else if (args.action === 'delete') {
+                            // SMART LOGIC: Find reminder to delete
+                            let reminderToDelete = null;
+
+                            if (args.id) {
+                                reminderToDelete = { id: args.id };
+                            } else {
+                                const search = args.search_title || args.title;
+                                // Prioritize PENDING
+                                const { data: pending } = await supabase.from('reminders').select('id, title, due_at').eq('user_id', userId).eq('is_completed', false).ilike('title', `%${search}%`).limit(5);
+
+                                if (pending && pending.length === 1) {
+                                    reminderToDelete = pending[0];
+                                } else if (pending && pending.length > 1) {
+                                    const options = pending.map((r: any) => `- ${r.title} (${new Date(r.due_at).toLocaleString('pt-BR')}) [ID: ${r.id}]`).join('\n');
+                                    toolOutput = `Encontrei múltiplos lembretes pendentes. Qual deles apagar?\n${options}`;
+                                } else {
+                                    // Try completed
+                                    const { data: anyRem } = await supabase.from('reminders').select('id, title').eq('user_id', userId).ilike('title', `%${search}%`).limit(1);
+                                    reminderToDelete = anyRem?.[0];
+                                }
+                            }
+
+                            if (!reminderToDelete && !toolOutput) {
+                                toolOutput = `Erro: Lembrete não encontrado para apagar.`;
+                            } else if (reminderToDelete) {
+                                await supabase.from('reminders').delete().eq('id', reminderToDelete.id).eq('user_id', userId);
+                                toolOutput = `Lembrete apagado (ID: ${reminderToDelete.id}).`;
+                            }
+                        }
+                    }
+
+
+                    // --- MANAGE TASKS (TO-DO) ---
+                    else if (functionName === 'manage_tasks') {
+                        if (args.action === 'create') {
+                            const finalDueAt = calculateDueAt(args, brasiliaTime, null);
+
+                            const { error } = await supabase.from('tasks').insert({
+                                user_id: userId,
+                                title: args.title,
+                                description: args.description || null,
+                                priority: args.priority || 'medium',
+                                status: args.status || 'todo',
+                                tags: args.tags || [],
+                                due_date: finalDueAt // Now supports dates!
+                            });
+                            if (error) throw error;
+
+                            const dateMsg = finalDueAt ? ` para ${new Date(finalDueAt).toLocaleDateString('pt-BR')}` : '';
+                            toolOutput = `Tarefa "${args.title}" adicionada à lista${dateMsg}.`;
+                        } else if (args.action === 'list') {
+                            let query = supabase.from('tasks').select('*').eq('user_id', userId);
+
+                            if (args.filter_status) {
+                                query = query.eq('status', args.filter_status);
+                            } else {
+                                // Default: hide done/archived unless asking for them
+                                query = query.neq('status', 'done').neq('status', 'archived');
+                            }
+
+                            const { data: tasks } = await query.order('created_at', { ascending: false });
+
+                            if (!tasks || tasks.length === 0) {
+                                toolOutput = "Nenhuma tarefa encontrada.";
+                            } else {
+                                let filteredTasks = tasks;
+
+                                // Date Filtering (In-memory for flexibility)
+                                if (args.filter_date === 'today') {
+                                    const todayStr = brasiliaTime.toISOString().split('T')[0];
+                                    filteredTasks = tasks.filter((t: any) => {
+                                        if (!t.due_date) return false;
+                                        const tDate = t.due_date.split('T')[0];
+                                        // Include today OR overdue (if not done)
+                                        return tDate === todayStr || (tDate < todayStr && t.status !== 'done');
+                                    });
+                                } else if (args.filter_date === 'tomorrow') {
+                                    const tomorrow = new Date(brasiliaTime);
+                                    tomorrow.setDate(tomorrow.getDate() + 1);
+                                    const tmrStr = tomorrow.toISOString().split('T')[0];
+                                    filteredTasks = tasks.filter((t: any) => t.due_date && t.due_date.startsWith(tmrStr));
+                                }
+
+                                if (filteredTasks.length === 0) {
+                                    toolOutput = `Nenhuma tarefa encontrada para "${args.filter_date || 'filtro atual'}".`;
+                                } else {
+                                    toolOutput = `Suas Tarefas:\n${filteredTasks.map((t: any) => {
+                                        const dateInfo = t.due_date ? ` [📅 ${new Date(t.due_date).toLocaleDateString('pt-BR')}]` : '';
+                                        return `- [${t.status.toUpperCase()}] ${t.title} (${t.priority})${dateInfo}`;
+                                    }).join('\n')}`;
+                                }
+                            }
+                        } else if (args.action === 'update' || args.action === 'complete' || args.action === 'delete') {
+                            // First find the task
+                            let query = supabase.from('tasks').select('id, title, status').eq('user_id', userId);
+
+                            // FILTER LOGIC:
+                            // If completing or deleting, prioritize NOT DONE tasks.
+                            if (args.action === 'complete' || args.action === 'delete') {
+                                // We can't easily do "order by status" to prioritize 'todo' over 'done' in one query without complex SQL.
+                                // So we'll fetch matches and filter in code, or try two queries.
+                                // Let's try fetching matches (limit 5) and picking the best one.
+                            }
+
+                            if (args.search_title) query = query.ilike('title', `%${args.search_title}%`);
+
+                            // Fetch a few candidates to make a smart decision
+                            const { data: candidates } = await query.limit(5);
+
+                            let task = null;
+
+                            if (candidates && candidates.length > 0) {
+                                // 1. Try to find an exact match that is NOT done (for complete/delete)
+                                if (args.action === 'complete') {
+                                    task = candidates.find((t: any) => t.status !== 'done' && t.status !== 'archived');
+                                }
+                                // 2. If no pending task found, or action is update, just take the first one (or maybe the most recent?)
+                                // Ideally we should sort by created_at desc in the query to get most recent.
+                                if (!task) task = candidates[0];
+                            }
+
+                            if (!task) {
+                                toolOutput = `Erro: Tarefa "${args.search_title}" não encontrada.`;
+                            } else {
+                                // Check if we are completing an already completed task
+                                if (args.action === 'complete' && task.status === 'done') {
+                                    toolOutput = `A tarefa "${task.title}" já estava concluída!`;
+                                } else {
+                                    if (args.action === 'delete') {
+                                        await supabase.from('tasks').delete().eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" apagada.`;
+                                    } else if (args.action === 'complete') {
+                                        await supabase.from('tasks').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" marcada como concluída! 🎉`;
+                                    } else { // update
+                                        const updateData: any = {};
+                                        if (args.title) updateData.title = args.title;
+                                        if (args.description) updateData.description = args.description;
+                                        if (args.priority) updateData.priority = args.priority;
+                                        if (args.status) updateData.status = args.status;
+                                        if (args.tags) updateData.tags = args.tags;
+
+                                        // Update due_date if provided
+                                        if (args.due_date || args.time_config || args.relative_time) {
+                                            const newDueAt = calculateDueAt(args, brasiliaTime, null);
+                                            if (newDueAt) updateData.due_date = newDueAt;
+                                        }
+
+                                        await supabase.from('tasks').update(updateData).eq('id', task.id);
+                                        toolOutput = `Tarefa "${task.title}" atualizada.`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- SAVE MEMORY (VECTOR) ---
+                    else if (functionName === 'save_memory') {
+                        console.log(`🧠 Saving memory: "${args.content}"`);
+
+                        // 1. Generate Embedding
+                        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${openaiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                model: 'text-embedding-3-small',
+                                input: args.content,
+                            }),
+                        });
+
+                        const embeddingData = await embeddingResponse.json();
+                        const embedding = embeddingData.data?.[0]?.embedding;
+
+                        if (!embedding) {
+                            console.error('❌ OpenAI Embedding Error:', JSON.stringify(embeddingData));
+                            toolOutput = `Erro ao gerar vetor: ${JSON.stringify(embeddingData)}`;
+                        } else {
+                            // 2. Save to DB
+                            const { error } = await supabase.from('memories').insert({
+                                user_id: userId,
+                                content: args.content,
+                                embedding: embedding,
+                                metadata: { category: args.category || 'general' }
+                            });
+
+                            if (error) throw error;
+                            toolOutput = "Memória salva com sucesso! 🧠";
+                        }
+                    }
+
+                    // --- RECALL MEMORY (RAG) ---
+                    else if (functionName === 'recall_memory') {
+                        console.log(`🧠 Recalling memory for: "${args.query}"`);
+
+                        // 1. Generate Embedding for the query
+                        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${openaiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                model: 'text-embedding-3-small',
+                                input: args.query,
+                            }),
+                        });
+
+                        const embeddingData = await embeddingResponse.json();
+                        const queryEmbedding = embeddingData.data?.[0]?.embedding;
+
+                        if (!queryEmbedding) {
+                            toolOutput = "Erro ao gerar vetor de busca.";
+                        } else {
+                            // 2. Call RPC to match memories
+                            const { data: memories, error: matchError } = await supabase.rpc('match_memories', {
+                                query_embedding: queryEmbedding,
+                                match_threshold: 0.5, // Similaridade mínima (0 a 1)
+                                match_count: args.match_count || 5,
+                                p_user_id: userId
+                            });
+
+                            if (matchError) {
+                                console.error('❌ Match Error:', matchError);
+                                toolOutput = "Erro ao buscar memórias.";
+                            } else if (!memories || memories.length === 0) {
+                                toolOutput = "Nenhuma memória relevante encontrada.";
+                            } else {
+                                const memoryText = memories.map((m: any) => `- ${m.content} (Similaridade: ${(m.similarity * 100).toFixed(0)}%)`).join('\n');
+                                toolOutput = `Memórias Encontradas:\n${memoryText}`;
+                            }
+                        }
+                    }
+
+                    // --- SEND WHATSAPP MESSAGE ---
+                    else if (functionName === 'send_whatsapp_message') {
+                        // 🛑 PRIVACY CHECK: OUTGOING ALLOWED?
+                        if (userSettings?.privacy_allow_outgoing === false) {
+                            console.warn(`🛑 BLOCKED OUTGOING MESSAGE: User disabled outgoing messages.`);
+                            throw new Error(`⛔ Ação Bloqueada: Você configurou sua privacidade para NÃO permitir que a IA envie mensagens para outras pessoas.`);
+                        }
+
+                        console.log(`📤 Sending WhatsApp message to ${args.number}`);
+
+                        // Sanitize number (remove non-digits)
+                        const cleanNumber = args.number.replace(/\D/g, '');
+                        // FORMATTING FIX: Ensure @s.whatsapp.net suffix
+                        const targetNumber = cleanNumber.includes('@') ? cleanNumber : `${cleanNumber}@s.whatsapp.net`;
+
+                        const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!;
+                        const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
+
+                        // Better: Fetch the active instance for this user.
+                        const { data: instances } = await supabase.from('whatsapp_instances').select('instance_name').eq('user_id', userId).eq('status', 'connected').limit(1);
+                        const instanceName = instances?.[0]?.instance_name || 'user_personal'; // Fallback
+
+                        console.log(`📤 Sending WhatsApp message to ${targetNumber} via ${instanceName}`);
+
+                        let sendRes;
+                        if (args.media_url) {
+                            // SEND MEDIA
+                            console.log(`📎 Sending Media: ${args.media_url}`);
+                            sendRes = await fetch(`${evolutionApiUrl}/message/sendMedia/${instanceName}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'apikey': evolutionApiKey
+                                },
+                                body: JSON.stringify({
+                                    number: targetNumber,
+                                    options: { delay: 1200 },
+                                    mediaMessage: {
+                                        mediatype: args.media_type || 'image',
+                                        media: args.media_url,
+                                        caption: args.message || ''
+                                    }
+                                })
+                            });
+                        } else {
+                            // SEND TEXT
+                            sendRes = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'apikey': evolutionApiKey
+                                },
+                                body: JSON.stringify({
+                                    number: targetNumber,
+                                    options: { delay: 1200 },
+                                    text: args.message
+                                })
+                            });
+                        }
+
+                        const respText = await sendRes.text();
+
+                        if (!sendRes.ok) {
+                            console.error('❌ Failed to send outgoing message:', respText);
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'process-message',
+                                level: 'error',
+                                message: 'Failed to send WhatsApp message',
+                                meta: { error: respText, number: targetNumber, instance: instanceName }
+                            });
+                            toolOutput = `Erro ao enviar mensagem: ${respText}`;
+                        } else {
+                            console.log('✅ Outgoing message sent!');
+                            await supabase.from('debug_logs').insert({
+                                function_name: 'process-message',
+                                level: 'info',
+                                message: 'Outgoing WhatsApp message sent',
+                                meta: { number: targetNumber, instance: instanceName, hasMedia: !!args.media_url }
+                            });
+                            toolOutput = `Mensagem enviada com sucesso para ${args.number}.`;
+                        }
+                    }
+
+                    // --- QUERY MESSAGES (WHATSAPP HISTORY) ---
+                    else if (functionName === 'query_messages') {
+                        const limit = args.limit || 20;
+                        const daysAgo = args.days_ago || 7;
+
+                        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+                        if (!encryptionKey) {
+                            console.error('❌ CRITICAL: ENCRYPTION_KEY not set. Cannot decrypt messages.');
+                            toolOutput = "Erro: Chave de criptografia não configurada. Não consigo ler o histórico.";
+                        } else {
+                            const { data: messages, error } = await supabase.rpc('get_messages_decrypted', {
+                                p_encryption_key: encryptionKey,
+                                p_limit: limit,
+                                p_offset: 0,
+                                p_user_id: userId,
+                                p_sender_number: args.sender_number || null,
+                                p_group_name: args.group_name || null,
+                                p_days_ago: daysAgo
+                            });
+
+                            if (error) {
+                                console.error('❌ Error fetching decrypted messages:', error);
+                                toolOutput = `Erro ao buscar mensagens: ${error.message}`;
+                            } else if (!messages || messages.length === 0) {
+                                toolOutput = "Nenhuma mensagem encontrada com esses critérios.";
+                            } else {
+                                toolOutput = messages.map((m: any) =>
+                                    `[${new Date(m.created_at).toLocaleString('pt-BR')}] ${m.sender_name || m.sender_number}: ${m.content} ${m.media_type ? `[${m.media_type}]` : ''}`
+                                ).reverse().join('\n');
+                            }
+                        }
+                    }
+
+                    // --- MIGRATE LEGACY COLLECTIONS ---
+                    else if (functionName === 'migrate_legacy_collections') {
+                        toolOutput = await handleMigrateLegacy(supabase, userId, args);
+                    }
+
+                    // --- UPDATE USER SETTINGS ---
+                    else if (functionName === 'update_user_settings') {
+                        const { preferred_name, daily_briefing_enabled, daily_briefing_time, daily_briefing_prompt, ai_name } = args;
+                        const updates: any = {};
+
+                        if (preferred_name) updates.preferred_name = preferred_name;
+                        if (daily_briefing_enabled !== undefined) updates.daily_briefing_enabled = daily_briefing_enabled;
+                        if (daily_briefing_time) updates.daily_briefing_time = daily_briefing_time;
+                        if (args.daily_briefing_prompt !== undefined) updates.daily_briefing_prompt = args.daily_briefing_prompt;
+                        if (args.ai_name !== undefined) updates.ai_name = args.ai_name;
+
+                        if (Object.keys(updates).length > 0) {
+                            const { error } = await supabase
+                                .from('user_settings')
+                                .update(updates)
+                                .eq('user_id', userId);
+
+                            if (error) {
+                                console.error('Error updating settings:', error);
+                                toolOutput = `Erro ao atualizar configurações: ${error.message}`;
+                            } else {
+                                const updatedFields = Object.keys(updates).join(', ');
+                                toolOutput = `Configurações atualizadas com sucesso: ${updatedFields}.`;
+                            }
+                        } else {
+                            toolOutput = "Nenhuma alteração solicitada.";
+                        }
+                    }
+                } catch (error: any) {
+                    console.error(`Error executing ${functionName}: `, error);
+                    toolOutput = `Erro ao executar ferramenta: ${error.message} `;
+                }
+
+                // Add tool result to history
+                messages.push({
+                    role: 'tool',
+                    tool_call_id: toolCall.id,
+                    content: toolOutput
+                });
+            }
+        }
+
+        // --- 🧠 MEMORY LAYER: SAVE AI RESPONSE ---
+        if (finalResponse) {
+            await supabase.from('messages').insert({
+                user_id: userId,
+                role: 'assistant',
+                content: finalResponse,
+                // Metadata for Context
+                is_from_me: true, // AI speaking on behalf of user/system
+                is_group: is_group, // Same context as the incoming message
+                sender_name: aiName,
+                sender_number: userPhoneNumber, // Use user's number as the "sender" identity for AI
+                message_timestamp: new Date().toISOString()
+            });
+            console.log('💾 AI Response saved to history.');
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            response: finalResponse
+        }), {
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+        });
+    } catch (error: any) {
+        console.error('Error processing message:', error);
+        return new Response(
+            JSON.stringify({ success: false, error: error.message }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+    }
+});
+// --- REFACTORED TOOL HANDLERS ---
+
+// --- ENTITY GOVERNANCE ---
+const ALLOWED_ENTITY_TYPES = ['trip', 'project', 'finance_bucket', 'event_list', 'generic'] as const;
+type EntityType = typeof ALLOWED_ENTITY_TYPES[number];
+
+function validateEntity(type: string, metadata: any): { valid: boolean; error?: string } {
+    if (!ALLOWED_ENTITY_TYPES.includes(type as any)) {
+        return {
+            valid: false,
+            error: `❌ ERRO DE GOVERNANÇA: O tipo de entidade '${type}' é inválido. Os tipos permitidos são: ${ALLOWED_ENTITY_TYPES.join(', ')}. Corrija e tente novamente.`
+        };
+    }
+
+    // Type-Specific Validation (Invalid States Unrepresentable)
+    if (type === 'trip') {
+        if (!metadata?.status) {
+            return { valid: false, error: `❌ ERRO DE VALIDAÇÃO: Viagens exigem um 'status' no metadata (planning, confirmed, completed). Ex: metadata: { status: 'planning' }` };
+        }
+    }
+
+    if (type === 'finance_bucket') {
+        if (!metadata?.currency) {
+            return { valid: false, error: `❌ ERRO DE VALIDAÇÃO: Potes financeiros exigem uma 'currency' no metadata (BRL, USD, EUR). Ex: metadata: { currency: 'BRL' }` };
+        }
+    }
+
+    return { valid: true };
+}
+
+async function handleManageCollections(supabase: any, userId: string, args: any): Promise<string> {
+    if (args.action === 'create') {
+        // 1. Validate Entity Type
+        const entityType = args.entity_type || 'generic';
+        const entityMetadata = args.metadata || {};
+
+        const validation = validateEntity(entityType, entityMetadata);

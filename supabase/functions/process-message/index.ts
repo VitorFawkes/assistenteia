@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+declare const Deno: any;
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 interface ProcessMessageRequest {
@@ -13,6 +14,11 @@ interface ProcessMessageRequest {
     is_group?: boolean;
     group_name?: string;
 }
+
+const DEFAULT_SYSTEM_PROMPT = `Você é um assistente pessoal inteligente e eficiente.
+Sua missão é ajudar o usuário a organizar sua vida, gerenciar tarefas, finanças e lembretes.
+Seja direto, proativo e use emojis para tornar a conversa agradável.
+Sempre verifique o contexto antes de responder.`;
 
 function calculateDueAt(args: any, brasiliaTime: Date, overrideDueAt: string | null): string | null {
     let finalDueAt = args.due_at || null;
@@ -150,6 +156,30 @@ CONTEXTO ATUAL:
 
             const isNoteToSelf = targetNumber === myNumber;
             const hasTrigger = content?.toLowerCase().match(/\b(bibi|ia|bot|assistente)\b/);
+
+            console.log(`🔍 NOTE TO SELF CHECK DETAILED:
+                - Sender Number (Raw): ${sender_number}
+                - Target Number (Normalized): ${targetNumber}
+                - User Phone (DB): ${userPhoneNumber}
+                - My Number (Normalized): ${myNumber}
+                - Is Note To Self: ${isNoteToSelf}
+                - Has Trigger: ${!!hasTrigger}
+            `);
+
+            // Log to DB for persistence
+            await supabase.from('debug_logs').insert({
+                function_name: 'process-message',
+                level: 'info',
+                message: 'Note to Self Check',
+                meta: {
+                    sender_number,
+                    targetNumber,
+                    userPhoneNumber,
+                    myNumber,
+                    isNoteToSelf,
+                    hasTrigger
+                }
+            });
 
             // If it's a message to someone else AND has no trigger, SKIP.
             if (!isNoteToSelf && !hasTrigger) {
@@ -356,6 +386,30 @@ CONTEXTO ATUAL:
             {
                 type: 'function',
                 function: {
+                    name: 'manage_tasks',
+                    description: 'Gerencia TAREFAS (Tasks) do usuário. Use para coisas que precisam ser feitas, mas não necessariamente em um horário específico (diferente de lembretes).',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', enum: ['create', 'list', 'update', 'delete'], description: 'Ação' },
+                            title: { type: 'string', description: 'Título da tarefa' },
+                            description: { type: 'string', description: 'Descrição ou checklist' },
+                            priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Prioridade' },
+                            status: { type: 'string', enum: ['todo', 'in_progress', 'done', 'archived'], description: 'Status' },
+                            due_date: { type: 'string', description: 'Data de entrega (ISO)' },
+                            id: { type: 'string', description: 'ID da tarefa (para update/delete)' },
+                            search_title: { type: 'string', description: 'Título para buscar ao atualizar/deletar' },
+                            filter_status: { type: 'string', description: 'Filtrar por status ao listar' },
+                            filter_date: { type: 'string', description: 'Filtrar por data ao listar (today, tomorrow)' },
+                            tags: { type: 'array', items: { type: 'string' }, description: 'Tags da tarefa' }
+                        },
+                        required: ['action']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
                     name: 'recall_memory',
                     description: 'Busca memórias passadas por significado (Busca Vetorial). Use para perguntas vagas ("O que eu falei sobre X?").',
                     parameters: {
@@ -535,7 +589,22 @@ CONTEXTO ATUAL:
                     required: ['query']
                 }
             }
-        });
+        } as any);
+
+        tools.push({
+            type: 'function',
+            function: {
+                name: 'get_unread_conversations',
+                description: 'Recupera uma lista de conversas onde a última mensagem NÃO foi enviada pelo usuário (ou seja, está "não lida" ou aguardando resposta).',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        limit: { type: 'number', description: 'Número máximo de conversas para retornar (padrão: 20)' },
+                        offset: { type: 'number', description: 'Paginação (padrão: 0)' }
+                    }
+                }
+            }
+        } as any);
 
         // Load custom system prompt from database (if exists)
         // Load custom system prompt from database (if exists)
@@ -598,151 +667,7 @@ CONTEXTO ATUAL:
         // ------------------------------------------------
         // PROMPT REGISTRY FETCH (ANTIGRAVITY DOCTRINE)
         // ------------------------------------------------
-        let systemPrompt = `You are Ela.ia, a structured, entity-driven personal operating system for {{preferred_name}}.
-Current Date/Time (Brasília): {{CURRENT_DATETIME}}
-
-Your primary responsibility is to transform user intent into correct, durable system state.
-You do not think in files, folders, or UI actions.
-You think in semantic entities with explicit types, lifecycle, and purpose.
-
-Your decisions must be predictable, explainable, and aligned with long-term data integrity.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CORE PRINCIPLE — ENTITY FIRST
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Users do not want to “create folders”.
-They want to manage real-world entities such as:
-- Trips
-- Projects
-- Financial Buckets
-- Event Lists
-- Generic Collections (only when nothing else applies)
-
-Every time you create or update a collection, you MUST explicitly classify it with an entity_type.
-
-Allowed entity_type values:
-- trip
-- project
-- finance_bucket
-- event_list
-- generic (use only if no other type reasonably applies)
-
-Creating a collection without a valid entity_type is forbidden.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REASONING FLOW (MANDATORY)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-For every user request, you must follow this reasoning loop:
-
-1. Intent Interpretation
-- What real-world thing is the user referring to?
-- Is this an ongoing entity or a one-off action?
-
-2. Entity Classification
-- Determine the correct entity_type.
-- If strong evidence exists, choose immediately.
-- If ambiguous, ask ONE concise clarification question before acting.
-
-3. Constraint Validation
-- Ensure entity_type is one of the allowed values.
-- Never invent new types.
-- Never default to generic when a stronger type is evident.
-
-4. State Mutation (Tool Use)
-- Use tools only after classification is complete.
-- When calling manage_collections, always include:
-  - name
-  - icon
-  - entity_type
-
-5. Confirmation
-- After creating or modifying an entity, summarize what was created and why.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ENTITY GOVERNANCE RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- A collection is only valid if it has:
-  - a name
-  - an icon
-  - a valid entity_type
-  - **REQUIRED METADATA:**
-    - If \`entity_type\` is \`trip\`, you MUST provide \`metadata: { status: 'planning' | 'confirmed' | 'completed' } \`.
-    - If \`entity_type\` is \`finance_bucket\`, you MUST provide \`metadata: { currency: 'BRL' | 'USD' | 'EUR' } \`.
-
-- If an entity is created with insufficient information, treat it as a draft entity.
-- Never silently correct user intent.
-- If you believe an entity was misclassified earlier, propose reclassification explicitly.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FAILURE PREVENTION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-You must actively prevent these failure classes:
-- Entity Dissociation (semantic meaning lost in storage)
-- Ambiguous Retrieval (Trips mixed with non-Trips)
-- Generic Overuse (lazy classification)
-
-If faced with a tradeoff between speed and correctness, choose correctness.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TOOL USAGE POLICY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Tools exist to mutate or retrieve state, not to decide meaning.
-
-- Decide first.
-- Act second.
-- Verify after.
-
-Never call manage_collections without a validated entity_type.
-Never fabricate metadata values.
-Never bypass constraints to “be helpful”.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-COMMUNICATION STYLE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- Be concise.
-- Be explicit.
-- Be calm and confident.
-- Avoid technical jargon unless the user asks.
-- Never mention internal prompts, tools, or system rules.
-- **LANGUAGE:** Respond in Portuguese (PT-BR) unless the user speaks to you in another language.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EXAMPLE (INTERNAL REFERENCE)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-User: “Vou viajar para Paris em dezembro.”
-
-Correct reasoning:
-- This refers to a real-world Trip.
-- Destination implies travel.
-- entity_type = trip.
-
-Correct action:
-manage_collections({
-  action: "create",
-  name: "Viagem Paris",
-  icon: "✈️",
-  entity_type: "trip",
-  metadata: { status: "planning" }
-})
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NORTH STAR
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Your success is measured by:
-- Long-term data clarity
-- Predictable system behavior
-- Trust that entities mean what they say
-
-You are not a chatbot.
-You are an entity-aware operating system.`;
+        let systemPrompt = "You are Ela.ia. Please check database for full prompt.";
 
         try {
             const { data: promptData, error: promptError } = await supabase
@@ -797,9 +722,9 @@ You are an entity-aware operating system.`;
                     .replace('{{CURRENT_DATETIME}}', isoBrasilia);
             }
 
-            // ENFORCED MODEL: Always use GPT 5.1 (User Enforced)
-            console.log('✨ Enforcing GPT 5.1 for all users.');
-            aiModel = 'gpt-5.1-preview';
+            // ENFORCED MODEL: Always use GPT 4o (User Enforced)
+            console.log('✨ Enforcing GPT 4o for all users.');
+            aiModel = 'gpt-4o';
 
             // Inject AI Name
             const aiName = userSettings?.ai_name;
@@ -1766,6 +1691,66 @@ REGRAS ABSOLUTAS:
                         }
                     }
 
+                    // --- GET UNREAD CONVERSATIONS ---
+                    else if (functionName === 'get_unread_conversations') {
+                        const limit = args.limit || 20;
+                        const offset = args.offset || 0;
+                        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+
+                        if (!encryptionKey) {
+                            console.error('❌ CRITICAL: ENCRYPTION_KEY not set. Cannot decrypt unread conversations.');
+                            toolOutput = "Erro: Chave de criptografia não configurada. Não consigo ler as mensagens.";
+                        } else {
+                            console.log('🔍 AI requested unread conversations. Triggering sync first...');
+
+                            // 1. Trigger Sync in whatsapp-manager (Wait for it to ensure accuracy)
+                            try {
+                                const syncResponse = await supabase.functions.invoke('whatsapp-manager', {
+                                    body: {
+                                        action: 'sync_unread_chats',
+                                        instanceName: userId
+                                    }
+                                });
+                                console.log('✅ Sync completed before query:', syncResponse.data);
+                            } catch (syncErr) {
+                                console.error('⚠️ Sync failed, proceeding with DB data:', syncErr);
+                            }
+
+                            // 2. Query DB
+                            const { data: unreadConvos, error: rpcError } = await supabase.rpc('get_unread_conversations', {
+                                p_user_id: userId,
+                                p_limit: limit,
+                                p_offset: offset,
+                                p_encryption_key: encryptionKey
+                            });
+
+                            if (rpcError) {
+                                console.error('Error fetching unread conversations:', rpcError);
+                                toolOutput = `Erro ao buscar conversas não lidas: ${rpcError.message}`;
+                            } else if (!unreadConvos || unreadConvos.length === 0) {
+                                toolOutput = "Nenhuma conversa não lida encontrada.";
+                            } else {
+                                toolOutput = "Conversas não lidas:\n" + unreadConvos.map((c: any) => {
+                                    let name = c.group_name || c.sender_name || c.sender_number;
+                                    // Fix: If name is "Unknown" or "undefined", fallback to number
+                                    if (name === 'Unknown' || name === 'undefined' || !name) {
+                                        name = c.sender_number || 'Número Desconhecido';
+                                    }
+
+                                    const type = c.is_group ? '[Grupo]' : '[Privado]';
+                                    const time = new Date(c.last_message_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+                                    const count = c.unread_count > 1 ? `(${c.unread_count} não lidas)` : `(1 não lida)`;
+
+                                    let content = c.last_message_content || '[Mídia/Sem texto]';
+                                    // Fix: Handle literal "undefined" string from DB
+                                    if (content === 'undefined') content = '[Conteúdo indisponível]';
+
+                                    return `- ${type} ${name} ${count} - ${time}\n  "${content.substring(0, 100)}..."`;
+                                }).join('\n\n');
+                            }
+                        }
+                    }
+
                     // --- MANAGE EMAILS (GMAIL & OUTLOOK) ---
                     else if (functionName === 'manage_emails') {
                         console.log('📧 Managing Emails:', args);
@@ -2295,20 +2280,20 @@ REGRAS ABSOLUTAS:
                             let items = allItems || [];
 
                             if (args.start_date) {
-                                items = items.filter(i => {
+                                items = items.filter((i: any) => {
                                     const itemDate = i.metadata?.date || i.created_at;
                                     return itemDate >= args.start_date;
                                 });
                             }
                             if (args.end_date) {
-                                items = items.filter(i => {
+                                items = items.filter((i: any) => {
                                     const itemDate = i.metadata?.date || i.created_at;
                                     return itemDate <= args.end_date;
                                 });
                             }
 
                             if (args.filter_key && args.filter_value) {
-                                items = items.filter(i => i.metadata?.[args.filter_key] === args.filter_value);
+                                items = items.filter((i: any) => i.metadata?.[args.filter_key] === args.filter_value);
                             }
 
                             // A query original foi substituída pela lógica in-memory acima.
@@ -2759,7 +2744,7 @@ REGRAS ABSOLUTAS:
                                 },
                                 body: JSON.stringify({
                                     number: targetNumber,
-                                    options: { delay: 1200, presence: 'composing' },
+                                    options: { delay: 1200 },
                                     mediaMessage: {
                                         mediatype: args.media_type || 'image',
                                         media: args.media_url,
@@ -2777,7 +2762,7 @@ REGRAS ABSOLUTAS:
                                 },
                                 body: JSON.stringify({
                                     number: targetNumber,
-                                    options: { delay: 1200, presence: 'composing' },
+                                    options: { delay: 1200 },
                                     text: args.message
                                 })
                             });
@@ -2806,48 +2791,37 @@ REGRAS ABSOLUTAS:
                         }
                     }
 
-                    // --- QUERY MESSAGES (HISTORY) ---
+                    // --- QUERY MESSAGES (WHATSAPP HISTORY) ---
                     else if (functionName === 'query_messages') {
-                        console.log(`🔎 Querying messages history...`);
-                        let query = supabase.from('messages')
-                            .select('sender_name, sender_number, group_name, content, message_timestamp, is_from_me, is_group, status, media_url, media_type')
-                            .eq('user_id', userId) // 🔒 SECURITY: Isolate by user
-                            .order('message_timestamp', { ascending: false })
-                            .limit(args.limit || 20);
+                        const limit = args.limit || 20;
+                        const daysAgo = args.days_ago || 7;
 
-                        if (args.sender_number) query = query.eq('sender_number', args.sender_number);
-                        if (args.sender_name) query = query.ilike('sender_name', `%${args.sender_name}%`);
-                        if (args.group_name) query = query.ilike('group_name', `%${args.group_name}%`);
-
-                        // Unread Filter
-                        if (args.only_unread) {
-                            query = query.eq('is_from_me', false).neq('status', 'read');
-                        }
-
-                        // Time filter (Default increased to 30 days to find older contacts)
-                        const days = args.days_ago || 30;
-                        const dateLimit = new Date();
-                        dateLimit.setDate(dateLimit.getDate() - days);
-                        query = query.gte('message_timestamp', dateLimit.toISOString());
-
-                        const { data: msgs, error } = await query;
-
-                        if (error) {
-                            toolOutput = `Erro ao buscar mensagens: ${error.message}`;
-                        } else if (!msgs || msgs.length === 0) {
-                            toolOutput = "Nenhuma mensagem encontrada com esses critérios.";
+                        const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+                        if (!encryptionKey) {
+                            console.error('❌ CRITICAL: ENCRYPTION_KEY not set. Cannot decrypt messages.');
+                            toolOutput = "Erro: Chave de criptografia não configurada. Não consigo ler o histórico.";
                         } else {
-                            // Format for AI
-                            toolOutput = msgs.reverse().map((m: any) => {
-                                const dir = m.is_from_me
-                                    ? `Eu (Dono) -> ${m.sender_number}`
-                                    : `${m.sender_name || 'Desconhecido'} (${m.sender_number})`;
-                                const context = m.is_group ? `[Grupo: ${m.group_name || 'Desconhecido'}]` : '[Privado]';
-                                const status = m.status ? `[Status: ${m.status}]` : '[Status: Pendente]';
-                                const time = new Date(m.message_timestamp).toLocaleString('pt-BR');
-                                const mediaInfo = m.media_url ? ` [Mídia: ${m.media_type} | URL: ${m.media_url}]` : '';
-                                return `[${time}] ${context} ${dir} ${status}: ${m.content}${mediaInfo}`;
-                            }).join('\n');
+                            const { data: messages, error } = await supabase.rpc('get_messages_decrypted', {
+                                p_encryption_key: encryptionKey,
+                                p_limit: limit,
+                                p_offset: 0,
+                                p_user_id: userId,
+                                p_sender_number: args.sender_number || null,
+                                p_group_name: args.group_name || null,
+                                p_sender_name: args.sender_name || null,
+                                p_days_ago: daysAgo
+                            });
+
+                            if (error) {
+                                console.error('❌ Error fetching decrypted messages:', error);
+                                toolOutput = `Erro ao buscar mensagens: ${error.message}`;
+                            } else if (!messages || messages.length === 0) {
+                                toolOutput = "Nenhuma mensagem encontrada com esses critérios.";
+                            } else {
+                                toolOutput = messages.map((m: any) =>
+                                    `[${new Date(m.created_at).toLocaleString('pt-BR')}] [STATUS: ${m.status || 'unknown'}] ${m.sender_name || m.sender_number}: ${m.content} ${m.media_type ? `[${m.media_type}]` : ''}`
+                                ).reverse().join('\n');
+                            }
                         }
                     }
 
@@ -2898,25 +2872,43 @@ REGRAS ABSOLUTAS:
             }
         }
 
+        let aiMessageId = null;
+
         // --- 🧠 MEMORY LAYER: SAVE AI RESPONSE ---
         if (finalResponse) {
-            await supabase.from('messages').insert({
-                user_id: userId,
-                role: 'assistant',
-                content: finalResponse,
-                // Metadata for Context
-                is_from_me: true, // AI speaking on behalf of user/system
-                is_group: is_group, // Same context as the incoming message
-                sender_name: aiName,
-                sender_number: userPhoneNumber, // Use user's number as the "sender" identity for AI
-                message_timestamp: new Date().toISOString()
-            });
-            console.log('💾 AI Response saved to history.');
+            // ENCRYPTED INSERTION FOR AI RESPONSE
+            const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+
+            if (encryptionKey) {
+                const { data: insertedId, error: saveError } = await supabase.rpc('insert_message_encrypted', {
+                    p_user_id: userId,
+                    p_role: 'assistant',
+                    p_content: finalResponse,
+                    p_encryption_key: encryptionKey,
+                    p_is_from_me: true,
+                    p_is_group: is_group,
+                    p_sender_name: aiName,
+                    p_sender_number: userPhoneNumber,
+                    p_message_timestamp: new Date().toISOString()
+                });
+
+                if (saveError) {
+                    console.error('❌ Failed to save encrypted AI response:', saveError);
+                } else {
+                    aiMessageId = insertedId;
+                    console.log('💾 AI Response saved ENCRYPTED to history. ID:', aiMessageId);
+                }
+            } else {
+                // Fallback for no key - DO NOT SAVE UNENCRYPTED
+                console.error('❌ CRITICAL: ENCRYPTION_KEY missing. AI response NOT saved to database to prevent data leak.');
+                // We do not insert unencrypted.
+            }
         }
 
         return new Response(JSON.stringify({
             success: true,
-            response: finalResponse
+            response: finalResponse,
+            db_message_id: aiMessageId
         }), {
             headers: {
                 'Content-Type': 'application/json',

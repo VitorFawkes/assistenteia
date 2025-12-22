@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import MobileNav from './MobileNav';
 import { supabase } from '../lib/supabase';
 import { ElaLogo } from './ElaLogo';
+import { Toaster } from 'sonner';
 
 export default function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -73,7 +74,7 @@ export default function Layout() {
                     </div>
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 hover:bg-gray-100 text-gray-500 rounded-lg transition-colors"
+                        className="p-2 hover:bg-gray-50 text-ela-sub rounded-lg transition-colors"
                     >
                         <Menu size={20} />
                     </button>
@@ -86,10 +87,10 @@ export default function Layout() {
                             to={item.path}
                             className={({ isActive }) =>
                                 clsx(
-                                    "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group",
+                                    "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative",
                                     isActive
-                                        ? "bg-ela-pink-light text-ela-pink font-semibold"
-                                        : "text-ela-sub hover:bg-gray-100 hover:text-ela-pink"
+                                        ? "bg-ela-pink-light text-ela-pink font-semibold shadow-sm"
+                                        : "text-ela-sub hover:bg-gray-50 hover:text-ela-pink"
                                 )
                             }
                         >
@@ -99,7 +100,7 @@ export default function Layout() {
                             </span>
                             {/* Tooltip for collapsed state */}
                             {!isSidebarOpen && (
-                                <div className="absolute left-16 bg-white text-gray-800 px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap border border-gray-200 shadow-sm">
+                                <div className="absolute left-16 bg-white text-ela-text px-3 py-1.5 rounded-lg text-sm opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap border border-ela-border shadow-lg">
                                     {item.label}
                                 </div>
                             )}
@@ -114,8 +115,8 @@ export default function Layout() {
                             clsx(
                                 "flex items-center gap-3 p-3 rounded-xl w-full transition-colors",
                                 isActive
-                                    ? "bg-gray-100 text-ela-pink"
-                                    : "text-ela-sub hover:text-ela-pink hover:bg-gray-100"
+                                    ? "bg-ela-pink-light text-ela-pink font-semibold shadow-sm"
+                                    : "text-ela-sub hover:text-ela-pink hover:bg-gray-50"
                             )
                         }
                     >
@@ -124,7 +125,7 @@ export default function Layout() {
                     </NavLink>
                     <button
                         onClick={signOut}
-                        className="flex items-center gap-3 p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl w-full transition-colors"
+                        className="flex items-center gap-3 p-3 text-ela-sub hover:text-red-500 hover:bg-red-50 rounded-xl w-full transition-colors"
                     >
                         <LogOut size={24} />
                         <span className={clsx("font-medium whitespace-nowrap", !isSidebarOpen && "hidden")}>Sair</span>
@@ -135,11 +136,11 @@ export default function Layout() {
             {/* Main Content */}
             <main className="flex-1 overflow-y-auto relative flex flex-col pb-24 md:pb-0">
                 {/* Mobile Header */}
-                <div className="md:hidden p-4 border-b border-gray-200 bg-white/90 backdrop-blur flex items-center justify-between sticky top-0 z-20">
+                <div className="md:hidden p-4 border-b border-ela-border bg-white/90 backdrop-blur flex items-center justify-between sticky top-0 z-20">
                     <ElaLogo />
                     <button
                         onClick={signOut}
-                        className="p-2 text-gray-400 hover:text-red-500"
+                        className="p-2 text-ela-sub hover:text-red-500"
                     >
                         <LogOut size={20} />
                     </button>
@@ -150,6 +151,7 @@ export default function Layout() {
 
             {/* Mobile Navigation */}
             <MobileNav />
+            <Toaster position="top-right" richColors />
         </div>
     );
 }

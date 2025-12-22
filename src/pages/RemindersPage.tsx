@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { useRealtimeSubscription, notifyAIAction } from '../hooks/useRealtimeSubscription';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -47,6 +48,20 @@ export default function RemindersPage() {
             fetchReminders();
         }
     }, [user]);
+
+    // --- REALTIME SUBSCRIPTION ---
+    useRealtimeSubscription({ table: 'reminders' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+            if (payload.new.user_id === user?.id) {
+                setReminders(prev => [...prev, payload.new]);
+                notifyAIAction(`Novo lembrete: ${payload.new.title}`);
+            }
+        } else if (payload.eventType === 'UPDATE') {
+            setReminders(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
+        } else if (payload.eventType === 'DELETE') {
+            setReminders(prev => prev.filter(r => r.id !== payload.old.id));
+        }
+    });
 
     // ... fetchReminders ...
 

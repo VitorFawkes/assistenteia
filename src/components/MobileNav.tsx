@@ -37,7 +37,7 @@ export default function MobileNav() {
     }
 
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 z-50 safe-area-bottom">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-ela-border z-50 safe-area-bottom">
             <div className="flex justify-around items-center py-2 px-1 overflow-x-auto">
                 {navItems.map((item) => (
                     <NavLink
@@ -48,7 +48,7 @@ export default function MobileNav() {
                                 "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-[64px]",
                                 isActive
                                     ? "text-ela-pink"
-                                    : "text-gray-400 hover:text-gray-600"
+                                    : "text-ela-sub hover:text-ela-text"
                             )
                         }
                     >

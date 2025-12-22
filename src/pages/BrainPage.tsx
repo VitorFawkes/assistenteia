@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Brain, Trash2, Search, Clock, Plus, Check, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import EmptyState from '../components/EmptyState';
 
 export function BrainPage() {
     const { user } = useAuth();
@@ -160,15 +161,12 @@ export function BrainPage() {
                         {activeTab === 'monitors' && (
                             <div className="space-y-4">
                                 {monitors.length === 0 ? (
-                                    <div className="text-center py-12 bg-white rounded-xl border border-ela-border shadow-sm">
-                                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <Eye className="w-6 h-6 text-gray-400" />
-                                        </div>
-                                        <p className="text-ela-text font-medium">Nenhum monitor ativo</p>
-                                        <p className="text-sm text-ela-sub mt-2 max-w-md mx-auto">
-                                            Peça para a IA: "Me avise quando falarem sobre 'planilha' no grupo 'Família'" ou "Monitore a palavra 'urgente'".
-                                        </p>
-                                    </div>
+                                    <EmptyState
+                                        icon={Eye}
+                                        title="Nenhum monitor ativo"
+                                        description="Posso ficar de olho em palavras-chave nos seus grupos e te avisar quando algo importante for mencionado."
+                                        exampleCommand="Me avise quando falarem 'urgente' no grupo da Família"
+                                    />
                                 ) : (
                                     <div className="grid gap-4">
                                         {monitors.map(monitor => (
@@ -251,9 +249,12 @@ export function BrainPage() {
                                 {/* Rules List */}
                                 <div className="space-y-4">
                                     {rules.length === 0 ? (
-                                        <div className="text-center py-12 bg-white rounded-xl border border-ela-border shadow-sm">
-                                            <p className="text-ela-sub">Nenhuma regra definida ainda.</p>
-                                        </div>
+                                        <EmptyState
+                                            icon={Brain}
+                                            title="Sem regras definidas"
+                                            description="As regras me ajudam a entender suas preferências. Você pode criar regras aqui ou pedir direto no chat."
+                                            exampleCommand="Crie uma regra: Sempre me chame de Senhor"
+                                        />
                                     ) : (
                                         rules.map(rule => (
                                             <div key={rule.id} className="bg-white p-4 rounded-xl border border-ela-border group hover:border-ela-pink/50 transition-colors shadow-sm">
@@ -290,9 +291,12 @@ export function BrainPage() {
 
                                 <div className="space-y-4">
                                     {filteredMemories.length === 0 ? (
-                                        <div className="text-center py-12">
-                                            <p className="text-ela-sub">Nenhuma memória encontrada.</p>
-                                        </div>
+                                        <EmptyState
+                                            icon={Brain}
+                                            title="Nenhuma memória encontrada"
+                                            description="Eu guardo automaticamente informações importantes que você me conta. Tente me ensinar algo novo."
+                                            exampleCommand="Lembre-se que o código do portão é 1234"
+                                        />
                                     ) : (
                                         filteredMemories.map(memory => (
                                             <div key={memory.id} className="bg-white p-4 rounded-xl border border-ela-border group hover:border-ela-pink/50 transition-colors shadow-sm">

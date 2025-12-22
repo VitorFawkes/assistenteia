@@ -1,0 +1,500 @@
+                                    toolOutput = "Erro: Item da lista não encontrado para atualização.";
+                                } else if (items.length > 1) {
+                                    const options = items.map((i: any) => `- ${i.content}`).join('\n');
+                                    toolOutput = `Múltiplos itens parecidos. Qual atualizar?\n${options}`;
+                                } else {
+                                    const targetItem = items[0];
+                                    const newMetadata = { ...targetItem.metadata };
+                                    if (args.quantity) newMetadata.quantity = args.quantity;
+                                    if (args.category) newMetadata.category = args.category;
+                                    if (args.checked !== undefined) newMetadata.checked = args.checked;
+                                    if (args.notes) newMetadata.notes = args.notes;
+
+                                    await supabase.from('collection_items').update({
+                                        content: args.new_content || targetItem.content,
+                                        metadata: newMetadata
+                                    }).eq('id', targetItem.id);
+                                    toolOutput = "Item da lista atualizado com sucesso.";
+                                }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE ITEMS (LEGACY/GENERIC) ---
+                    else if (functionName === 'manage_items') {
+                        // 🛡️ SECURITY & SPECIALIZATION CHECK (STRICT MODE)
+                        // Força a IA a usar as ferramentas corretas para dados sensíveis ou estruturados
+                        if (args.metadata) {
+                            if (args.metadata.password || args.metadata.username) {
+                                throw new Error("FORBIDDEN: You are trying to save CREDENTIALS using the generic 'manage_items' tool. You MUST use 'manage_credentials' for security.");
+                            }
+                            if (args.metadata.amount) {
+                                throw new Error("FORBIDDEN: You are trying to save FINANCIAL data using 'manage_items'. You MUST use 'manage_financials' to ensure correct calculations.");
+                            }
+                        }
+                        if (args.items && Array.isArray(args.items)) {
+                            for (const item of args.items) {
+                                if (item.metadata?.password || item.metadata?.username) {
+                                    throw new Error("FORBIDDEN: You are trying to save CREDENTIALS using 'manage_items'. Use 'manage_credentials'.");
+                                }
+                                if (item.metadata?.amount) {
+                                    throw new Error("FORBIDDEN: You are trying to save FINANCIAL data using 'manage_items'. Use 'manage_financials'.");
+                                }
+                            }
+                        }
+                        // Buscar coleção ID
+                        const { data: coll } = await supabase.from('collections').select('id').eq('user_id', userId).eq('name', args.collection_name).maybeSingle();
+
+                        if (!coll) {
+                            // Se não achar, tenta criar automaticamente (comportamento proativo)
+                            const { data: newColl, error: createError } = await supabase.from('collections').insert({
+                                user_id: userId,
+                                name: args.collection_name,
+                                icon: '📁'
+                            }).select().single();
+
+                            if (createError || !newColl) {
+                                toolOutput = `Erro: Não foi possível criar a pasta "${args.collection_name}".`;
+                            } else {
+                                // Agora adiciona o item (ou ITENS) na pasta nova
+
+                                // BATCH MODE FOR NEW COLLECTION
+                                if (args.items && Array.isArray(args.items) && args.items.length > 0) {
+                                    const itemsToInsert = args.items.map((item: any) => ({
+                                        collection_id: newColl.id,
+                                        user_id: userId,
+                                        type: item.metadata?.type || 'text',
+                                        content: item.content || 'Item sem nome',
+                                        media_url: null, // Batch doesn't support media yet for simplicity
+                                        metadata: item.metadata ? {
+                                            ...item.metadata,
+                                            amount: item.metadata.amount ? Number(item.metadata.amount) : undefined
+                                        } : null
+                                    }));
+
+                                    const { error: batchError } = await supabase.from('collection_items').insert(itemsToInsert);
+                                    if (batchError) {
+                                        toolOutput = `Pasta criada, mas erro ao adicionar itens: ${batchError.message}`;
+                                    } else {
+                                        toolOutput = `Pasta "${args.collection_name}" criada e ${args.items.length} itens adicionados.`;
+                                    }
+
+                                } else {
+                                    // SINGLE MODE FOR NEW COLLECTION
+                                    const { error: insertError } = await supabase.from('collection_items').insert({
+                                        collection_id: newColl.id,
+                                        user_id: userId, // Adicionado user_id explicitamente
+                                        type: args.type || 'text',
+                                        content: args.content || null,
+                                        media_url: args.media_url || mediaUrl || null,
+                                        metadata: args.metadata ? {
+                                            ...args.metadata,
+                                            amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                        } : null,
+                                    });
+
+                                    if (insertError) {
+                                        console.error('❌ Error inserting item into NEW collection:', insertError);
+                                        toolOutput = `Erro ao salvar item na nova pasta: ${insertError.message} `;
+                                    } else {
+                                        console.log(`✅ Item inserted into NEW collection ${newColl.id} `);
+                                        toolOutput = `Pasta "${args.collection_name}" criada automaticamente e item adicionado com sucesso.`;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Coleção existe
+                            if (args.action === 'list') {
+                                const { data: items } = await supabase.from('collection_items').select('*').eq('collection_id', coll.id).order('created_at', { ascending: false }).limit(20);
+                                toolOutput = `Itens na pasta "${args.collection_name}":\n${items?.map((i: any) => `- ${i.content} (${JSON.stringify(i.metadata)})`).join('\n') || 'Vazia'}`;
+                            }
+                            else if (args.action === 'add') {
+                                // BATCH MODE SUPPORT
+                                if (args.items && Array.isArray(args.items) && args.items.length > 0) {
+                                    console.log(`🚀 BATCH ADD: ${args.items.length} items to ${args.collection_name}`);
+
+                                    const itemsToInsert = args.items.map((item: any) => ({
+                                        collection_id: coll.id,
+                                        user_id: userId,
+                                        type: item.metadata?.type || 'text',
+                                        content: item.content || 'Item sem nome',
+                                        media_url: null, // Batch doesn't support media yet for simplicity
+                                        metadata: item.metadata ? {
+                                            ...item.metadata,
+                                            amount: item.metadata.amount ? Number(item.metadata.amount) : undefined
+                                        } : null
+                                    }));
+
+                                    const { error: batchError } = await supabase.from('collection_items').insert(itemsToInsert);
+
+                                    if (batchError) {
+                                        console.error('❌ Error in batch insert:', batchError);
+                                        toolOutput = `Erro ao adicionar itens em lote: ${batchError.message}`;
+                                    } else {
+                                        toolOutput = `${args.items.length} itens adicionados com sucesso na pasta "${args.collection_name}".`;
+                                    }
+
+                                } else {
+                                    // SINGLE ITEM MODE (Legacy)
+                                    const { error: insertError } = await supabase.from('collection_items').insert({
+                                        collection_id: coll.id,
+                                        user_id: userId, // Adicionado user_id explicitamente
+                                        type: args.type || 'text',
+                                        content: args.content || null,
+                                        media_url: args.media_url || mediaUrl || null,
+                                        metadata: args.metadata ? {
+                                            ...args.metadata,
+                                            amount: args.metadata.amount ? Number(args.metadata.amount) : undefined
+                                        } : null,
+                                    });
+
+                                    if (insertError) {
+                                        console.error('❌ Error inserting item into EXISTING collection:', insertError);
+                                        toolOutput = `Erro ao salvar item: ${insertError.message} `;
+                                    } else {
+                                        console.log(`✅ Item inserted into EXISTING collection ${coll.id} `);
+                                        toolOutput = `Item adicionado na pasta "${args.collection_name}".`;
+                                    }
+                                }
+                            }
+                            else if (args.action === 'update' || args.action === 'delete') {
+                                // Lógica de busca para encontrar o item
+                                let query = supabase.from('collection_items').select('id, content, metadata').eq('collection_id', coll.id);
+
+                                const searchTerm = args.search_content || args.content;
+                                if (searchTerm) query = query.ilike('content', `%${searchTerm}%`);
+                                if (args.search_metadata_key && args.search_metadata_value) {
+                                    query = query.eq(`metadata ->> ${args.search_metadata_key} `, args.search_metadata_value);
+                                }
+
+                                // SMART LOGIC: Fetch candidates to handle ambiguity
+                                const { data: items } = await query.limit(5);
+
+                                let targetItem = null;
+
+                                if (!items || items.length === 0) {
+                                    toolOutput = `Erro: Não encontrei nenhum item correspondente na pasta "${args.collection_name}".`;
+                                } else if (items.length > 1) {
+                                    // Ambiguity detected
+                                    const options = items.map((i: any) => `- ${i.content} (ID: ${i.id})`).join('\n');
+                                    toolOutput = `Encontrei múltiplos itens parecidos. Qual deles você quer ${args.action === 'delete' ? 'apagar' : 'alterar'}?\n${options}\n\nPor favor, seja mais específico.`;
+                                } else {
+                                    // Single match found
+                                    targetItem = items[0];
+
+                                    if (args.action === 'delete') {
+                                        await supabase.from('collection_items').delete().eq('id', targetItem.id);
+                                        toolOutput = `Item apagado da pasta "${args.collection_name}".`;
+                                    } else {
+                                        let newContent = args.content || targetItem.content;
+                                        if (args.should_append && args.content) {
+                                            newContent = `${targetItem.content}\n${args.content}`;
+                                        }
+
+                                        await supabase.from('collection_items').update({
+                                            content: newContent,
+                                            metadata: args.metadata ? {
+                                                ...targetItem.metadata,
+                                                ...args.metadata,
+                                                amount: args.metadata.amount ? Number(args.metadata.amount) : (targetItem.metadata?.amount || undefined)
+                                            } : targetItem.metadata
+                                        }).eq('id', targetItem.id);
+                                        toolOutput = `Item atualizado na pasta "${args.collection_name}".`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- MANAGE MONITORS (NEW) ---
+                    else if (functionName === 'manage_monitors') {
+                        if (args.action === 'create') {
+                            if (!args.keyword) {
+                                toolOutput = "Erro: 'keyword' é obrigatório para criar um monitor.";
+                            } else {
+                                const { error } = await supabase.from('monitors').insert({
+                                    user_id: userId,
+                                    keyword: args.keyword,
+                                    chat_name: args.chat_name || null,
+                                    frequency: args.frequency || 'ask'
+                                });
+                                if (error) toolOutput = `Erro ao criar monitor: ${error.message}`;
+                                else toolOutput = `Monitor criado! Vou te avisar se encontrar "${args.keyword}" ${args.chat_name ? `em "${args.chat_name}"` : "em qualquer conversa"}.`;
+                            }
+                        } else if (args.action === 'list') {
+                            const { data } = await supabase.from('monitors').select('*').eq('user_id', userId).eq('is_active', true);
+                            if (!data || data.length === 0) toolOutput = "Nenhum monitor ativo no momento.";
+                            else toolOutput = "Monitores Ativos:\n" + data.map((m: any) => `- "${m.keyword}" (${m.chat_name || 'Todos'}) [${m.frequency}]`).join('\n');
+                        } else if (args.action === 'delete') {
+                            // Delete by keyword match
+                            const { error } = await supabase.from('monitors').delete().eq('user_id', userId).ilike('keyword', `%${args.keyword}%`);
+                            if (error) toolOutput = `Erro ao apagar monitor: ${error.message}`;
+                            else toolOutput = "Monitor removido.";
+                        }
+                    }
+
+                    // --- MANAGE RULES ---
+                    else if (functionName === 'manage_rules') {
+                        console.log('rules manager called', args);
+                        if (args.action === 'create') {
+                            if (!args.key || !args.value) {
+                                toolOutput = "Erro: 'key' e 'value' são obrigatórios para criar uma regra.";
+                            } else {
+                                const { error } = await supabase.from('user_preferences').insert({
+                                    user_id: userId,
+                                    key: args.key,
+                                    value: args.value
+                                });
+                                if (error) {
+                                    console.error('Error creating rule:', error);
+                                    toolOutput = `Erro ao criar regra: ${error.message}`;
+                                } else {
+                                    toolOutput = `Regra criada: [${args.key}] ${args.value}`;
+                                }
+                            }
+                        } else if (args.action === 'delete') {
+                            if (!args.id && !args.key) {
+                                toolOutput = "Erro: Forneça o ID da regra ou o 'key' para deletar.";
+                            } else {
+                                let query = supabase.from('user_preferences').delete().eq('user_id', userId);
+
+                                if (args.id) {
+                                    query = query.eq('id', args.id);
+                                } else if (args.key) {
+                                    query = query.eq('key', args.key);
+                                }
+
+                                const { error } = await query;
+                                if (error) {
+                                    console.error('Error deleting rule:', error);
+                                    toolOutput = `Erro ao deletar regra: ${error.message}`;
+                                } else {
+                                    toolOutput = "Regra(s) removida(s) com sucesso.";
+                                }
+                            }
+                        } else if (args.action === 'list') {
+                            const { data } = await supabase.from('user_preferences').select('*').eq('user_id', userId);
+                            if (data && data.length > 0) {
+                                toolOutput = "Regras Atuais:\n" + data.map((r: any) => `ID: ${r.id} | [${r.key}]: ${r.value}`).join('\n');
+                            } else {
+                                toolOutput = "Nenhuma regra definida.";
+                            }
+                        }
+                    }
+
+                    // --- GET UNREAD CONVERSATIONS ---
+                    else if (functionName === 'get_unread_conversations') {
+                        const limit = args.limit || 20;
+                        const offset = args.offset || 0;
+
+                        const { data: unreadConvos, error: rpcError } = await supabase.rpc('get_unread_conversations', {
+                            p_user_id: userId,
+                            p_limit: limit,
+                            p_offset: offset
+                        });
+
+                        if (rpcError) {
+                            console.error('Error fetching unread conversations:', rpcError);
+                            toolOutput = `Erro ao buscar conversas não lidas: ${rpcError.message}`;
+                        } else if (!unreadConvos || unreadConvos.length === 0) {
+                            toolOutput = "Nenhuma conversa não lida encontrada.";
+                        } else {
+                            toolOutput = "Conversas não lidas:\n" + unreadConvos.map((c: any) => {
+                                const name = c.group_name || c.sender_name || c.sender_number;
+                                const type = c.is_group ? '[Grupo]' : '[Privado]';
+                                const time = new Date(c.last_message_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+                                return `- ${type} ${name}: "${c.last_message_content?.substring(0, 50)}..." (${time})`;
+                            }).join('\n');
+                        }
+                    }
+
+                    // --- MANAGE EMAILS (GMAIL & OUTLOOK) ---
+                    else if (functionName === 'manage_emails') {
+                        console.log('📧 Managing Emails:', args);
+                        const targetProvider = args.provider || 'all';
+                        const providersToFetch = targetProvider === 'all' ? ['google', 'microsoft'] : [targetProvider];
+
+                        const { data: integrations } = await supabase
+                            .from('user_integrations')
+                            .select('*')
+                            .eq('user_id', userId)
+                            .in('provider', providersToFetch);
+
+                        if (!integrations || integrations.length === 0) {
+                            toolOutput = "Nenhuma conta de email conectada para o provedor solicitado. Por favor, conecte suas contas nas configurações.";
+                        } else {
+                            const results = [];
+
+                            for (const integration of integrations) {
+                                try {
+                                    let accessToken = integration.access_token;
+                                    const expiresAt = new Date(integration.expires_at);
+                                    const now = new Date();
+                                    const isGoogle = integration.provider === 'google';
+                                    const isMicrosoft = integration.provider === 'microsoft';
+
+                                    // --- REFRESH TOKEN LOGIC ---
+                                    if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+                                        console.log(`🔄 Refreshing ${integration.provider} Token...`);
+                                        let refreshUrl = '';
+                                        let bodyParams: any = {};
+
+                                        if (isGoogle) {
+                                            refreshUrl = 'https://oauth2.googleapis.com/token';
+                                            bodyParams = {
+                                                client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
+                                                client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
+                                                refresh_token: integration.refresh_token,
+                                                grant_type: 'refresh_token',
+                                            };
+                                        } else if (isMicrosoft) {
+                                            refreshUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+                                            bodyParams = {
+                                                client_id: Deno.env.get('MICROSOFT_CLIENT_ID')!,
+                                                client_secret: Deno.env.get('MICROSOFT_CLIENT_SECRET')!,
+                                                refresh_token: integration.refresh_token,
+                                                grant_type: 'refresh_token',
+                                            };
+                                        }
+
+                                        const refreshResponse = await fetch(refreshUrl, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                            body: new URLSearchParams(bodyParams),
+                                        });
+
+                                        const refreshData = await refreshResponse.json();
+                                        if (refreshData.error) throw new Error(refreshData.error_description || refreshData.error);
+
+                                        accessToken = refreshData.access_token;
+                                        const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+
+                                        await supabase.from('user_integrations').update({
+                                            access_token: accessToken,
+                                            expires_at: newExpiresAt,
+                                            updated_at: new Date().toISOString()
+                                        }).eq('id', integration.id);
+                                    }
+
+                                    // --- EXECUTE ACTIONS ---
+                                    const headers = {
+                                        'Authorization': `Bearer ${accessToken}`,
+                                        'Content-Type': 'application/json'
+                                    };
+
+                                    if (isGoogle) {
+                                        const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
+
+                                        if (args.action === 'list') {
+                                            const q = args.query || 'is:inbox';
+                                            const listRes = await fetch(`${GMAIL_API}/messages?q=${encodeURIComponent(q)}&maxResults=${args.limit || 5}`, { headers });
+                                            const listData = await listRes.json();
+
+                                            if (listData.messages) {
+                                                for (const msg of listData.messages) {
+                                                    const detailRes = await fetch(`${GMAIL_API}/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, { headers });
+                                                    const detailData = await detailRes.json();
+                                                    const subject = detailData.payload.headers.find((h: any) => h.name === 'Subject')?.value || '(Sem Assunto)';
+                                                    const from = detailData.payload.headers.find((h: any) => h.name === 'From')?.value || 'Desconhecido';
+                                                    const date = detailData.payload.headers.find((h: any) => h.name === 'Date')?.value || '';
+                                                    results.push(`[GMAIL] ID: ${msg.id} | ${date} | De: ${from} | ${subject}`);
+                                                }
+                                            }
+                                        } else if (args.action === 'read') {
+                                            // Only try to read if ID looks like Gmail ID (hex string) or if provider is specifically google/all
+                                            // Simple check: Gmail IDs are usually hex. Microsoft IDs are very long base64-like.
+                                            // But better to just try if provider matches.
+                                            const msgRes = await fetch(`${GMAIL_API}/messages/${args.email_id}?format=full`, { headers });
+                                            if (msgRes.ok) {
+                                                const msgData = await msgRes.json();
+                                                const snippet = msgData.snippet;
+                                                let body = snippet; // Fallback
+                                                // ... (Body decoding logic same as before) ...
+                                                const decode = (str: string) => { try { return atob(str.replace(/-/g, '+').replace(/_/g, '/')); } catch (e) { return "(Erro decode)"; } };
+                                                if (msgData.payload.body?.data) body = decode(msgData.payload.body.data);
+                                                else if (msgData.payload.parts) {
+                                                    const textPart = msgData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
+                                                    if (textPart?.body?.data) body = decode(textPart.body.data);
+                                                }
+
+                                                const subject = msgData.payload.headers.find((h: any) => h.name === 'Subject')?.value;
+                                                const from = msgData.payload.headers.find((h: any) => h.name === 'From')?.value;
+                                                results.push(`[GMAIL] De: ${from}\nAssunto: ${subject}\nCorpo: ${body}`);
+                                            }
+                                        } else if (args.action === 'send' || args.action === 'reply') {
+                                            const messageParts = [
+                                                `To: ${args.to}`,
+                                                `Subject: ${args.subject}`,
+                                                `Content-Type: text/plain; charset="UTF-8"`,
+                                                `MIME-Version: 1.0`,
+                                                ``,
+                                                args.body
+                                            ];
+                                            const rawMessage = messageParts.join('\n');
+                                            const encodedMessage = btoa(unescape(encodeURIComponent(rawMessage))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+                                            const sendRes = await fetch(`${GMAIL_API}/messages/send`, {
+                                                method: 'POST', headers, body: JSON.stringify({ raw: encodedMessage })
+                                            });
+                                            if (sendRes.ok) results.push(`[GMAIL] Enviado com sucesso.`);
+                                            else results.push(`[GMAIL] Erro ao enviar: ${(await sendRes.json()).error.message}`);
+                                        } else if (args.action === 'move_to_trash') {
+                                            await fetch(`${GMAIL_API}/messages/${args.email_id}/trash`, { method: 'POST', headers });
+                                            results.push(`[GMAIL] Movido para lixeira.`);
+                                        }
+
+                                    } else if (isMicrosoft) {
+                                        const GRAPH_API = 'https://graph.microsoft.com/v1.0/me';
+
+                                        if (args.action === 'list') {
+                                            const listRes = await fetch(`${GRAPH_API}/messages?$top=${args.limit || 5}&$select=id,subject,from,receivedDateTime,bodyPreview&$orderby=receivedDateTime desc`, { headers });
+                                            const listData = await listRes.json();
+                                            if (listData.value) {
+                                                for (const msg of listData.value) {
+                                                    results.push(`[OUTLOOK] ID: ${msg.id} | ${msg.receivedDateTime} | De: ${msg.from.emailAddress.name} <${msg.from.emailAddress.address}> | ${msg.subject}`);
+                                                }
+                                            }
+                                        } else if (args.action === 'read') {
+                                            const msgRes = await fetch(`${GRAPH_API}/messages/${args.email_id}?$select=subject,from,toRecipients,receivedDateTime,body`, { headers });
+                                            if (msgRes.ok) {
+                                                const msgData = await msgRes.json();
+                                                // Microsoft body is HTML by default, but we can get text content or just show it.
+                                                // Let's try to strip HTML tags for simplicity or just return content.
+                                                const body = msgData.body.content.replace(/<[^>]*>?/gm, ''); // Simple strip
+                                                results.push(`[OUTLOOK] De: ${msgData.from.emailAddress.name}\nAssunto: ${msgData.subject}\nCorpo: ${body}`);
+                                            }
+                                        } else if (args.action === 'send' || args.action === 'reply') {
+                                            const sendBody = {
+                                                message: {
+                                                    subject: args.subject,
+                                                    body: { contentType: "Text", content: args.body },
+                                                    toRecipients: [{ emailAddress: { address: args.to } }]
+                                                },
+                                                saveToSentItems: "true"
+                                            };
+                                            const sendRes = await fetch(`${GRAPH_API}/sendMail`, {
+                                                method: 'POST', headers, body: JSON.stringify(sendBody)
+                                            });
+                                            if (sendRes.ok) results.push(`[OUTLOOK] Enviado com sucesso.`);
+                                            else results.push(`[OUTLOOK] Erro ao enviar: ${await sendRes.text()}`);
+                                        } else if (args.action === 'move_to_trash') {
+                                            // Move to Deleted Items. Need to know folder ID? 
+                                            // Graph API has 'move' endpoint.
+                                            // We can try to guess 'deleteditems' or just skip for now if too complex.
+                                            // Actually, standard folder names usually work?
+                                            // Let's try to find 'deleteditems' folder id first? No, too many calls.
+                                            // Alternative: DELETE method on message resource moves to Deleted Items?
+                                            // "Deleting a message moves it to the Deleted Items folder by default." -> YES!
+                                            // So just DELETE request.
+                                            const delRes = await fetch(`${GRAPH_API}/messages/${args.email_id}`, { method: 'DELETE', headers });
+                                            if (delRes.ok) results.push(`[OUTLOOK] Movido para lixeira.`);
+                                            else results.push(`[OUTLOOK] Erro ao apagar: ${await delRes.text()}`);
+                                        }
+                                    }
+
+                                } catch (err: any) {
+                                    console.error(`Error processing ${integration.provider}:`, err);
+                                    results.push(`[${integration.provider.toUpperCase()}] Erro: ${err.message}`);
+                                }
+                            }
+

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { CheckSquare, Plus, Search, Filter, Trash2, CheckCircle2, Circle, Check, Calendar, Sun } from 'lucide-react';
+import { CheckSquare, Plus, Search, Trash2, CheckCircle2, Circle, Check, Calendar, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -8,6 +8,8 @@ import Button from '../components/ui/Button';
 import { format, isToday, isPast, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import SwipeableItem from '../components/ui/SwipeableItem';
+import EmptyState from '../components/EmptyState';
+import { useRealtimeSubscription, notifyAIAction } from '../hooks/useRealtimeSubscription';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -43,6 +45,20 @@ export default function TasksPage() {
             fetchTasks();
         }
     }, [user]);
+
+    // --- REALTIME SUBSCRIPTION ---
+    useRealtimeSubscription({ table: 'tasks' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+            if (payload.new.user_id === user?.id) {
+                setTasks(prev => [payload.new, ...prev]);
+                notifyAIAction(`Nova tarefa criada: ${payload.new.title}`);
+            }
+        } else if (payload.eventType === 'UPDATE') {
+            setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
+        } else if (payload.eventType === 'DELETE') {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+        }
+    });
 
     const fetchTasks = async () => {
         try {
@@ -420,10 +436,14 @@ export default function TasksPage() {
             {/* Main Task List */}
             <div className="space-y-3">
                 {otherTasks.length === 0 ? (
-                    <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                        <Filter className="mx-auto text-gray-400 mb-3" size={48} />
-                        <p className="text-gray-500 font-medium">Nenhuma tarefa encontrada</p>
-                    </div>
+                    <EmptyState
+                        icon={CheckSquare}
+                        title="Tudo limpo por aqui!"
+                        description="Sua lista de tarefas está vazia. Que tal planejar seu dia?"
+                        exampleCommand="Me lembre de pagar a conta de luz amanhã às 10h"
+                        actionLabel="Adicionar Tarefa"
+                        onAction={() => setIsAddTaskOpen(true)}
+                    />
                 ) : (
                     otherTasks.map(renderTaskItem)
                 )}

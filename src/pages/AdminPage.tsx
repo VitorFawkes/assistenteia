@@ -263,15 +263,15 @@ export function AdminPage() {
 
                     {/* Stats Pills */}
                     <div className="flex gap-4 overflow-x-auto pb-2 md:pb-0 no-scrollbar mask-fade-right">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200 whitespace-nowrap">
-                            <User size={14} className="text-gray-400" />
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-ela-border whitespace-nowrap shadow-sm">
+                            <User size={14} className="text-ela-sub" />
                             <span className="text-sm font-medium text-ela-text">{totalUsers} Usuários</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200 whitespace-nowrap">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-ela-border whitespace-nowrap shadow-sm">
                             <Activity size={14} className="text-green-500" />
                             <span className="text-sm font-medium text-ela-text">{activeUsers} Ativos</span>
                         </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200 whitespace-nowrap">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-ela-border whitespace-nowrap shadow-sm">
                             <Shield size={14} className="text-purple-500" />
                             <span className="text-sm font-medium text-ela-text">{totalAdmins} Admins</span>
                         </div>
@@ -290,7 +290,7 @@ export function AdminPage() {
                     <div className="p-4 border-b border-ela-border space-y-3">
                         <div className="flex gap-2">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ela-sub" size={18} />
                                 <input
                                     type="text"
                                     placeholder="Buscar..."
@@ -317,7 +317,7 @@ export function AdminPage() {
                                 className={clsx(
                                     "w-full text-left p-3 rounded-xl transition-all border group",
                                     selectedUser?.user_id === u.user_id
-                                        ? "bg-ela-pink/10 border-ela-pink/50 shadow-lg shadow-pink-900/10"
+                                        ? "bg-ela-pink-light border-ela-pink/30 shadow-sm"
                                         : "bg-transparent border-transparent hover:bg-gray-50 text-ela-sub hover:text-ela-text"
                                 )}
                             >
@@ -344,11 +344,11 @@ export function AdminPage() {
                     {selectedUser ? (
                         <>
                             {/* User Header */}
-                            <div className="p-6 border-b border-ela-border flex justify-between items-start bg-gray-50">
+                            <div className="p-6 border-b border-ela-border flex justify-between items-start bg-gray-50/50">
                                 <div className="flex items-start gap-3">
                                     <button
                                         onClick={() => setSelectedUser(null)}
-                                        className="lg:hidden p-1 -ml-2 mr-1 text-gray-400 hover:text-ela-text"
+                                        className="lg:hidden p-1 -ml-2 mr-1 text-ela-sub hover:text-ela-text"
                                     >
                                         <ArrowLeft size={24} />
                                     </button>
@@ -357,13 +357,13 @@ export function AdminPage() {
                                         <h2 className="text-2xl font-bold text-ela-text mb-1 flex items-center gap-2">
                                             {selectedUser.preferred_name}
                                             {selectedUser.is_active === false && (
-                                                <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-200">
+                                                <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">
                                                     INATIVO
                                                 </span>
                                             )}
                                         </h2>
                                         <div className="flex items-center gap-3 text-sm text-ela-sub">
-                                            <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-xs hidden sm:inline border border-gray-200">{selectedUser.user_id}</span>
+                                            <span className="font-mono bg-white px-2 py-0.5 rounded text-xs hidden sm:inline border border-ela-border">{selectedUser.user_id}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -372,7 +372,7 @@ export function AdminPage() {
                                         <>
                                             <button
                                                 onClick={() => setIsEditing(false)}
-                                                className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+                                                className="p-2 hover:bg-white rounded-lg text-ela-sub transition-colors border border-transparent hover:border-ela-border"
                                             >
                                                 <X size={20} />
                                             </button>
@@ -387,9 +387,9 @@ export function AdminPage() {
                                     ) : (
                                         <button
                                             onClick={() => setIsEditing(true)}
-                                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-ela-text rounded-lg font-medium transition-colors border border-gray-200"
+                                            className="px-4 py-2 bg-white hover:bg-gray-50 text-ela-text rounded-lg font-medium transition-colors border border-ela-border shadow-sm"
                                         >
-                                            <span className="hidden sm:inline">Editar</span>
+                                            <span className="hidden sm:inline">Editar Perfil</span>
                                             <span className="sm:hidden">Editar</span>
                                         </button>
                                     )}
@@ -397,7 +397,7 @@ export function AdminPage() {
                             </div>
 
                             {/* Tabs */}
-                            <div className="flex border-b border-ela-border px-6 overflow-x-auto">
+                            <div className="flex border-b border-ela-border px-6 overflow-x-auto no-scrollbar">
                                 {[
                                     { id: 'profile', label: 'Perfil', icon: User },
                                     { id: 'features', label: 'Funcionalidades', icon: Power },
@@ -432,7 +432,7 @@ export function AdminPage() {
                                                     disabled={!isEditing}
                                                     value={editForm.preferred_name || ''}
                                                     onChange={e => setEditForm({ ...editForm, preferred_name: e.target.value })}
-                                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text"
+                                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text shadow-sm"
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -442,31 +442,31 @@ export function AdminPage() {
                                                     disabled={!isEditing}
                                                     value={editForm.ai_name || ''}
                                                     onChange={e => setEditForm({ ...editForm, ai_name: e.target.value })}
-                                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text"
+                                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text shadow-sm"
                                                 />
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-sm font-medium text-ela-sub">Telefone (WhatsApp)</label>
                                                 <div className="relative">
-                                                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-ela-sub" size={18} />
                                                     <input
                                                         type="text"
                                                         disabled={!isEditing}
                                                         value={editForm.phone_number || ''}
                                                         onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
-                                                        className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-3 py-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text"
+                                                        className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-3 py-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 text-ela-text shadow-sm"
                                                     />
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-sm font-medium text-ela-sub">Modelo de IA</label>
                                                 <div className="relative">
-                                                    <Brain className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                                    <Brain className="absolute left-3 top-1/2 -translate-y-1/2 text-ela-sub" size={18} />
                                                     <select
                                                         disabled={!isEditing}
                                                         value={editForm.ai_model || 'gpt-4o'}
                                                         onChange={e => setEditForm({ ...editForm, ai_model: e.target.value })}
-                                                        className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-3 py-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 appearance-none text-ela-text"
+                                                        className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-3 py-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 appearance-none text-ela-text shadow-sm"
                                                     >
                                                         <option value="gpt-4o">GPT-4o</option>
                                                         <option value="gpt-5.1-preview">GPT 5.1 Preview</option>
@@ -478,7 +478,7 @@ export function AdminPage() {
                                         <div className="pt-6 border-t border-ela-border space-y-4">
                                             <h3 className="text-sm font-bold text-ela-sub uppercase tracking-wider">Controle de Acesso</h3>
 
-                                            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+                                            <label className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-ela-border cursor-pointer hover:bg-gray-50 transition-colors">
                                                 <div>
                                                     <span className="font-medium text-ela-text block">Status da Conta</span>
                                                     <span className="text-sm text-ela-sub">
@@ -497,7 +497,7 @@ export function AdminPage() {
                                                 />
                                             </label>
 
-                                            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+                                            <label className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-ela-border cursor-pointer hover:bg-gray-50 transition-colors">
                                                 <div>
                                                     <span className="font-medium text-ela-text block">Acesso de Administrador</span>
                                                     <span className="text-sm text-ela-sub">Permite acesso total a este painel.</span>
@@ -507,7 +507,7 @@ export function AdminPage() {
                                                     disabled={!isEditing}
                                                     checked={editForm.is_admin || false}
                                                     onChange={e => setEditForm({ ...editForm, is_admin: e.target.checked })}
-                                                    className="w-5 h-5 rounded border-gray-300 text-ela-pink focus:ring-ela-pink"
+                                                    className="w-5 h-5 rounded border-ela-border text-ela-pink focus:ring-ela-pink"
                                                 />
                                             </label>
                                         </div>
@@ -515,7 +515,7 @@ export function AdminPage() {
                                         <div className="pt-6">
                                             <button
                                                 onClick={() => handleDeleteUser(selectedUser.user_id)}
-                                                className="w-full p-4 border border-red-200 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                                                className="w-full p-4 border border-red-100 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <Trash2 size={18} />
                                                 Deletar Usuário Permanentemente
@@ -536,7 +536,7 @@ export function AdminPage() {
                                                 { key: 'storage_download_audio', label: 'Download de Áudio', desc: 'Salva áudios recebidos no Storage' },
                                                 { key: 'storage_download_documents', label: 'Download de Documentos', desc: 'Salva PDFs e docs no Storage' },
                                             ].map(feature => (
-                                                <label key={feature.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+                                                <label key={feature.key} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-xl border border-ela-border cursor-pointer hover:bg-gray-50 transition-colors">
                                                     <div>
                                                         <span className="font-medium text-ela-text block">{feature.label}</span>
                                                         <span className="text-sm text-ela-sub">{feature.desc}</span>
@@ -568,7 +568,7 @@ export function AdminPage() {
                                                 disabled={!isEditing}
                                                 value={editForm.custom_system_prompt || ''}
                                                 onChange={e => setEditForm({ ...editForm, custom_system_prompt: e.target.value })}
-                                                className="w-full h-64 bg-white border border-ela-border rounded-xl p-4 font-mono text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 resize-none text-ela-text"
+                                                className="w-full h-64 bg-white border border-ela-border rounded-xl p-4 font-mono text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 resize-none text-ela-text shadow-sm"
                                                 placeholder="Instruções base para a IA..."
                                             />
                                         </div>
@@ -581,7 +581,7 @@ export function AdminPage() {
                                                 disabled={!isEditing}
                                                 value={editForm.daily_briefing_prompt || ''}
                                                 onChange={e => setEditForm({ ...editForm, daily_briefing_prompt: e.target.value })}
-                                                className="w-full h-32 bg-white border border-ela-border rounded-xl p-4 font-mono text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 resize-none text-ela-text"
+                                                className="w-full h-32 bg-white border border-ela-border rounded-xl p-4 font-mono text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 resize-none text-ela-text shadow-sm"
                                                 placeholder="Como o resumo deve ser gerado..."
                                             />
                                         </div>
@@ -591,7 +591,7 @@ export function AdminPage() {
                                 {activeTab === 'rules' && (
                                     <div className="space-y-4">
                                         {/* Add Rule */}
-                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        <div className="bg-gray-50/50 p-4 rounded-xl border border-ela-border">
                                             {!isAddingRule ? (
                                                 <button
                                                     onClick={() => setIsAddingRule(true)}
@@ -607,13 +607,13 @@ export function AdminPage() {
                                                         placeholder="Chave (ex: time_futebol, aniversario)"
                                                         value={newRuleKey}
                                                         onChange={e => setNewRuleKey(e.target.value)}
-                                                        className="w-full bg-white border border-ela-border rounded-lg p-2 text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text"
+                                                        className="w-full bg-white border border-ela-border rounded-lg p-2 text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text shadow-sm"
                                                     />
                                                     <textarea
                                                         placeholder="Valor (ex: Corinthians, 25/12/1990)"
                                                         value={newRuleValue}
                                                         onChange={e => setNewRuleValue(e.target.value)}
-                                                        className="w-full bg-white border border-ela-border rounded-lg p-2 text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none h-20 resize-none text-ela-text"
+                                                        className="w-full bg-white border border-ela-border rounded-lg p-2 text-sm focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none h-20 resize-none text-ela-text shadow-sm"
                                                     />
                                                     <div className="flex justify-end gap-2">
                                                         <button
@@ -624,7 +624,7 @@ export function AdminPage() {
                                                         </button>
                                                         <button
                                                             onClick={handleAddRule}
-                                                            className="px-3 py-1.5 text-sm bg-ela-pink text-white rounded-lg hover:bg-pink-600"
+                                                            className="px-3 py-1.5 text-sm bg-ela-pink text-white rounded-lg hover:bg-pink-600 shadow-md shadow-pink-900/10"
                                                         >
                                                             Salvar Regra
                                                         </button>
@@ -642,16 +642,16 @@ export function AdminPage() {
                                                 </div>
                                             ) : (
                                                 userRules.map(rule => (
-                                                    <div key={rule.id} className="group flex items-start justify-between p-4 bg-gray-50 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors">
+                                                    <div key={rule.id} className="group flex items-start justify-between p-4 bg-white border border-ela-border rounded-xl hover:border-ela-pink/30 hover:bg-ela-pink-light/30 transition-all shadow-sm">
                                                         <div>
-                                                            <span className="text-xs font-mono text-ela-pink bg-pink-50 px-2 py-0.5 rounded mb-1 inline-block">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-ela-pink bg-ela-pink-light px-2 py-0.5 rounded mb-1 inline-block">
                                                                 {rule.key}
                                                             </span>
                                                             <p className="text-ela-text text-sm whitespace-pre-wrap">{rule.value}</p>
                                                         </div>
                                                         <button
                                                             onClick={() => handleDeleteRule(rule.id)}
-                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                                            className="p-2 text-ela-sub hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                                         >
                                                             <Trash2 size={16} />
                                                         </button>
@@ -664,9 +664,9 @@ export function AdminPage() {
                             </div>
                         </>
                     ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-ela-sub">
-                            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4 border border-gray-100">
-                                <User size={40} className="opacity-20" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-ela-sub bg-gray-50/30">
+                            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-4 border border-ela-border shadow-sm">
+                                <User size={40} className="opacity-20 text-ela-pink" />
                             </div>
                             <h3 className="text-lg font-medium text-ela-text">Nenhum usuário selecionado</h3>
                             <p className="text-sm opacity-60">Selecione um usuário na lista para ver detalhes</p>
@@ -677,50 +677,56 @@ export function AdminPage() {
 
             {/* Create User Modal */}
             {isCreatingUser && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white border border-ela-border rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95">
-                        <h2 className="text-xl font-bold text-ela-text mb-4">Criar Novo Usuário</h2>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-ela-text/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-ela-border rounded-3xl p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-ela-pink-light rounded-xl">
+                                <User className="w-6 h-6 text-ela-pink" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-ela-text">Criar Novo Usuário</h2>
+                        </div>
+
+                        <div className="space-y-5">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-ela-sub">Nome</label>
+                                <label className="text-sm font-medium text-ela-sub">Nome Completo</label>
                                 <input
                                     type="text"
                                     value={newUserName}
                                     onChange={e => setNewUserName(e.target.value)}
-                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text"
+                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text shadow-sm"
                                     placeholder="Ex: João Silva"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-ela-sub">Email</label>
+                                <label className="text-sm font-medium text-ela-sub">Email de Acesso</label>
                                 <input
                                     type="email"
                                     value={newUserEmail}
                                     onChange={e => setNewUserEmail(e.target.value)}
-                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text"
+                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text shadow-sm"
                                     placeholder="email@exemplo.com"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-ela-sub">Senha</label>
+                                <label className="text-sm font-medium text-ela-sub">Senha Temporária</label>
                                 <input
                                     type="password"
                                     value={newUserPassword}
                                     onChange={e => setNewUserPassword(e.target.value)}
-                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text"
+                                    className="w-full bg-white border border-ela-border rounded-xl p-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none text-ela-text shadow-sm"
                                     placeholder="Mínimo 6 caracteres"
                                 />
                             </div>
-                            <div className="flex gap-3 pt-4">
+                            <div className="flex gap-3 pt-6">
                                 <button
                                     onClick={() => setIsCreatingUser(false)}
-                                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-ela-text rounded-xl font-medium transition-colors border border-gray-200"
+                                    className="flex-1 py-3 bg-white hover:bg-gray-50 text-ela-sub rounded-xl font-medium transition-colors border border-ela-border"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={handleCreateUser}
-                                    className="flex-1 py-3 bg-ela-pink hover:bg-pink-600 text-white rounded-xl font-medium transition-colors shadow-lg shadow-pink-900/20"
+                                    className="flex-1 py-3 bg-ela-pink hover:bg-pink-600 text-white rounded-xl font-medium transition-colors shadow-xl shadow-pink-900/20"
                                 >
                                     Criar Conta
                                 </button>

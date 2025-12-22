@@ -19,12 +19,12 @@ export default function Button({
     disabled,
     ...props
 }: ButtonProps) {
-    const baseStyles = "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white";
+    const baseStyles = "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-ela-bg";
 
     const variants = {
-        primary: "bg-ela-pink text-white hover:bg-rose-700 shadow-lg shadow-rose-900/20 focus:ring-ela-pink",
-        secondary: "bg-ela-card text-ela-text hover:bg-gray-50 border border-ela-border focus:ring-gray-400",
-        ghost: "text-ela-sub hover:text-ela-text hover:bg-gray-100 focus:ring-gray-400",
+        primary: "bg-ela-pink text-white hover:bg-pink-600 shadow-lg shadow-pink-900/20 focus:ring-ela-pink",
+        secondary: "bg-white text-ela-text hover:bg-gray-50 border border-ela-border focus:ring-ela-pink/30 shadow-sm",
+        ghost: "text-ela-sub hover:text-ela-text hover:bg-gray-50 focus:ring-ela-pink/30",
         danger: "bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 focus:ring-red-500"
     };
 
