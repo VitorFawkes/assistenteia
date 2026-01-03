@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
         // ESTRATÉGIA: Usar transcrição da Evolution (se disponível), senão tentar Whisper como fallback
         console.log('📝 Initial content received:', processedText || 'EMPTY');
 
-        // Tools/Functions disponíveis para o GPT-4o
+        // Tools/Functions disponíveis para o GPT-5.1
         const tools = [
             {
                 type: 'function',
@@ -214,7 +214,7 @@ IMPORTANTE - QUANDO EXECUTAR vs QUANDO PERGUNTAR:
 **REGRA SIMPLES**: Se você sabe O QUE fazer e QUANDO/QUANTO → FAÇA e confirme. Se algo essencial está vago → PERGUNTE.`;
 
         let systemPrompt = DEFAULT_SYSTEM_PROMPT;
-        let aiModel = 'gpt-4o'; // Default model
+        let aiModel = 'gpt-5.1-preview'; // Default model
         let userSettings: any = null;
 
         // Try to load user's custom prompt and model

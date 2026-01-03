@@ -19,7 +19,7 @@ begin
 
     -- 2. Update
     update messages
-    set content = pgp_sym_encrypt(content, v_encryption_key, 'cipher-algo=aes256, compress-algo=0, armor=1')
+    set content = public.pgp_sym_encrypt(content, v_encryption_key, 'cipher-algo=aes256, compress-algo=0, armor=1')
     where content is not null 
     and content not like '-----BEGIN PGP MESSAGE-----' || '%';
     

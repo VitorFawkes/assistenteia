@@ -5,8 +5,89 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')!;
 const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')!;
+const openaiKey = Deno.env.get('OPENAI_API_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// --- SESSION MANAGER (SPRINT 1) ---
+class SessionManager {
+    static async getOrCreate(userId: string, threadId: string): Promise<{ id: string, isNew: boolean }> {
+        // 1. Try to find active session
+        const { data: activeSession } = await supabase
+            .from('conversations')
+            .select('id, last_message_at')
+            .eq('user_id', userId)
+            .eq('thread_id', threadId)
+            .eq('status', 'active')
+            .maybeSingle(); // Use maybeSingle to avoid error if 0 rows
+
+        if (activeSession) {
+            // Check Idle Time (60 min)
+            const lastMsg = new Date(activeSession.last_message_at).getTime();
+            const now = new Date().getTime();
+            const diffMinutes = (now - lastMsg) / (1000 * 60);
+
+            if (diffMinutes < 60) {
+                // Update last_message_at async
+                await supabase.from('conversations')
+                    .update({ last_message_at: new Date().toISOString() })
+                    .eq('id', activeSession.id);
+
+                return { id: activeSession.id, isNew: false };
+            } else {
+                // Archive old session due to timeout
+                console.log(`⏳ Session ${activeSession.id} timed out (${Math.round(diffMinutes)} min). Archiving.`);
+                await supabase.from('conversations')
+                    .update({ status: 'archived' })
+                    .eq('id', activeSession.id);
+            }
+        }
+
+        // 2. Create new session (with Retry for Race Condition)
+        console.log(`✨ Creating new session for thread ${threadId}`);
+
+        try {
+            const { data: newSession, error } = await supabase
+                .from('conversations')
+                .insert({
+                    user_id: userId,
+                    thread_id: threadId,
+                    status: 'active',
+                    title: 'Nova Conversa'
+                })
+                .select('id')
+                .single();
+
+            if (error) throw error;
+            return { id: newSession.id, isNew: true };
+
+        } catch (error: any) {
+            // 3. Handle Race Condition (Unique Constraint Violation)
+            // If another request created the session milliseconds ago, insert will fail.
+            // We should catch this and fetch the session that was just created.
+            if (error.code === '23505') { // Postgres Unique Violation
+                console.warn('⚠️ Race condition detected (Unique Violation). Retrying fetch...');
+
+                // Retry fetch
+                const { data: existingSession } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('thread_id', threadId)
+                    .eq('status', 'active')
+                    .single();
+
+                if (existingSession) {
+                    console.log(`✅ Recovered from race condition. Using session ${existingSession.id}`);
+                    return { id: existingSession.id, isNew: false };
+                }
+            }
+
+            console.error('❌ Failed to create session:', error);
+            throw new Error('Failed to create session');
+        }
+    }
+}
 
 // Helper to upload media
 async function uploadMediaToStorage(base64: string, mimeType: string, folder: string, fileName: string) {
@@ -58,6 +139,66 @@ async function fetchGroupInfo(instanceName: string, groupJid: string) {
         console.error('Error fetching group info:', e);
     }
     return null;
+}
+
+// Helper to transcribe audio (Phase 7)
+async function transcribeAudio(base64: string, mimeType: string, openaiKey: string): Promise<string | null> {
+    try {
+        // Convert Base64 to Blob/File structure for FormData
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], { type: mimeType });
+        const file = new File([blob], "audio.ogg", { type: mimeType });
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Primary Strategy: Custom Model
+        formData.append('model', 'gpt-4o-transcribe-diarize');
+
+        console.log('🎙️ Calling OpenAI Transcription (Primary: gpt-4o-transcribe-diarize)...');
+
+        let response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openaiKey}`
+            },
+            body: formData
+        });
+
+        // Fallback Strategy
+        if (!response.ok) {
+            console.warn(`⚠️ Primary model failed (${response.status}). Retrying with fallback (whisper-1)...`);
+
+            const fallbackFormData = new FormData();
+            fallbackFormData.append('file', file);
+            fallbackFormData.append('model', 'whisper-1');
+
+            response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${openaiKey}`
+                },
+                body: fallbackFormData
+            });
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`OpenAI API Error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data.text || null;
+
+    } catch (error) {
+        console.error('❌ Transcription Helper Error:', error);
+        return null;
+    }
 }
 
 Deno.serve(async (req: Request) => {
@@ -500,10 +641,70 @@ Deno.serve(async (req: Request) => {
             console.warn('⚠️ Media detected but no Base64 available. Skipping upload.');
         }
 
+        // 4.5 AUDIO TRANSCRIPTION (Phase 7)
+        if (mediaType === 'audio' && mediaBase64) {
+            console.log('🎙️ Audio detected. Attempting transcription...');
+            try {
+                const transcription = await transcribeAudio(mediaBase64, mimeType || 'audio/ogg', openaiKey);
+                if (transcription) {
+                    console.log('✅ Transcription success:', transcription);
+                    content = transcription; // Replace empty content with transcription
+                }
+            } catch (e) {
+                console.error('❌ Transcription failed:', e);
+                content = '[Áudio recebido, mas falha na transcrição]';
+            }
+        }
+
         // 5. CALL PROCESS-MESSAGE
         // We already have userData.user_id from step 2.
 
         console.log(`🚀 Forwarding to process-message. Content: "${content}", Media: ${mediaType}`);
+
+        // --- DEDUPLICATION CHECK ---
+        // Check if this message ID already exists in the database to prevent double-processing
+        // This handles duplicate webhooks or retries from Evolution API
+        const { data: existingMessage } = await supabase
+            .from('messages')
+            .select('id')
+            .eq('wa_message_id', message.key.id)
+            .maybeSingle();
+
+        if (existingMessage) {
+            console.log(`♻️ Duplicate message detected (ID: ${message.key.id}). Skipping processing.`);
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'info',
+                message: 'Duplicate message skipped',
+                meta: { wa_message_id: message.key.id }
+            });
+            return new Response(JSON.stringify({ success: true, skipped: 'duplicate' }), { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // --- SESSION MANAGEMENT (SPRINT 1) ---
+        // Identify Thread ID (Phone Number or Group JID)
+        const threadId = remoteJid; // e.g., 551199999999@s.whatsapp.net or 123456@g.us
+
+        // Handle "New Subject" command (Manual Rotation)
+        if (content.toLowerCase().trim() === 'novo assunto' || content.toLowerCase().trim() === 'nova conversa') {
+            console.log('🔄 Manual Session Rotation triggered by user.');
+            // Find active session and archive it
+            await supabase.from('conversations')
+                .update({ status: 'archived' })
+                .eq('user_id', userData.user_id)
+                .eq('thread_id', threadId)
+                .eq('status', 'active');
+        }
+
+        // Get or Create Session
+        let sessionData = null;
+        try {
+            sessionData = await SessionManager.getOrCreate(userData.user_id, threadId);
+            console.log(`🧵 Session Active: ${sessionData.id} (New: ${sessionData.isNew})`);
+        } catch (e) {
+            console.error('❌ Session Manager Error:', e);
+            // Fallback? No, we need session.
+        }
 
         // 4.5 INSERT MESSAGE INTO DATABASE (ENCRYPTED)
         // Extract Metadata
@@ -554,8 +755,8 @@ Deno.serve(async (req: Request) => {
                 p_file_path: storagePath,
                 p_file_name: fileName,
                 p_mime_type: mimeType,
-
-                p_file_size: fileSize
+                p_file_size: fileSize,
+                p_conversation_id: sessionData?.id || null // PASS SESSION ID
             });
 
             if (rpcError) {
@@ -577,37 +778,48 @@ Deno.serve(async (req: Request) => {
         }
 
         // Call Edge Function
-        const { data: processData, error: invokeError } = await supabase.functions.invoke('process-message', {
-            body: {
-                content,
-                mediaUrl: finalMediaUrl,
-                mediaType,
-                userId: userData.user_id,
-                messageId: message.key.id,
-                // Context for Authority
-                is_owner: fromMe,
-                sender_name: pushName,
-                sender_number: senderNumber,
-                is_group: isGroup
-            }
-        });
+        let processData = null;
+        let invokeError = null;
 
-        if (invokeError) {
-            console.error('❌ Error invoking process-message:', invokeError);
-            await supabase.from('debug_logs').insert({
-                function_name: 'whatsapp-webhook',
-                level: 'error',
-                message: 'Error invoking process-message',
-                meta: { error: invokeError }
+        if (!skipAIResponse) {
+            const result = await supabase.functions.invoke('process-message', {
+                body: {
+                    content,
+                    mediaUrl: finalMediaUrl,
+                    mediaType,
+                    userId: userData.user_id,
+                    messageId: message.key.id,
+                    // Context for Authority
+                    is_owner: fromMe,
+                    sender_name: pushName,
+                    sender_number: senderNumber,
+                    is_group: isGroup,
+                    quotedContent: quotedContent, // Pass quoted content to AI
+                    conversationId: sessionData?.id // PASS SESSION ID TO PROCESS-MESSAGE
+                }
             });
+            processData = result.data;
+            invokeError = result.error;
+
+            if (invokeError) {
+                console.error('❌ Error invoking process-message:', invokeError);
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'error',
+                    message: 'Error invoking process-message',
+                    meta: { error: invokeError }
+                });
+            } else {
+                console.log('✅ process-message invoked successfully:', processData);
+                await supabase.from('debug_logs').insert({
+                    function_name: 'whatsapp-webhook',
+                    level: 'info',
+                    message: 'process-message invoked successfully',
+                    meta: { response: processData }
+                });
+            }
         } else {
-            console.log('✅ process-message invoked successfully:', processData);
-            await supabase.from('debug_logs').insert({
-                function_name: 'whatsapp-webhook',
-                level: 'info',
-                message: 'process-message invoked successfully',
-                meta: { response: processData }
-            });
+            console.log('🚫 AI Processing skipped (Private Context / Not Triggered).');
         }
 
         // Handle AI Response (if any)

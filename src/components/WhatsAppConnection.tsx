@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, CheckCircle, Smartphone, Trash2 } from 'lucide-react';
 import Button from './ui/Button';
+import AlertDialog from './ui/AlertDialog';
 
 interface WhatsAppConnectionProps {
     userId: string;
@@ -19,6 +20,7 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
     const [isLoading, setIsLoading] = useState(false);
     const [method, setMethod] = useState<'qr' | 'phone'>('qr');
     const [phoneNumber, setPhoneNumber] = useState(prefilledPhone || '');
+    const [isDisconnectAlertOpen, setIsDisconnectAlertOpen] = useState(false);
 
     const checkInstanceStatus = async () => {
         try {
@@ -198,10 +200,13 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
         }
     };
 
-    const handleDisconnect = async () => {
-        // Evitar double-click
+    const handleDisconnectClick = () => {
         if (isLoading) return;
-        if (!confirm('Tem certeza que deseja desconectar?')) return;
+        setIsDisconnectAlertOpen(true);
+    };
+
+    const confirmDisconnect = async () => {
+        setIsDisconnectAlertOpen(false);
 
         setIsLoading(true);
         setStatus('cleaning'); // Show cleaning state
@@ -280,7 +285,7 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
                         </div>
                         <Button
                             variant="danger"
-                            onClick={handleDisconnect}
+                            onClick={handleDisconnectClick}
                             isLoading={isLoading}
                             disabled={isLoading}
                             className="mt-4 flex items-center gap-2"
@@ -346,7 +351,7 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
 
                         <Button
                             variant="secondary"
-                            onClick={handleDisconnect}
+                            onClick={handleDisconnectClick}
                             isLoading={isLoading}
                             disabled={isLoading}
                             className="mt-2"
@@ -405,6 +410,16 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
                     50% { top: calc(100% - 1rem); }
                 }
             `}</style>
+
+            <AlertDialog
+                isOpen={isDisconnectAlertOpen}
+                onClose={() => setIsDisconnectAlertOpen(false)}
+                onConfirm={confirmDisconnect}
+                title="Desconectar WhatsApp?"
+                description="Tem certeza que deseja desconectar? A IA deixará de processar suas mensagens."
+                confirmText="Desconectar"
+                variant="danger"
+            />
         </div>
     );
 }

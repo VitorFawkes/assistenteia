@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Brain, Trash2, Search, Clock, Plus, Check, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import EmptyState from '../components/EmptyState';
+import AlertDialog from '../components/ui/AlertDialog';
 
 export function BrainPage() {
     const { user } = useAuth();
@@ -16,6 +17,11 @@ export function BrainPage() {
     const [newRuleValue, setNewRuleValue] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
     const [isSavingRule, setIsSavingRule] = useState(false);
+
+    // Delete States
+    const [memoryToDelete, setMemoryToDelete] = useState<string | null>(null);
+    const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
+    const [monitorToDelete, setMonitorToDelete] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -41,8 +47,14 @@ export function BrainPage() {
         }
     };
 
-    const handleDeleteMemory = async (id: string) => {
-        if (!confirm('Tem certeza que deseja apagar esta memória?')) return;
+    const handleDeleteMemoryClick = (id: string) => {
+        setMemoryToDelete(id);
+    };
+
+    const confirmDeleteMemory = async () => {
+        if (!memoryToDelete) return;
+        const id = memoryToDelete;
+        setMemoryToDelete(null);
         try {
             const { error } = await supabase.from('memories').delete().eq('id', id);
             if (error) throw error;
@@ -52,8 +64,14 @@ export function BrainPage() {
         }
     };
 
-    const handleDeleteRule = async (id: string) => {
-        if (!confirm('Tem certeza que deseja apagar esta regra?')) return;
+    const handleDeleteRuleClick = (id: string) => {
+        setRuleToDelete(id);
+    };
+
+    const confirmDeleteRule = async () => {
+        if (!ruleToDelete) return;
+        const id = ruleToDelete;
+        setRuleToDelete(null);
         try {
             const { error } = await supabase.from('user_preferences').delete().eq('id', id);
             if (error) throw error;
@@ -88,8 +106,14 @@ export function BrainPage() {
         }
     };
 
-    const handleDeleteMonitor = async (id: string) => {
-        if (!confirm('Apagar este monitor?')) return;
+    const handleDeleteMonitorClick = (id: string) => {
+        setMonitorToDelete(id);
+    };
+
+    const confirmDeleteMonitor = async () => {
+        if (!monitorToDelete) return;
+        const id = monitorToDelete;
+        setMonitorToDelete(null);
         try {
             const { error } = await supabase.from('monitors' as any).delete().eq('id', id);
             if (error) throw error;
@@ -186,7 +210,7 @@ export function BrainPage() {
                                                     </div>
                                                 </div>
                                                 <button
-                                                    onClick={() => handleDeleteMonitor(monitor.id)}
+                                                    onClick={() => handleDeleteMonitorClick(monitor.id)}
                                                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                     title="Parar de monitorar"
                                                 >
@@ -261,7 +285,7 @@ export function BrainPage() {
                                                 <div className="flex justify-between items-start mb-2">
                                                     <h4 className="font-semibold text-ela-text text-lg">{rule.key}</h4>
                                                     <button
-                                                        onClick={() => handleDeleteRule(rule.id)}
+                                                        onClick={() => handleDeleteRuleClick(rule.id)}
                                                         className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors"
                                                     >
                                                         <Trash2 size={18} />
@@ -303,7 +327,7 @@ export function BrainPage() {
                                                 <div className="flex justify-between items-start gap-4">
                                                     <p className="text-ela-text flex-1">{memory.content}</p>
                                                     <button
-                                                        onClick={() => handleDeleteMemory(memory.id)}
+                                                        onClick={() => handleDeleteMemoryClick(memory.id)}
                                                         className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors shrink-0"
                                                     >
                                                         <Trash2 size={18} />
@@ -335,6 +359,36 @@ export function BrainPage() {
                     <span>Salvo com sucesso!</span>
                 </div>
             )}
+
+            <AlertDialog
+                isOpen={!!memoryToDelete}
+                onClose={() => setMemoryToDelete(null)}
+                onConfirm={confirmDeleteMemory}
+                title="Apagar Memória?"
+                description="Tem certeza que deseja apagar esta memória?"
+                confirmText="Apagar"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={!!ruleToDelete}
+                onClose={() => setRuleToDelete(null)}
+                onConfirm={confirmDeleteRule}
+                title="Apagar Regra?"
+                description="Tem certeza que deseja apagar esta regra?"
+                confirmText="Apagar"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={!!monitorToDelete}
+                onClose={() => setMonitorToDelete(null)}
+                onConfirm={confirmDeleteMonitor}
+                title="Apagar Monitor?"
+                description="Tem certeza que deseja apagar este monitor?"
+                confirmText="Apagar"
+                variant="danger"
+            />
         </div>
     );
 }

@@ -1,8 +1,11 @@
 # Guia de Deploy Manual - Edge Functions Avançadas
 
-## ✅ ATUALIZAÇÃO: Sistema de Prompt Dinâmico
+## ✅ ATUALIZAÇÃO: Listas Inteligentes e Preferências (v2)
 
-A Edge Function `process-message` agora **carrega automaticamente** o prompt personalizado do usuário do banco de dados!
+A Edge Function `process-message` foi atualizada para:
+1. **Nomear listas automaticamente** (ex: "Lista de Compras" em vez de "Nova Lista").
+2. **Entender preferências** sem ser rígida (salva "Gosto de Malbec" sem reclamar).
+3. **Recuperar contexto** de forma mais robusta.
 
 **Como funciona:**
 1. Você edita o prompt em `/settings` no app

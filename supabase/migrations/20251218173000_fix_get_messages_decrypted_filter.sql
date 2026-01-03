@@ -36,10 +36,10 @@ BEGIN
         CASE
             -- Case 1: PGP Armor (Old format)
             WHEN m.content LIKE '-----BEGIN PGP MESSAGE-----' || '%' THEN
-                pgp_sym_decrypt(m.content::bytea, p_encryption_key)
+                public.pgp_sym_decrypt(m.content::bytea, p_encryption_key)
             -- Case 2: ENC:Prefix + Base64 (New format)
             WHEN m.content LIKE 'ENC:%' THEN
-                pgp_sym_decrypt(decode(substring(m.content from 5), 'base64'), p_encryption_key)
+                public.pgp_sym_decrypt(decode(substring(m.content from 5), 'base64'), p_encryption_key)
             -- Case 3: Plain text (Legacy / Fallback)
             ELSE
                 m.content

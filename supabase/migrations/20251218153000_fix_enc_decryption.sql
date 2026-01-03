@@ -28,10 +28,10 @@ BEGIN
             CASE
                 -- Handle ENC: format (Base64 encoded binary)
                 WHEN p_encryption_key IS NOT NULL AND m.content LIKE 'ENC:%' THEN
-                    pgp_sym_decrypt(decode(substring(m.content from 5), 'base64'), p_encryption_key)
+                    public.pgp_sym_decrypt(decode(substring(m.content from 5), 'base64'), p_encryption_key)
                 -- Handle Standard PGP Armor
                 WHEN p_encryption_key IS NOT NULL AND m.content LIKE '%-----BEGIN PGP MESSAGE-----%' THEN
-                    pgp_sym_decrypt(m.content::bytea, p_encryption_key)
+                    public.pgp_sym_decrypt(m.content::bytea, p_encryption_key)
                 ELSE
                     m.content
             END as content,

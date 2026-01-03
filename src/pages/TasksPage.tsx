@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import AlertDialog from '../components/ui/AlertDialog';
 import { format, isToday, isPast, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import SwipeableItem from '../components/ui/SwipeableItem';
@@ -34,6 +35,8 @@ export default function TasksPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+    const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+    const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('todo');
     const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
@@ -155,8 +158,14 @@ export default function TasksPage() {
         }
     };
 
-    const deleteTask = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir esta tarefa?')) return;
+    const handleDeleteClick = (id: string) => {
+        setTaskToDelete(id);
+    };
+
+    const confirmDeleteTask = async () => {
+        if (!taskToDelete) return;
+        const id = taskToDelete;
+        setTaskToDelete(null);
         try {
             const { error } = await supabase.from('tasks').delete().eq('id', id);
             if (error) throw error;
@@ -183,7 +192,11 @@ export default function TasksPage() {
 
     const deleteSelectedTasks = async () => {
         if (selectedTasks.size === 0) return;
-        if (!confirm(`Tem certeza que deseja excluir ${selectedTasks.size} tarefas?`)) return;
+        setIsBulkDeleteAlertOpen(true);
+    };
+
+    const confirmDeleteSelectedTasks = async () => {
+        setIsBulkDeleteAlertOpen(false);
 
         try {
             const { error } = await supabase
@@ -236,7 +249,7 @@ export default function TasksPage() {
         <SwipeableItem
             key={task.id}
             onSwipeRight={() => updateStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
-            onSwipeLeft={() => deleteTask(task.id)}
+            onSwipeLeft={() => handleDeleteClick(task.id)}
             leftActionIcon={task.status === 'done' ? <Circle size={24} /> : <CheckCircle2 size={24} />}
             leftActionColor={task.status === 'done' ? 'bg-gray-400' : 'bg-green-500'}
             rightActionColor="bg-red-500"
@@ -320,7 +333,7 @@ export default function TasksPage() {
                     </div>
 
                     <button
-                        onClick={() => deleteTask(task.id)}
+                        onClick={() => handleDeleteClick(task.id)}
                         className="text-gray-500 hover:text-red-400 p-1 shrink-0"
                     >
                         <Trash2 size={18} />
@@ -486,6 +499,26 @@ export default function TasksPage() {
                     </div>
                 </div>
             )}
+            {/* Confirmation Modals */}
+            <AlertDialog
+                isOpen={!!taskToDelete}
+                onClose={() => setTaskToDelete(null)}
+                onConfirm={confirmDeleteTask}
+                title="Excluir Tarefa?"
+                description="Tem certeza que deseja excluir esta tarefa?"
+                confirmText="Excluir"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={isBulkDeleteAlertOpen}
+                onClose={() => setIsBulkDeleteAlertOpen(false)}
+                onConfirm={confirmDeleteSelectedTasks}
+                title="Excluir Selecionadas?"
+                description={`Tem certeza que deseja excluir ${selectedTasks.size} tarefas?`}
+                confirmText="Excluir"
+                variant="danger"
+            />
         </div>
     );
 }

@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import AlertDialog from '../components/ui/AlertDialog';
 import { useRealtimeSubscription, notifyAIAction } from '../hooks/useRealtimeSubscription';
 
 // Initialize Supabase client
@@ -37,6 +38,8 @@ export default function RemindersPage() {
     const [newDate, setNewDate] = useState('');
     const [reminderToDelete, setReminderToDelete] = useState<string | null>(null);
     const [selectedReminders, setSelectedReminders] = useState<Set<string>>(new Set());
+    const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
+    const [isClearCompletedAlertOpen, setIsClearCompletedAlertOpen] = useState(false);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -171,7 +174,11 @@ export default function RemindersPage() {
 
     const deleteSelected = async () => {
         if (selectedReminders.size === 0) return;
-        if (!confirm(`Tem certeza que deseja excluir ${selectedReminders.size} lembretes?`)) return;
+        setIsBulkDeleteAlertOpen(true);
+    };
+
+    const confirmDeleteSelected = async () => {
+        setIsBulkDeleteAlertOpen(false);
 
         try {
             const ids = Array.from(selectedReminders);
@@ -215,9 +222,7 @@ export default function RemindersPage() {
         setReminderToDelete(id);
     };
 
-    const cancelDelete = () => {
-        setReminderToDelete(null);
-    };
+
 
     const confirmDelete = async () => {
         if (!reminderToDelete) return;
@@ -247,7 +252,11 @@ export default function RemindersPage() {
     };
 
     const clearCompleted = async () => {
-        if (!confirm('Deseja excluir todos os lembretes concluídos?')) return;
+        setIsClearCompletedAlertOpen(true);
+    };
+
+    const confirmClearCompleted = async () => {
+        setIsClearCompletedAlertOpen(false);
 
         try {
             const { error } = await supabase
@@ -499,25 +508,36 @@ export default function RemindersPage() {
                 )}
             </div>
 
-            {/* Confirmation Modal */}
-            {reminderToDelete && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={cancelDelete}>
-                    <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-gray-900 mb-3">Confirmar Exclusão</h3>
-                        <p className="text-gray-600 mb-6">
-                            Tem certeza que deseja excluir este lembrete?
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                            <Button variant="secondary" onClick={cancelDelete} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
-                                Cancelar
-                            </Button>
-                            <Button variant="danger" onClick={confirmDelete}>
-                                Excluir
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Confirmation Modals */}
+            <AlertDialog
+                isOpen={!!reminderToDelete}
+                onClose={() => setReminderToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Confirmar Exclusão"
+                description="Tem certeza que deseja excluir este lembrete?"
+                confirmText="Excluir"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={isBulkDeleteAlertOpen}
+                onClose={() => setIsBulkDeleteAlertOpen(false)}
+                onConfirm={confirmDeleteSelected}
+                title="Excluir Selecionados?"
+                description={`Tem certeza que deseja excluir ${selectedReminders.size} lembretes?`}
+                confirmText="Excluir"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={isClearCompletedAlertOpen}
+                onClose={() => setIsClearCompletedAlertOpen(false)}
+                onConfirm={confirmClearCompleted}
+                title="Limpar Concluídos?"
+                description="Deseja excluir todos os lembretes concluídos?"
+                confirmText="Limpar"
+                variant="danger"
+            />
         </div>
     );
 }

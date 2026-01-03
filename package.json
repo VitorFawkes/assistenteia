@@ -11,7 +11,7 @@
     "deploy:webhook": "sh scripts/deploy-webhook.sh"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.86.0",
+    "@supabase/supabase-js": "^2.89.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "esbuild": "^0.27.2",

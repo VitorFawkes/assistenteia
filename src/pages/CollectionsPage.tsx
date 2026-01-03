@@ -1,15 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Search, Trash2, Edit2, X, Filter, Folder, FileText, CheckSquare, Lock, CheckCircle, DollarSign, Grid, Eye, EyeOff, Copy, Calendar, ArrowUpDown, ChevronDown, Square, CheckSquare as CheckSquareIcon, ArrowLeft, Check } from 'lucide-react';
+import { Trash2, Plus, Search, Filter, Calendar, X, CheckSquare, CheckSquare as CheckSquareIcon, Square, Check, ChevronDown, Edit2, Folder, ArrowUpDown, Grid, ArrowLeft, DollarSign, Lock, CheckCircle, FileText, Copy, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import Card from '../components/ui/Card';
-
 import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
 import EditItemModal from '../components/collections/EditItemModal';
 import SwipeableItem from '../components/ui/SwipeableItem';
+import AlertDialog from '../components/ui/AlertDialog';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -37,11 +37,10 @@ export default function CollectionsPage() {
     const { user } = useAuth();
     const location = useLocation();
     const [collections, setCollections] = useState<Collection[]>([]);
-    const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
     const [items, setItems] = useState<CollectionItem[]>([]);
-    const [_isLoadingCollections, setIsLoadingCollections] = useState(true);
-    const [isLoadingItems, setIsLoadingItems] = useState(false);
+    const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
 
+    const [isLoadingItems, setIsLoadingItems] = useState(false);
     // Search & Filters
     const [collectionSearch, setCollectionSearch] = useState('');
     const [itemSearch, setItemSearch] = useState('');
@@ -66,6 +65,7 @@ export default function CollectionsPage() {
     const [initialLoadDone, setInitialLoadDone] = useState(false);
     const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
 
     // Modals
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -107,8 +107,6 @@ export default function CollectionsPage() {
             setCollections(collectionsWithCounts);
         } catch (error) {
             console.error('Error fetching collections:', error);
-        } finally {
-            setIsLoadingCollections(false);
         }
     }, [user]);
 
@@ -208,7 +206,6 @@ export default function CollectionsPage() {
                 if (itemDate < startDate || itemDate > endDate) return false;
             }
         }
-
         return true;
     }).sort((a, b) => {
         const dateA = parseDate(a.metadata?.date || a.created_at).getTime();
@@ -382,8 +379,12 @@ export default function CollectionsPage() {
 
     const handleBulkDelete = async () => {
         if (selectedItems.size === 0) return;
+        setIsBulkDeleteAlertOpen(true);
+    };
 
-        if (!confirm(`Tem certeza que deseja apagar ${selectedItems.size} itens?`)) return;
+    const confirmBulkDelete = async () => {
+        if (selectedItems.size === 0) return;
+        setIsBulkDeleteAlertOpen(false);
 
         try {
             const ids = Array.from(selectedItems);
@@ -408,8 +409,6 @@ export default function CollectionsPage() {
             alert('Erro ao apagar itens selecionados.');
         }
     };
-
-
 
     const handleSaveItem = async (id: string, updates: any) => {
         try {
@@ -1204,47 +1203,39 @@ export default function CollectionsPage() {
             }
 
             {/* Delete Confirmation Modals */}
-            {
-                collectionToDelete && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setCollectionToDelete(null)}>
-                        <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-gray-900 mb-3">Excluir Coleção?</h3>
-                            <p className="text-gray-600 mb-6">
-                                Isso apagará a coleção e <strong>TODOS os itens</strong> nela permanentemente.
-                            </p>
-                            <div className="flex gap-3 justify-end">
-                                <Button variant="secondary" onClick={() => setCollectionToDelete(null)} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
-                                    Cancelar
-                                </Button>
-                                <Button variant="danger" onClick={confirmDeleteCollection}>
-                                    Excluir Tudo
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            <AlertDialog
+                isOpen={!!collectionToDelete}
+                onClose={() => setCollectionToDelete(null)}
+                onConfirm={confirmDeleteCollection}
+                title="Excluir Coleção?"
+                description={
+                    <span>
+                        Isso apagará a coleção e <strong>TODOS os itens</strong> nela permanentemente.
+                    </span>
+                }
+                confirmText="Excluir Tudo"
+                variant="danger"
+            />
 
-            {
-                itemToDelete && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setItemToDelete(null)}>
-                        <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-gray-900 mb-3">Excluir Item?</h3>
-                            <p className="text-gray-600 mb-6">
-                                Tem certeza que deseja excluir este item?
-                            </p>
-                            <div className="flex gap-3 justify-end">
-                                <Button variant="secondary" onClick={() => setItemToDelete(null)} className="bg-gray-100 text-gray-700 hover:bg-gray-200">
-                                    Cancelar
-                                </Button>
-                                <Button variant="danger" onClick={confirmDeleteItem}>
-                                    Excluir
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            <AlertDialog
+                isOpen={!!itemToDelete}
+                onClose={() => setItemToDelete(null)}
+                onConfirm={confirmDeleteItem}
+                title="Excluir Item?"
+                description="Tem certeza que deseja excluir este item?"
+                confirmText="Excluir"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={isBulkDeleteAlertOpen}
+                onClose={() => setIsBulkDeleteAlertOpen(false)}
+                onConfirm={confirmBulkDelete}
+                title="Excluir Itens Selecionados?"
+                description={`Tem certeza que deseja apagar ${selectedItems.size} itens?`}
+                confirmText={`Apagar (${selectedItems.size})`}
+                variant="danger"
+            />
 
             {/* Edit Item Modal */}
             <EditItemModal

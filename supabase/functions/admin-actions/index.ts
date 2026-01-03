@@ -56,7 +56,7 @@ serve(async (req) => {
             await supabaseAdmin.from('user_settings').insert({
                 user_id: data.user.id,
                 preferred_name: preferred_name || email.split('@')[0],
-                ai_model: 'gpt-4o',
+                ai_model: 'gpt-5.1-preview',
                 is_active: true
             });
 

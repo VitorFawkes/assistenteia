@@ -1,5 +1,4 @@
--- Enable pgcrypto extension for encryption functions
-create extension if not exists pgcrypto;
+-- Encryption functions
 
 -- Function to insert an encrypted message
 -- Uses PGP Symmetric Encryption with ASCII Armor to store the result as text in the existing column
@@ -35,7 +34,7 @@ begin
     -- Encrypt the content using the provided key
     -- armor=1 ensures the output is ASCII text, safe for the text column
     if p_content is not null then
-        v_encrypted_content := pgp_sym_encrypt(p_content, p_encryption_key, 'cipher-algo=aes256, compress-algo=0, armor=1');
+        v_encrypted_content := public.pgp_sym_encrypt(p_content, p_encryption_key, 'cipher-algo=aes256, compress-algo=0, armor=1');
     else
         v_encrypted_content := null;
     end if;
@@ -118,7 +117,7 @@ begin
         -- We use a safe approach: check if it looks like PGP message.
         case
             when m.content like '-----BEGIN PGP MESSAGE-----' || '%' then
-                pgp_sym_decrypt(m.content::bytea, p_encryption_key)
+                public.pgp_sym_decrypt(m.content::bytea, p_encryption_key)
             else
                 m.content
         end as content,

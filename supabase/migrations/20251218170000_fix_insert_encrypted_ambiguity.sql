@@ -34,7 +34,7 @@ DECLARE
 BEGIN
     -- Encrypt content using PGP Symmetric Encryption + Base64 + ENC: Prefix
     IF p_content IS NOT NULL THEN
-        v_encrypted_content := 'ENC:' || encode(pgp_sym_encrypt(p_content, p_encryption_key, 'cipher-algo=aes256, compress-algo=0'), 'base64');
+        v_encrypted_content := 'ENC:' || encode(public.pgp_sym_encrypt(p_content, p_encryption_key, 'cipher-algo=aes256, compress-algo=0'), 'base64');
     ELSE
         v_encrypted_content := NULL;
     END IF;

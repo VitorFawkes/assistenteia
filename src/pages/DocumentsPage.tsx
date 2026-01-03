@@ -9,6 +9,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
+import AlertDialog from '../components/ui/AlertDialog';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -29,6 +30,7 @@ export default function DocumentsPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -97,8 +99,14 @@ export default function DocumentsPage() {
         }
     };
 
-    const handleDelete = async (doc: Document) => {
-        if (!confirm(`Tem certeza que deseja excluir "${doc.filename}"?`)) return;
+    const handleDeleteClick = (doc: Document) => {
+        setDocumentToDelete(doc);
+    };
+
+    const confirmDeleteDocument = async () => {
+        if (!documentToDelete) return;
+        const doc = documentToDelete;
+        setDocumentToDelete(null);
 
         try {
             // 1. Delete from Storage
@@ -254,7 +262,7 @@ export default function DocumentsPage() {
                                                 <Download size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(doc)}
+                                                onClick={() => handleDeleteClick(doc)}
                                                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-lg transition-colors"
                                                 title="Excluir"
                                             >
@@ -298,7 +306,7 @@ export default function DocumentsPage() {
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => handleDownload(doc)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-ela-pink"><Download size={16} /></button>
-                                                    <button onClick={() => handleDelete(doc)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
+                                                    <button onClick={() => handleDeleteClick(doc)} className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -318,6 +326,16 @@ export default function DocumentsPage() {
                     />
                 )}
             </div>
-        </div>
+
+            <AlertDialog
+                isOpen={!!documentToDelete}
+                onClose={() => setDocumentToDelete(null)}
+                onConfirm={confirmDeleteDocument}
+                title="Excluir Documento?"
+                description={documentToDelete ? `Tem certeza que deseja excluir "${documentToDelete.filename}"?` : ''}
+                confirmText="Excluir"
+                variant="danger"
+            />
+        </div >
     );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Calendar as CalendarIcon, Plus, Trash2, MapPin, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
+import AlertDialog from '../components/ui/AlertDialog';
 
 interface CalendarEvent {
     id: string;
@@ -20,6 +21,7 @@ export default function CalendarPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [showModal, setShowModal] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<{ id: string, provider: string } | null>(null);
 
     // New Event Form
     const [newEvent, setNewEvent] = useState({
@@ -97,8 +99,14 @@ export default function CalendarPage() {
         }
     };
 
-    const handleDeleteEvent = async (id: string, provider: string) => {
-        if (!confirm('Tem certeza que deseja apagar este evento?')) return;
+    const handleDeleteEventClick = (id: string, provider: string) => {
+        setEventToDelete({ id, provider });
+    };
+
+    const confirmDeleteEvent = async () => {
+        if (!eventToDelete) return;
+        const { id, provider } = eventToDelete;
+        setEventToDelete(null);
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -202,7 +210,7 @@ export default function CalendarPage() {
                                         </a>
                                     )}
                                     <button
-                                        onClick={() => handleDeleteEvent(event.id, event.provider)}
+                                        onClick={() => handleDeleteEventClick(event.id, event.provider)}
                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
                                     >
                                         <Trash2 size={18} />
@@ -297,6 +305,16 @@ export default function CalendarPage() {
                     </div>
                 </div>
             )}
+            {/* Delete Confirmation Alert */}
+            <AlertDialog
+                isOpen={!!eventToDelete}
+                onClose={() => setEventToDelete(null)}
+                onConfirm={confirmDeleteEvent}
+                title="Excluir Evento?"
+                description="Tem certeza que deseja apagar este evento?"
+                confirmText="Excluir"
+                variant="danger"
+            />
         </div>
     );
 }

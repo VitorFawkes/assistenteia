@@ -3,6 +3,7 @@ import { Save, User, Loader2, Check, AlertCircle, Bot, Brain, Info, Sun, Send } 
 import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 import WhatsAppConnection from '../components/WhatsAppConnection';
+import AlertDialog from '../components/ui/AlertDialog';
 
 export default function SettingsPage() {
     const [userId, setUserId] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export default function SettingsPage() {
     const [dailyBriefingEnabled, setDailyBriefingEnabled] = useState(true);
     const [dailyBriefingTime, setDailyBriefingTime] = useState('08:00');
     const [dailyBriefingPrompt, setDailyBriefingPrompt] = useState('');
+    const [isBriefingTestAlertOpen, setIsBriefingTestAlertOpen] = useState(false);
 
     // Storage Settings
     const [storageDownloadImages, setStorageDownloadImages] = useState(true);
@@ -526,28 +528,7 @@ export default function SettingsPage() {
                                                     variant="secondary"
                                                     className="w-full justify-center bg-gray-50/50 hover:bg-gray-100 border-ela-border text-ela-text"
                                                     size="sm"
-                                                    onClick={async () => {
-                                                        if (!confirm('Enviar resumo agora para o seu WhatsApp?')) return;
-                                                        try {
-                                                            const { data: { session } } = await supabase.auth.getSession();
-                                                            if (!session) return;
-
-                                                            const res = await fetch('https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/daily-briefing', {
-                                                                method: 'POST',
-                                                                headers: {
-                                                                    'Authorization': `Bearer ${session.access_token}`,
-                                                                    'Content-Type': 'application/json'
-                                                                },
-                                                                body: JSON.stringify({ action: 'test_now' })
-                                                            });
-
-                                                            if (res.ok) alert('Resumo enviado! Verifique seu WhatsApp.');
-                                                            else alert('Erro ao enviar resumo.');
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                            alert('Erro ao conectar com servidor.');
-                                                        }
-                                                    }}
+                                                    onClick={() => setIsBriefingTestAlertOpen(true)}
                                                 >
                                                     <Send size={14} className="mr-2" />
                                                     Enviar
@@ -643,6 +624,44 @@ export default function SettingsPage() {
                     </Button>
                 </div>
             </div>
+        </div>
+    );
+
+    const handleTestBriefing = async () => {
+        setIsBriefingTestAlertOpen(false);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            const res = await fetch('https://bvjfiismidgzmdmrotee.supabase.co/functions/v1/daily-briefing', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ action: 'test_now' })
+            });
+
+            if (res.ok) alert('Resumo enviado! Verifique seu WhatsApp.');
+            else alert('Erro ao enviar resumo.');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao conectar com servidor.');
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-ela-bg p-4 md:p-6 pb-32 md:pb-6 overflow-auto">
+            {/* ... existing JSX ... */}
+            <AlertDialog
+                isOpen={isBriefingTestAlertOpen}
+                onClose={() => setIsBriefingTestAlertOpen(false)}
+                onConfirm={handleTestBriefing}
+                title="Testar Resumo Diário?"
+                description="Enviar resumo agora para o seu WhatsApp?"
+                confirmText="Enviar"
+                variant="primary"
+            />
         </div>
     );
 }

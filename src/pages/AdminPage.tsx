@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Trash2, BookOpen, User, Search, Save, X, Plus, Brain, Smartphone, ArrowLeft, Power, Activity, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { clsx } from 'clsx';
+import AlertDialog from '../components/ui/AlertDialog';
 
 interface UserSettings {
     user_id: string;
@@ -57,6 +58,10 @@ export function AdminPage() {
     const [newUserEmail, setNewUserEmail] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
     const [newUserName, setNewUserName] = useState('');
+
+    // Delete States
+    const [userToDelete, setUserToDelete] = useState<string | null>(null);
+    const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
 
     useEffect(() => {
         checkAdmin();
@@ -175,8 +180,14 @@ export function AdminPage() {
         }
     };
 
-    const handleDeleteUser = async (userId: string) => {
-        if (!confirm('ATENÇÃO: Isso apagará PERMANENTEMENTE o usuário do Auth e do Banco de Dados. Continuar?')) return;
+    const handleDeleteUserClick = (userId: string) => {
+        setUserToDelete(userId);
+    };
+
+    const confirmDeleteUser = async () => {
+        if (!userToDelete) return;
+        const userId = userToDelete;
+        setUserToDelete(null);
 
         try {
             const { error } = await supabase.functions.invoke('admin-actions', {
@@ -220,8 +231,14 @@ export function AdminPage() {
         }
     };
 
-    const handleDeleteRule = async (ruleId: string) => {
-        if (!confirm('Apagar esta regra?')) return;
+    const handleDeleteRuleClick = (ruleId: string) => {
+        setRuleToDelete(ruleId);
+    };
+
+    const confirmDeleteRule = async () => {
+        if (!ruleToDelete) return;
+        const ruleId = ruleToDelete;
+        setRuleToDelete(null);
 
         const { error } = await supabase
             .from('user_preferences')
@@ -464,11 +481,10 @@ export function AdminPage() {
                                                     <Brain className="absolute left-3 top-1/2 -translate-y-1/2 text-ela-sub" size={18} />
                                                     <select
                                                         disabled={!isEditing}
-                                                        value={editForm.ai_model || 'gpt-4o'}
+                                                        value={editForm.ai_model || 'gpt-5.1-preview'}
                                                         onChange={e => setEditForm({ ...editForm, ai_model: e.target.value })}
                                                         className="w-full bg-white border border-ela-border rounded-xl pl-10 pr-3 py-3 focus:ring-2 focus:ring-ela-pink focus:border-transparent outline-none disabled:opacity-50 appearance-none text-ela-text shadow-sm"
                                                     >
-                                                        <option value="gpt-4o">GPT-4o</option>
                                                         <option value="gpt-5.1-preview">GPT 5.1 Preview</option>
                                                     </select>
                                                 </div>
@@ -514,7 +530,7 @@ export function AdminPage() {
 
                                         <div className="pt-6">
                                             <button
-                                                onClick={() => handleDeleteUser(selectedUser.user_id)}
+                                                onClick={() => handleDeleteUserClick(selectedUser.user_id)}
                                                 className="w-full p-4 border border-red-100 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <Trash2 size={18} />
@@ -650,7 +666,7 @@ export function AdminPage() {
                                                             <p className="text-ela-text text-sm whitespace-pre-wrap">{rule.value}</p>
                                                         </div>
                                                         <button
-                                                            onClick={() => handleDeleteRule(rule.id)}
+                                                            onClick={() => handleDeleteRuleClick(rule.id)}
                                                             className="p-2 text-ela-sub hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                                         >
                                                             <Trash2 size={16} />
@@ -735,6 +751,26 @@ export function AdminPage() {
                     </div>
                 </div>
             )}
+            {/* Confirmation Modals */}
+            <AlertDialog
+                isOpen={!!userToDelete}
+                onClose={() => setUserToDelete(null)}
+                onConfirm={confirmDeleteUser}
+                title="Deletar Usuário?"
+                description="ATENÇÃO: Isso apagará PERMANENTEMENTE o usuário do Auth e do Banco de Dados. Continuar?"
+                confirmText="Deletar Permanentemente"
+                variant="danger"
+            />
+
+            <AlertDialog
+                isOpen={!!ruleToDelete}
+                onClose={() => setRuleToDelete(null)}
+                onConfirm={confirmDeleteRule}
+                title="Apagar Regra?"
+                description="Tem certeza que deseja apagar esta regra?"
+                confirmText="Apagar"
+                variant="danger"
+            />
         </div>
     );
 }
