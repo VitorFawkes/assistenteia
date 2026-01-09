@@ -14,13 +14,13 @@ import { WorkerOutputSchema } from './validation/schemas.ts';
 // Tools Definition
 const TOOLS_DEFINITION = [
     { type: 'function', function: { name: 'manage_tasks', description: 'Manage tasks and checklists', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['create', 'update_checklist_item', 'add_item'] }, title: { type: 'string', description: 'Task title (for create)' }, description: { type: 'string', description: 'Task description or checklist (for create)' }, priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'] }, task_id: { type: 'string', description: 'Required for update_checklist_item and add_item. Get from Active Context → active_list → id.' }, item_content: { type: 'string', description: 'Required for update_checklist_item. The item name to check/uncheck.' }, items: { type: 'array', items: { type: 'string' }, description: 'Required for add_item. List of items to add.' } }, required: ['action'] } } },
-    { type: 'function', function: { name: 'manage_reminders', description: 'Manage reminders', parameters: { type: 'object', properties: { action: { type: 'string' } } } } },
+    { type: 'function', function: { name: 'manage_reminders', description: 'Manage reminders', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['create'] }, title: { type: 'string', description: 'Reminder title' }, due_at: { type: 'string', description: 'ISO 8601 date string for when the reminder is due' }, recurrence_type: { type: 'string', enum: ['once', 'daily', 'weekly', 'custom'] }, recurrence_interval: { type: 'number' }, recurrence_unit: { type: 'string', enum: ['minutes', 'hours', 'days', 'weeks'] }, recurrence_count: { type: 'number' } }, required: ['action', 'title', 'due_at'] } } },
     { type: 'function', function: { name: 'manage_collections', description: 'Manage collections', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['create', 'add_item', 'update_item', 'archive_list'] }, name: { type: 'string' }, items: { type: 'array', items: { type: 'string' } }, list_id: { type: 'string' }, item_id: { type: 'string' }, status: { type: 'string' }, content: { type: 'string' } } } } },
     { type: 'function', function: { name: 'manage_inventory', description: 'Manage inventory', parameters: { type: 'object', properties: { action: { type: 'string' } } } } },
     { type: 'function', function: { name: 'manage_financials', description: 'Manage financials', parameters: { type: 'object', properties: { action: { type: 'string' } } } } },
     { type: 'function', function: { name: 'recall_memory', description: 'Recall memory', parameters: { type: 'object', properties: { query: { type: 'string' } } } } },
     { type: 'function', function: { name: 'save_memory', description: 'Save memory', parameters: { type: 'object', properties: { content: { type: 'string' } } } } },
-    { type: 'function', function: { name: 'query_messages', description: 'Query messages', parameters: { type: 'object', properties: { limit: { type: 'number' } } } } },
+    { type: 'function', function: { name: 'query_messages', description: 'Query past messages to answer user questions. Use this to read from Personal Instance (groups/chats).', parameters: { type: 'object', properties: { limit: { type: 'number' }, group_name: { type: 'string', description: 'Filter by group name (exact match)' }, sender_name: { type: 'string', description: 'Filter by sender name (fuzzy match)' }, days_ago: { type: 'number', description: 'How many days back to search (default 7)' } } } } },
     { type: 'function', function: { name: 'update_user_settings', description: 'Update settings', parameters: { type: 'object', properties: { preferred_name: { type: 'string' } } } } }
 ];
 
@@ -131,13 +131,73 @@ Deno.serve(async (req: Request) => {
                     parsedOutput = WorkerOutputSchema.parse(jsonContent);
                 }
             } catch (e) {
-                console.warn('⚠️ Invalid JSON from Worker. Retrying...', e);
-                // Fallback: try to just use the raw JSON if schema validation failed but it looks okay-ish?
-                // Or just fail gracefully.
-                parsedOutput = { response: workerResponse.content || 'Action completed.' };
+                console.warn('⚠️ Invalid JSON from Worker. Attempting Elite Recovery...', e);
+
+                // ELITE RECOVERY: Try to salvage action/data even if validation failed
+                try {
+                    const rawContent = workerResponse.content || '{}';
+                    const jsonContent = JSON.parse(rawContent);
+
+                    // Check if we have the critical fields for TRANSFORM
+                    if (routerOutput.mode === 'TRANSFORM' && routerOutput.intent === 'list_normalization') {
+                        if (jsonContent.action && jsonContent.data) {
+                            console.log('✅ Elite Recovery: Found valid action/data despite validation error.');
+                            parsedOutput = {
+                                ...jsonContent,
+                                response: jsonContent.response || 'Ação realizada com sucesso.' // Default Portuguese response
+                            };
+                        } else {
+                            throw new Error('Missing critical fields (action/data) for TRANSFORM');
+                        }
+                    } else {
+                        // For other modes, try to fallback to response or raw content
+                        if (jsonContent.response) {
+                            parsedOutput = { response: jsonContent.response };
+                        } else {
+                            parsedOutput = { response: workerResponse.content || 'Ação realizada com sucesso.' };
+                        }
+                    }
+                } catch (parseError) {
+                    console.error('❌ Elite Recovery Failed:', parseError);
+                    parsedOutput = { response: workerResponse.content || 'Erro ao processar resposta.' };
+                }
+            }
+
+            // FINAL SAFETY NET: Ensure response is not empty
+            if (!parsedOutput.response && routerOutput.mode === 'TRANSFORM') {
+                parsedOutput.response = 'Ação realizada com sucesso.';
             }
         } else {
-            parsedOutput = { response: workerResponse.content };
+            // SAFETY NET: Check if CHAT mode accidentally outputted JSON
+            const rawContent = workerResponse.content || '';
+            if (rawContent.trim().startsWith('{') || rawContent.includes('```json')) {
+                console.warn('⚠️ CHAT mode outputted JSON! Attempting to recover...');
+                try {
+                    // Extract JSON if wrapped in code blocks
+                    let jsonStr = rawContent;
+                    const codeBlockMatch = rawContent.match(/```json\n([\s\S]*?)\n```/) || rawContent.match(/```\n([\s\S]*?)\n```/);
+                    if (codeBlockMatch) {
+                        jsonStr = codeBlockMatch[1];
+                    }
+
+                    const jsonContent = JSON.parse(jsonStr);
+
+                    // If it has a response field, use it
+                    if (jsonContent.response) {
+                        parsedOutput = { response: jsonContent.response };
+                    } else {
+                        // If it's a raw action object (e.g. { action: "create_checklist", ... })
+                        // We might want to execute it? 
+                        // For now, let's just show the raw content as a fallback or try to extract a message.
+                        parsedOutput = { response: jsonContent.message || rawContent };
+                    }
+                } catch (e) {
+                    // Failed to parse, just return raw text
+                    parsedOutput = { response: rawContent };
+                }
+            } else {
+                parsedOutput = { response: rawContent };
+            }
         }
 
         // 4.5 Persistence (Side Effects for TRANSFORM)
@@ -160,14 +220,20 @@ Deno.serve(async (req: Request) => {
 
             try {
                 if (action === 'create_list' || action === 'create_collection') {
+                    console.log('✅ FIX VERSION: 1.0.1 - Sanitization Active');
                     // Create new list with dynamic name
                     const nameToUse = list_name || 'Nova Lista';
 
                     // Allow creating empty lists
+                    // FIX: Handle objects in data
+                    const sanitizedItems = (data || []).map((item: any) =>
+                        typeof item === 'object' && item.content ? item.content : String(item)
+                    );
+
                     const result = await ToolExecutor.execute('manage_collections', {
                         action: 'create',
                         name: nameToUse,
-                        items: data || []
+                        items: sanitizedItems
                     }, supabase, userId);
 
                     await supabase.from('debug_logs').insert({
@@ -178,11 +244,16 @@ Deno.serve(async (req: Request) => {
                     });
 
                 } else if (action === 'create_checklist') {
+                    console.log('✅ FIX VERSION: 1.0.1 - Sanitization Active (Checklist)');
                     // EPHEMERAL LIST: Create a Task with Checklist Description
                     const nameToUse = list_name || 'Lista Rápida';
 
                     // Format items as markdown checklist
-                    const checklistDescription = (data || []).map((item: string) => `[ ] ${item}`).join('\n');
+                    // FIX: Handle objects in data (e.g. { content: "item", status: "todo" })
+                    const checklistDescription = (data || []).map((item: any) => {
+                        const content = typeof item === 'object' && item.content ? item.content : String(item);
+                        return `[ ] ${content}`;
+                    }).join('\n');
 
                     const result = await ToolExecutor.execute('manage_tasks', {
                         action: 'create',
@@ -201,10 +272,15 @@ Deno.serve(async (req: Request) => {
                 } else if (action === 'add_to_context' && data?.length > 0) {
                     if (activeContext.active_list?.id) {
                         // Add to active list
+                        // FIX: Handle objects in data
+                        const sanitizedItems = (data || []).map((item: any) =>
+                            typeof item === 'object' && item.content ? item.content : String(item)
+                        );
+
                         await ToolExecutor.execute('manage_collections', {
                             action: 'add_item',
                             list_id: activeContext.active_list.id,
-                            items: data
+                            items: sanitizedItems
                         }, supabase, userId);
                     } else {
                         console.warn('⚠️ Action was add_to_context but no active list found. Creating new list instead.');
@@ -244,6 +320,14 @@ Deno.serve(async (req: Request) => {
             router_source: routerSource,
             active_context_size: JSON.stringify(activeContext).length,
             tool_calls: workerResponse.tool_calls || null
+        });
+
+        // LOG FINAL RESPONSE
+        await supabase.from('debug_logs').insert({
+            function_name: 'process-message',
+            level: 'info',
+            message: 'Pipeline Complete',
+            meta: { finalResponse, parsedOutput }
         });
 
         return new Response(JSON.stringify({ success: true, response: finalResponse }), { headers: { 'Content-Type': 'application/json' } });

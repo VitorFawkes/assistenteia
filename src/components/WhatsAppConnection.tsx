@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, CheckCircle, Smartphone, Trash2 } from 'lucide-react';
 import Button from './ui/Button';
 import AlertDialog from './ui/AlertDialog';
+import PhoneVerificationFlow from './PhoneVerificationFlow';
 
 interface WhatsAppConnectionProps {
     userId: string;
@@ -12,6 +13,7 @@ interface WhatsAppConnectionProps {
 }
 
 export default function WhatsAppConnection({ userId, onConnected, prefilledPhone }: WhatsAppConnectionProps) {
+    const [isVerified, setIsVerified] = useState<boolean | null>(null); // null = loading
     const [showSuccess, setShowSuccess] = useState(false);
     const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'cleaning'>('disconnected');
     const [qrCode, setQrCode] = useState<string | null>(null);
@@ -21,6 +23,20 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
     const [method, setMethod] = useState<'qr' | 'phone'>('qr');
     const [phoneNumber, setPhoneNumber] = useState(prefilledPhone || '');
     const [isDisconnectAlertOpen, setIsDisconnectAlertOpen] = useState(false);
+
+    // Check Verification Status
+    useEffect(() => {
+        const checkVerification = async () => {
+            const { data } = await supabase
+                .from('user_settings')
+                .select('phone_verified_at')
+                .eq('user_id', userId)
+                .single();
+
+            setIsVerified(!!data?.phone_verified_at);
+        };
+        checkVerification();
+    }, [userId]);
 
     const checkInstanceStatus = async () => {
         try {
@@ -239,6 +255,14 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
         }
     };
 
+    if (isVerified === null) {
+        return <div className="p-8 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-ela-sub" /></div>;
+    }
+
+    if (!isVerified) {
+        return <PhoneVerificationFlow userId={userId} onVerified={() => setIsVerified(true)} />;
+    }
+
     return (
         <div className="bg-white border border-ela-border rounded-2xl p-6 shadow-sm relative overflow-hidden">
             {showSuccess && (
@@ -252,7 +276,7 @@ export default function WhatsAppConnection({ userId, onConnected, prefilledPhone
                     <Smartphone className={`w-6 h-6 transition-colors duration-500 ${status === 'connected' ? 'text-green-600' : 'text-green-500'}`} />
                 </div>
                 <div>
-                    <h3 className="text-lg font-semibold text-ela-text">Conectar WhatsApp Pessoal</h3>
+                    <h3 className="text-lg font-semibold text-ela-text">Conectar WhatsApp Pessoal (Opcional)</h3>
                     <p className="text-sm text-ela-sub">
                         Conecte seu próprio número para a IA ler suas mensagens e grupos.
                     </p>

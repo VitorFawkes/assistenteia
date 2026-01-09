@@ -34,7 +34,11 @@ export const TransformOutputSchema = WorkerOutputSchema; // Generic is usually f
 
 // Strict Schema for List Normalization
 export const ListNormalizationSchema = WorkerOutputSchema.extend({
+    response: z.string().optional(), // Allow empty response for auto-recovery
     action: z.enum(['create_list', 'create_collection', 'create_checklist', 'add_to_context', 'ask_confirmation']),
     list_name: z.string().optional(), // Required if action is create_list
-    data: z.array(z.string()) // The items
+    data: z.union([
+        z.array(z.string()),
+        z.array(z.object({ content: z.string(), status: z.string().optional() }))
+    ]) // The items
 });

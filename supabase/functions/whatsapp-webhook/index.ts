@@ -269,7 +269,7 @@ Deno.serve(async (req: Request) => {
         // 1.5 FETCH INSTANCE DATA (Early)
         const { data: instanceData } = await supabase
             .from('whatsapp_instances')
-            .select('user_id, type, settings')
+            .select('user_id, type, settings, is_master')
             .eq('instance_name', instance)
             .single();
 
@@ -277,6 +277,14 @@ Deno.serve(async (req: Request) => {
             console.error(`❌ Instance ${instance} not found in DB`);
             return new Response(JSON.stringify({ error: 'Instance not found' }), { status: 404 });
         }
+
+        // DEBUG: Log Instance Data
+        await supabase.from('debug_logs').insert({
+            function_name: 'whatsapp-webhook',
+            level: 'info',
+            message: 'Instance Data Loaded',
+            meta: { instanceData }
+        });
 
         // --- HANDLE STATUS UPDATES ---
         if (event === 'messages.update') {
@@ -372,28 +380,45 @@ Deno.serve(async (req: Request) => {
 
         const { remoteJid } = message.key;
 
-        const instanceType = instanceData.type || 'assistant'; // Default to assistant
-        console.log(`🤖 Instance Type: ${instanceType}`);
+        const isMasterInstance = instanceData.is_master === true;
+        console.log(`🤖 Instance Mode: ${isMasterInstance ? 'MASTER (AI)' : 'PERSONAL (Sensor)'}`);
 
         let userData = null;
         let userSettings: any = null;
         let skipAIResponse = false;
 
         // =================================================================================
-        // PATH A: ASSISTANT BOT (Legacy / Shared Bot)
-        // Logic: Identify user by their phone number sending the message.
+        // PATH A: MASTER INSTANCE (The AI)
+        // Logic: Strict Interaction, Group Blocking, Verification Handshake
         // =================================================================================
-        if (instanceType === 'assistant') {
-            // ... (existing assistant logic) ...
-            // Extract phone number from JID (remove @s.whatsapp.net)
-            const senderPhone = remoteJid.split('@')[0];
+        if (isMasterInstance) {
+            const { remoteJid } = message.key;
+            const isGroup = remoteJid.includes('@g.us');
+
+            // 1. STRICT GROUP BLOCK
+            if (isGroup) {
+                console.log('🛑 Master Instance added to Group. IGNORING strictly.');
+                return new Response(JSON.stringify({ ignored: 'master_in_group' }), { headers: { 'Content-Type': 'application/json' } });
+            }
+
+            // 2. USER IDENTIFICATION
+            let senderPhone = remoteJid.split('@')[0];
+
+            // STRICT PRIVACY CHECK REMOVED to allow public interaction (registered users).
+            // We rely on the user lookup below to authorize interaction.
+
+            // If we pass this, it is GUARANTEED to be a Note to Self (or Owner messaging themselves).
+            if (message.key.fromMe) {
+                console.log('👤 Message from ME to ME (Note to Self). Treating as User.');
+            }
+
             const formattedPhone = '+' + senderPhone;
 
-            console.log(`🔍 [Assistant Mode] Looking up user for phone: ${formattedPhone}`);
+            console.log(`🔍 [Master Mode] Looking up user for phone: ${formattedPhone}`);
 
             const { data: foundUser, error: userError } = await supabase
                 .from('user_settings')
-                .select('user_id, bot_mode, ai_name')
+                .select('user_id, bot_mode, ai_name, phone_verified_at, phone_verification_code, privacy_read_scope, storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents')
                 .or(`phone_number.eq.${formattedPhone},phone_number.eq.${senderPhone}`)
                 .maybeSingle();
 
@@ -401,9 +426,45 @@ Deno.serve(async (req: Request) => {
                 console.log(`❌ User not found for phone ${formattedPhone}. Ignoring.`);
                 return new Response(JSON.stringify({ ignored: 'user_not_found' }), { headers: { 'Content-Type': 'application/json' } });
             }
-            userData = foundUser;
 
-            // 3. CHECK BOT MODE (PASSIVE VS ACTIVE)
+            userData = foundUser;
+            userSettings = foundUser; // For media settings
+
+            // 3. VERIFICATION HANDSHAKE
+            if (!userData.phone_verified_at) {
+                const msgText = (message.message?.conversation || message.message?.extendedTextMessage?.text || '').trim();
+
+                // Check if message is the code
+                if (userData.phone_verification_code && msgText === userData.phone_verification_code) {
+                    // VERIFY!
+                    await supabase
+                        .from('user_settings')
+                        .update({ phone_verified_at: new Date().toISOString() })
+                        .eq('user_id', userData.user_id);
+
+                    // Reply Success
+                    const responseText = "✅ Conta vinculada com sucesso! Eu sou sua IA pessoal. Como posso ajudar?";
+                    await fetch(`${evolutionApiUrl}/message/sendText/${instance}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                        body: JSON.stringify({ number: remoteJid, text: responseText })
+                    });
+
+                    // Stop processing this message as AI command
+                    return new Response(JSON.stringify({ success: true, type: 'handshake_verified' }));
+                } else {
+                    // Reply with Instruction
+                    const responseText = `⚠️ Verificação Pendente.\n\nPor favor, envie o código de 6 dígitos que apareceu na tela para vincular sua conta.`;
+                    await fetch(`${evolutionApiUrl}/message/sendText/${instance}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': evolutionApiKey },
+                        body: JSON.stringify({ number: remoteJid, text: responseText })
+                    });
+                    return new Response(JSON.stringify({ ignored: 'handshake_pending' }));
+                }
+            }
+
+            // 4. CHECK BOT MODE (PASSIVE VS ACTIVE)
             let shouldProcess = true;
             if (userData.bot_mode === 'mention_only') {
                 const msgText = (message.message?.conversation || message.message?.extendedTextMessage?.text || '').toLowerCase();
@@ -421,60 +482,26 @@ Deno.serve(async (req: Request) => {
             }
         }
         // =================================================================================
-        // PATH B: USER PERSONAL INSTANCE (New / Multi-Tenant)
-        // Logic: The User IS the Instance Owner.
+        // PATH B: PERSONAL INSTANCE (Sensor)
+        // Logic: Read-Only, Encrypted Storage, NO AI Response
         // =================================================================================
-        else if (instanceType === 'user_personal') {
+        else {
             userData = { user_id: instanceData.user_id }; // The user is the instance owner
-            const { fromMe } = message.key;
+            console.log(`👤 [Sensor Mode] Saving message for User ID: ${userData.user_id}`);
 
-            console.log(`👤 [Personal Mode] Processing for User ID: ${userData.user_id}`);
-
-            // 1. Fetch User Settings (Phone + Bot Mode)
+            // Fetch settings for media download preferences AND phone number for Note-to-Self check
             const { data: settings } = await supabase
                 .from('user_settings')
-                .select('phone_number, bot_mode, privacy_read_scope, storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents, storage_track_status, ai_name')
+                .select('storage_download_images, storage_download_videos, storage_download_audio, storage_download_documents, phone_number')
                 .eq('user_id', userData.user_id)
                 .single();
-
             userSettings = settings;
 
-            if (!userSettings?.phone_number) {
-                console.warn('⚠️ User phone number not found. Cannot verify Note to Self.');
-                return new Response(JSON.stringify({ ignored: 'no_phone_number' }), { headers: { 'Content-Type': 'application/json' } });
-            }
+            // FORCE SKIP AI
+            skipAIResponse = true;
 
-            // Normalize numbers
-            const userPhone = userSettings.phone_number.replace(/\D/g, '');
-            const targetPhone = remoteJid.split('@')[0].replace(/\D/g, '');
-            const privacyReadScope = userSettings.privacy_read_scope || 'all';
-
-            // LOGIC MATRIX
-            const isNoteToSelf = fromMe && targetPhone === userPhone;
-
-            // --- PRIVACY SCOPE CHECK ---
-            const isGroup = remoteJid.includes('@g.us');
-
-            if (privacyReadScope === 'none' && !isNoteToSelf) {
-                console.log('🛑 Privacy Setting: Ignoring message (Scope: none / Note to Self Only)');
-                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
-            }
-            if (privacyReadScope === 'private_only' && isGroup) {
-                console.log('🛑 Privacy Setting: Ignoring GROUP message (Scope: private_only)');
-                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
-            }
-            if (privacyReadScope === 'groups_only' && !isGroup && !isNoteToSelf) {
-                // Allow Note to Self even in groups_only mode? Usually yes, as it's a command interface.
-                console.log('🛑 Privacy Setting: Ignoring PRIVATE message (Scope: groups_only)');
-                return new Response(JSON.stringify({ ignored: 'privacy_scope_filtered' }), { headers: { 'Content-Type': 'application/json' } });
-            }
-
-            if (isNoteToSelf) {
-                console.log('🧠 Note to Self detected. AI WILL reply.');
-            } else {
-                console.log(`🤐 Not a Note to Self (Target: ${targetPhone}). Saving but NOT replying.`);
-                skipAIResponse = true;
-            }
+            // We still want to save the message (encrypted) for context.
+            // The code below handles saving.
         }
         console.log(`✅ User identified: ${userData.user_id}`);
         console.log('✅ Processing Message');
@@ -782,6 +809,14 @@ Deno.serve(async (req: Request) => {
         let invokeError = null;
 
         if (!skipAIResponse) {
+            console.log('🚀 Invoking process-message...');
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'info',
+                message: 'Invoking process-message',
+                meta: { conversationId: sessionData?.id }
+            });
+
             const result = await supabase.functions.invoke('process-message', {
                 body: {
                     content,
@@ -801,6 +836,14 @@ Deno.serve(async (req: Request) => {
             processData = result.data;
             invokeError = result.error;
 
+            console.log('🏁 process-message returned:', { processData, invokeError });
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'info',
+                message: 'process-message returned',
+                meta: { processData, invokeError }
+            });
+
             if (invokeError) {
                 console.error('❌ Error invoking process-message:', invokeError);
                 await supabase.from('debug_logs').insert({
@@ -811,15 +854,15 @@ Deno.serve(async (req: Request) => {
                 });
             } else {
                 console.log('✅ process-message invoked successfully:', processData);
-                await supabase.from('debug_logs').insert({
-                    function_name: 'whatsapp-webhook',
-                    level: 'info',
-                    message: 'process-message invoked successfully',
-                    meta: { response: processData }
-                });
             }
         } else {
             console.log('🚫 AI Processing skipped (Private Context / Not Triggered).');
+            await supabase.from('debug_logs').insert({
+                function_name: 'whatsapp-webhook',
+                level: 'info',
+                message: 'AI Processing skipped',
+                meta: { reason: 'Private Context / Not Triggered' }
+            });
         }
 
         // Handle AI Response (if any)

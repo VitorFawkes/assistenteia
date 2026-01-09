@@ -16,7 +16,7 @@ export class HeuristicRouter {
         // 0. TRANSFORM: List Normalization (Explicit Request + Items) - HIGH PRIORITY
         // Matches: "Faz uma lista de X: item1, item2" or multiline
         // Moved to top to prevent "Add Item" capture from stealing it.
-        if (text.match(/^(faz(er)?|cria(r)?|monta(r)?) (uma )?lista/) || text.match(/^lista de/)) {
+        if (text.match(/(faz(er)?|cria(r)?|monta(r)?) (uma )?lista/) || text.match(/lista de/)) {
             // TRUST THE REGEX: If user explicitly asks to create a list, route to TRANSFORM.
             // The Worker (LLM) will handle extraction (even without commas) or empty lists.
             return {
